@@ -30,6 +30,7 @@ Expert skill for building high-performance reactive applications with PostgreSQL
 ## Mục đích
 
 Skill này giúp agent:
+
 - Thiết kế và tối ưu hóa reactive database layer với R2DBC
 - Viết high-performance queries cho PostgreSQL
 - Apply best practices cho connection pooling, batching, và streaming
@@ -58,6 +59,7 @@ Skill này giúp agent:
 ### 1. Non-blocking Everything
 
 R2DBC là fully non-blocking. KHÔNG BAO GIỜ:
+
 - Block trong reactive chain (`.block()`, `.toFuture().get()`)
 - Sử dụng blocking I/O trong reactive pipeline
 - Mix blocking JDBC với R2DBC trong cùng transaction
@@ -374,9 +376,9 @@ public class R2dbcMetricsConfig {
 # application.yml
 logging:
   level:
-    io.r2dbc.postgresql.QUERY: DEBUG  # Log all queries
-    io.r2dbc.postgresql.PARAM: DEBUG  # Log parameters
-    io.r2dbc.pool: DEBUG              # Connection pool events
+    io.r2dbc.postgresql.QUERY: DEBUG # Log all queries
+    io.r2dbc.postgresql.PARAM: DEBUG # Log parameters
+    io.r2dbc.pool: DEBUG # Connection pool events
 ```
 
 ### Slow Query Detection
@@ -480,6 +482,7 @@ public Mono<UserSummary> getUserSummary(Long id) {
 ## References
 
 Xem thêm chi tiết trong:
+
 - `references/r2dbc-config.md` - Configuration chi tiết
 - `references/query-patterns.md` - Query patterns và examples
 - `references/performance-tuning.md` - Performance tuning guide

@@ -19,11 +19,11 @@ Hướng dẫn chi tiết sử dụng các skills trong hệ thống.
 
 Skills là các module kiến thức chuyên biệt giúp AI agent thực hiện các tác vụ cụ thể một cách hiệu quả. Mỗi skill bao gồm:
 
-| Component | Mô tả |
-|-----------|-------|
-| `skill.md` | File chính chứa instructions và best practices |
-| `references/` | Tài liệu tham khảo, API docs, examples |
-| `scripts/` | Scripts hỗ trợ (setup, validation, benchmark) |
+| Component     | Mô tả                                          |
+| ------------- | ---------------------------------------------- |
+| `SKILL.md`    | File chính chứa instructions và best practices |
+| `references/` | Tài liệu tham khảo, API docs, examples         |
+| `scripts/`    | Scripts hỗ trợ (setup, validation, benchmark)  |
 
 ## Cách sử dụng Skills
 
@@ -69,15 +69,16 @@ python skills/postgres-java-reactive-pro/scripts/analyze-queries.py --help
 
 #### Thông tin
 
-| Field | Value |
-|-------|-------|
-| Name | `postgres-java-reactive-pro` |
-| Slash Command | `/postgres-reactive` |
-| Stack | PostgreSQL, Java, R2DBC, Spring Data R2DBC |
+| Field         | Value                                      |
+| ------------- | ------------------------------------------ |
+| Name          | `postgres-java-reactive-pro`               |
+| Slash Command | `/postgres-reactive`                       |
+| Stack         | PostgreSQL, Java, R2DBC, Spring Data R2DBC |
 
 #### Triggers
 
 Skill được kích hoạt khi user đề cập:
+
 - `r2dbc postgresql`
 - `reactive postgres java`
 - `spring data r2dbc`
@@ -85,21 +86,21 @@ Skill được kích hoạt khi user đề cập:
 
 #### Use Cases
 
-| Scenario | Skill giúp gì |
-|----------|---------------|
+| Scenario                  | Skill giúp gì                                                 |
+| ------------------------- | ------------------------------------------------------------- |
 | Thiết kế repository layer | Hướng dẫn patterns cho ReactiveCrudRepository, custom queries |
-| Tối ưu connection pool | Config pool size, timeouts, validation |
-| Batch operations | Patterns cho bulk insert, upsert, batch update |
-| Query optimization | Keyset pagination, covering indexes, avoiding N+1 |
-| Streaming large data | Backpressure handling, limitRate, buffer |
-| Transaction management | Reactive transactions, savepoints |
+| Tối ưu connection pool    | Config pool size, timeouts, validation                        |
+| Batch operations          | Patterns cho bulk insert, upsert, batch update                |
+| Query optimization        | Keyset pagination, covering indexes, avoiding N+1             |
+| Streaming large data      | Backpressure handling, limitRate, buffer                      |
+| Transaction management    | Reactive transactions, savepoints                             |
 
 #### References
 
-| File | Nội dung |
-|------|----------|
-| `references/r2dbc-config.md` | Dependencies, connection config, pool settings, SSL, converters |
-| `references/query-patterns.md` | Repository patterns, pagination, batch ops, joins, locking |
+| File                               | Nội dung                                                            |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| `references/r2dbc-config.md`       | Dependencies, connection config, pool settings, SSL, converters     |
+| `references/query-patterns.md`     | Repository patterns, pagination, batch ops, joins, locking          |
 | `references/performance-tuning.md` | PostgreSQL config, index strategies, query optimization, monitoring |
 
 #### Scripts
@@ -123,6 +124,7 @@ python scripts/analyze-queries.py --log postgresql.log --top 30
 ```
 
 **Output example:**
+
 ```
 Found 156 slow queries
 +--------+----------+----------+------------+--------------------------------------------------+
@@ -157,6 +159,7 @@ Benchmark connection pool với các pool sizes khác nhau.
 ```
 
 **Output example:**
+
 ```
 ==========================================
 R2DBC Connection Pool Benchmark
@@ -234,13 +237,13 @@ public Flux<User> streamUsers() {
 
 #### Anti-patterns to Avoid
 
-| Anti-pattern | Problem | Solution |
-|--------------|---------|----------|
-| `.block()` trong reactive chain | Blocks event loop | Keep chain fully reactive |
-| `SELECT *` | Over-fetching | Select only needed columns |
-| Offset pagination | Slow với large offsets | Use keyset pagination |
-| N+1 queries | Multiple round trips | Use JOINs hoặc batch fetch |
-| Unbounded queries | Memory exhaustion | Always use LIMIT |
+| Anti-pattern                    | Problem                | Solution                   |
+| ------------------------------- | ---------------------- | -------------------------- |
+| `.block()` trong reactive chain | Blocks event loop      | Keep chain fully reactive  |
+| `SELECT *`                      | Over-fetching          | Select only needed columns |
+| Offset pagination               | Slow với large offsets | Use keyset pagination      |
+| N+1 queries                     | Multiple round trips   | Use JOINs hoặc batch fetch |
+| Unbounded queries               | Memory exhaustion      | Always use LIMIT           |
 
 #### Checklist Production
 
@@ -265,15 +268,16 @@ public Flux<User> streamUsers() {
 
 #### Thông tin
 
-| Field | Value |
-|-------|-------|
-| Name | `git-pro` |
-| Slash Command | `/git-pro` |
-| Stack | Git, Shell, Python |
+| Field         | Value              |
+| ------------- | ------------------ |
+| Name          | `git-pro`          |
+| Slash Command | `/git-pro`         |
+| Stack         | Git, Shell, Python |
 
 #### Triggers
 
 Skill được kích hoạt khi user đề cập:
+
 - `git advanced`
 - `git workflow`
 - `commit message`
@@ -282,22 +286,22 @@ Skill được kích hoạt khi user đề cập:
 
 #### Use Cases
 
-| Scenario | Skill giúp gì |
-|----------|---------------|
-| Phân tích repo status | Comprehensive analysis của working tree, branches, remotes |
-| Generate commit message | Tự động tạo message theo Conventional Commits |
-| Branch management | Patterns cho branching, merging, rebasing |
-| History analysis | Search commits, blame, bisect |
-| Conflict resolution | Strategies và commands cho merge conflicts |
-| Repository cleanup | Prune, gc, stale branches |
+| Scenario                | Skill giúp gì                                              |
+| ----------------------- | ---------------------------------------------------------- |
+| Phân tích repo status   | Comprehensive analysis của working tree, branches, remotes |
+| Generate commit message | Tự động tạo message theo Conventional Commits              |
+| Branch management       | Patterns cho branching, merging, rebasing                  |
+| History analysis        | Search commits, blame, bisect                              |
+| Conflict resolution     | Strategies và commands cho merge conflicts                 |
+| Repository cleanup      | Prune, gc, stale branches                                  |
 
 #### References
 
-| File | Nội dung |
-|------|----------|
-| `references/commands.md` | Full Git command reference với examples |
-| `references/workflows.md` | GitFlow, GitHub Flow, Trunk-Based Development |
-| `references/commit-conventions.md` | Conventional Commits specification |
+| File                               | Nội dung                                      |
+| ---------------------------------- | --------------------------------------------- |
+| `references/commands.md`           | Full Git command reference với examples       |
+| `references/workflows.md`          | GitFlow, GitHub Flow, Trunk-Based Development |
+| `references/commit-conventions.md` | Conventional Commits specification            |
 
 #### Scripts
 
@@ -326,6 +330,7 @@ Phân tích toàn diện trạng thái repository.
 ```
 
 **Output example:**
+
 ```
 ════════════════════════════════════════════════════════════
   REPOSITORY STATUS
@@ -377,6 +382,7 @@ python scripts/generate-commit-msg.py --no-body
 ```
 
 **Output example:**
+
 ```
 ════════════════════════════════════════════════════════════
 STAGED CHANGES ANALYSIS
@@ -432,16 +438,16 @@ To use this message:
 
 ##### Commit Types
 
-| Type | Description |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation |
-| `style` | Formatting |
+| Type       | Description      |
+| ---------- | ---------------- |
+| `feat`     | New feature      |
+| `fix`      | Bug fix          |
+| `docs`     | Documentation    |
+| `style`    | Formatting       |
 | `refactor` | Code restructure |
-| `perf` | Performance |
-| `test` | Tests |
-| `chore` | Other |
+| `perf`     | Performance      |
+| `test`     | Tests            |
+| `chore`    | Other            |
 
 ##### Useful Commands
 
@@ -480,13 +486,13 @@ git blame -L 10,20 file.ts
 
 #### Anti-patterns to Avoid
 
-| Anti-pattern | Problem | Solution |
-|--------------|---------|----------|
-| Commit trực tiếp vào main | Risk, no review | Use feature branches |
-| Force push shared branch | Overwrites others' work | Use `--force-with-lease` |
-| Vague commit messages | Hard to understand history | Follow Conventional Commits |
-| Large commits | Hard to review, revert | Atomic commits |
-| Commit secrets | Security risk | Use .gitignore, git-secrets |
+| Anti-pattern              | Problem                    | Solution                    |
+| ------------------------- | -------------------------- | --------------------------- |
+| Commit trực tiếp vào main | Risk, no review            | Use feature branches        |
+| Force push shared branch  | Overwrites others' work    | Use `--force-with-lease`    |
+| Vague commit messages     | Hard to understand history | Follow Conventional Commits |
+| Large commits             | Hard to review, revert     | Atomic commits              |
+| Commit secrets            | Security risk              | Use .gitignore, git-secrets |
 
 #### Checklist trước Commit
 
@@ -517,7 +523,7 @@ git blame -L 10,20 file.ts
 
 ```bash
 # Skill đơn giản
-cp templates/basic-skill.md skills/my-new-skill.md
+cp templates/SKILL.md skills/SKILL.md
 
 # Skill phức tạp
 cp -r templates/advanced-skill skills/my-new-skill
@@ -527,7 +533,7 @@ cp -r templates/advanced-skill skills/my-new-skill
 
 ```
 skills/my-new-skill/
-├── skill.md              # Required
+├── SKILL.md              # Required
 ├── references/           # Optional
 │   ├── api-docs.md
 │   └── examples.md

@@ -29,6 +29,7 @@ Advanced Git source control skill với khả năng phân tích source và gener
 ## Mục đích
 
 Skill này giúp agent:
+
 - Phân tích trạng thái repository một cách toàn diện
 - Sử dụng Git commands tối ưu cho từng tình huống
 - Generate commit messages theo conventions chuẩn
@@ -119,16 +120,16 @@ git diff --cached
 
 ### Step 2: Determine Commit Type
 
-| Type | Khi nào dùng |
-|------|--------------|
-| `feat` | Thêm feature mới |
-| `fix` | Sửa bug |
+| Type       | Khi nào dùng                            |
+| ---------- | --------------------------------------- |
+| `feat`     | Thêm feature mới                        |
+| `fix`      | Sửa bug                                 |
 | `refactor` | Refactor code (không thay đổi behavior) |
-| `docs` | Chỉ thay đổi documentation |
-| `style` | Format, missing semicolons, etc. |
-| `test` | Thêm hoặc sửa tests |
-| `chore` | Build, CI, dependencies |
-| `perf` | Performance improvements |
+| `docs`     | Chỉ thay đổi documentation              |
+| `style`    | Format, missing semicolons, etc.        |
+| `test`     | Thêm hoặc sửa tests                     |
+| `chore`    | Build, CI, dependencies                 |
+| `perf`     | Performance improvements                |
 
 ### Step 3: Identify Scope
 
@@ -147,6 +148,7 @@ git diff --cached --name-only | xargs -I {} dirname {} | sort -u
 ### Step 4: Write Subject Line
 
 Rules:
+
 - Imperative mood: "add" không phải "added"
 - Không capitalize chữ đầu
 - Không dấu chấm cuối
@@ -361,6 +363,7 @@ git diff --cached -p | grep -E '^\+.*function|^\+.*def |^\+.*class '
 ### Detect Breaking Changes
 
 Patterns to look for:
+
 - Renamed public APIs
 - Changed function signatures
 - Removed exports

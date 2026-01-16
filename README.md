@@ -15,38 +15,38 @@ agent-skills/
 ├── GUIDE.md                      # Hướng dẫn sử dụng skills
 ├── skills/                       # Chứa các skills đã tạo
 │   ├── postgres-java-reactive-pro/
-│   │   ├── skill.md
+│   │   ├── SKILL.md
 │   │   ├── references/
 │   │   └── scripts/
 │   └── git-pro/
-│       ├── skill.md
+│       ├── SKILL.md
 │       ├── references/
 │       └── scripts/
 ├── templates/
-│   ├── basic-skill.md            # Template skill đơn giản
+│   ├── SKILL.md            # Template skill đơn giản
 │   └── advanced-skill/           # Template skill với refs & scripts
 └── README.md
 ```
 
 ## Available Skills
 
-| Skill | Description | Command |
-|-------|-------------|---------|
-| [postgres-java-reactive-pro](./skills/postgres-java-reactive-pro/) | High-performance PostgreSQL with R2DBC | `/postgres-reactive` |
-| [git-pro](./skills/git-pro/) | Advanced Git with intelligent commit messages | `/git-pro` |
+| Skill                                                              | Description                                   | Command              |
+| ------------------------------------------------------------------ | --------------------------------------------- | -------------------- |
+| [postgres-java-reactive-pro](./skills/postgres-java-reactive-pro/) | High-performance PostgreSQL with R2DBC        | `/postgres-reactive` |
+| [git-pro](./skills/git-pro/)                                       | Advanced Git with intelligent commit messages | `/git-pro`           |
 
 ## Sử dụng
 
 ### Tạo skill đơn giản
 
-1. Copy `templates/basic-skill.md` vào `skills/`
+1. Copy `templates/SKILL.md` vào `skills/`
 2. Rename và điền nội dung
 
 ### Tạo skill phức tạp (với references và scripts)
 
 1. Copy folder `templates/advanced-skill/` vào `skills/`
 2. Rename folder và cập nhật nội dung:
-   - `skill.md` - File chính
+   - `SKILL.md` - File chính
    - `references/` - Tài liệu tham khảo
    - `scripts/` - Scripts hỗ trợ
 
@@ -56,11 +56,11 @@ Load `SYSTEM_PROMPT.md` làm system prompt cho Claude để có AI assistant h�
 
 ## Skill Components
 
-| Component | Mô tả | Bắt buộc |
-|-----------|-------|----------|
-| `skill.md` | File chính chứa instructions | Yes |
-| `references/` | API docs, examples, external links | No |
-| `scripts/` | Setup, helpers, validators | No |
+| Component     | Mô tả                              | Bắt buộc |
+| ------------- | ---------------------------------- | -------- |
+| `SKILL.md`    | File chính chứa instructions       | Yes      |
+| `references/` | API docs, examples, external links | No       |
+| `scripts/`    | Setup, helpers, validators         | No       |
 
 ## Skill Format
 
@@ -74,30 +74,31 @@ triggers:
 tools:
   - Read
   - Write
-references:        # Optional
+references: # Optional
   - references/api-docs.md
-scripts:           # Optional
+scripts: # Optional
   - scripts/helper.py
 ---
 ```
 
 ## Tools hỗ trợ
 
-| Tool | Chức năng |
-|------|-----------|
-| Read | Đọc file |
-| Write | Tạo file |
-| Edit | Sửa file |
-| Glob | Tìm files |
-| Grep | Tìm nội dung |
-| Bash | Shell commands |
-| WebFetch | Fetch web |
-| WebSearch | Tìm kiếm web |
-| Task | Spawn sub-agents |
+| Tool      | Chức năng        |
+| --------- | ---------------- |
+| Read      | Đọc file         |
+| Write     | Tạo file         |
+| Edit      | Sửa file         |
+| Glob      | Tìm files        |
+| Grep      | Tìm nội dung     |
+| Bash      | Shell commands   |
+| WebFetch  | Fetch web        |
+| WebSearch | Tìm kiếm web     |
+| Task      | Spawn sub-agents |
 
 ## Documentation
 
 Xem [GUIDE.md](./GUIDE.md) để biết chi tiết về:
+
 - Cách sử dụng từng skill
 - Scripts và commands
 - Quick reference và examples
