@@ -24,31 +24,31 @@ scripts:
 
 # Git Pro
 
-Advanced Git source control skill với khả năng phân tích source và generate commit messages tối ưu.
+Advanced Git source control skill with source analysis capabilities and optimal commit message generation.
 
-## Mục đích
+## Purpose
 
-Skill này giúp agent:
+This skill helps the agent:
 
-- Phân tích trạng thái repository một cách toàn diện
-- Sử dụng Git commands tối ưu cho từng tình huống
-- Generate commit messages theo conventions chuẩn
-- Quản lý branches, merges, và history hiệu quả
-- Detect và resolve conflicts thông minh
+- Comprehensively analyze repository status
+- Use optimal Git commands for each situation
+- Generate commit messages following standard conventions
+- Efficiently manage branches, merges, and history
+- Intelligently detect and resolve conflicts
 
-## Khi nào sử dụng
+## When to Use
 
-- Phân tích trạng thái repo và changes
-- Tạo commit với message chất lượng
-- Quản lý branches và merging
-- Review history và tìm kiếm commits
-- Resolve conflicts và rebase
-- Cleanup và optimize repository
+- Analyzing repo status and changes
+- Creating commits with quality messages
+- Managing branches and merging
+- Reviewing history and searching commits
+- Resolving conflicts and rebasing
+- Cleanup and repository optimization
 
-## Khi nào KHÔNG sử dụng
+## When NOT to Use
 
-- Simple `git add . && git commit` không cần analyze
-- User đã có commit message sẵn
+- Simple `git add . && git commit` without analysis
+- User already has a commit message
 - Non-git version control systems (SVN, Mercurial)
 
 ---
@@ -57,41 +57,41 @@ Skill này giúp agent:
 
 ### 1. Analyze Repository Status
 
-Trước khi thực hiện bất kỳ thao tác nào, LUÔN phân tích trạng thái repo:
+Before performing any operation, ALWAYS analyze repo status:
 
 ```bash
 # Full status analysis
 git status --short --branch
 
-# Xem staged changes
+# View staged changes
 git diff --cached --stat
 
-# Xem unstaged changes
+# View unstaged changes
 git diff --stat
 
-# Xem untracked files
+# View untracked files
 git ls-files --others --exclude-standard
 ```
 
 ### 2. Understand the Changes
 
 ```bash
-# Detailed diff của staged changes
+# Detailed diff of staged changes
 git diff --cached
 
-# Diff với context
+# Diff with context
 git diff --cached -U5
 
-# Chỉ xem file names changed
+# View only changed file names
 git diff --cached --name-only
 
-# Xem changes theo từng file
+# View changes by file
 git diff --cached -- path/to/file
 ```
 
 ### 3. Generate Optimal Commit Message
 
-Dựa trên analysis, generate message theo format:
+Based on analysis, generate message in format:
 
 ```
 <type>(<scope>): <subject>
@@ -108,38 +108,38 @@ Dựa trên analysis, generate message theo format:
 ### Step 1: Analyze Changes
 
 ```bash
-# Lấy danh sách files changed
+# List changed files
 git diff --cached --name-only
 
-# Lấy stats
+# Get stats
 git diff --cached --stat
 
-# Lấy detailed changes
+# Get detailed changes
 git diff --cached
 ```
 
 ### Step 2: Determine Commit Type
 
-| Type       | Khi nào dùng                            |
+| Type       | When to use                             |
 | ---------- | --------------------------------------- |
-| `feat`     | Thêm feature mới                        |
-| `fix`      | Sửa bug                                 |
-| `refactor` | Refactor code (không thay đổi behavior) |
-| `docs`     | Chỉ thay đổi documentation              |
-| `style`    | Format, missing semicolons, etc.        |
-| `test`     | Thêm hoặc sửa tests                     |
+| `feat`     | Adding a new feature                    |
+| `fix`      | Fixing a bug                            |
+| `refactor` | Code refactoring (no behavior change)   |
+| `docs`     | Documentation changes only              |
+| `style`    | Formatting, missing semicolons, etc.    |
+| `test`     | Adding or fixing tests                  |
 | `chore`    | Build, CI, dependencies                 |
 | `perf`     | Performance improvements                |
 
 ### Step 3: Identify Scope
 
-Scope là module/component bị ảnh hưởng:
+Scope is the affected module/component:
 
 ```bash
-# Tìm common directory của changed files
+# Find common directory of changed files
 git diff --cached --name-only | xargs -I {} dirname {} | sort -u
 
-# Ví dụ output:
+# Example output:
 # src/auth          -> scope: auth
 # src/api/users     -> scope: api
 # tests/            -> scope: tests
@@ -149,9 +149,9 @@ git diff --cached --name-only | xargs -I {} dirname {} | sort -u
 
 Rules:
 
-- Imperative mood: "add" không phải "added"
-- Không capitalize chữ đầu
-- Không dấu chấm cuối
+- Imperative mood: "add" not "added"
+- No capitalization of first letter
+- No trailing period
 - Max 50 characters
 
 ```
@@ -162,15 +162,15 @@ Bad:  feat(auth): Added JWT refresh token support.
 ### Step 5: Write Body (if needed)
 
 ```
-Khi nào cần body:
-- Changes phức tạp cần giải thích
+When body is needed:
+- Complex changes requiring explanation
 - Breaking changes
-- Liên quan đến issue/ticket
+- Related to issue/ticket
 
 Format:
 - Wrap at 72 characters
-- Giải thích WHAT và WHY, không phải HOW
-- Bullet points cho multiple changes
+- Explain WHAT and WHY, not HOW
+- Bullet points for multiple changes
 ```
 
 ### Step 6: Add Footer (if needed)
@@ -192,10 +192,10 @@ Refs #789
 ### Branch Management
 
 ```bash
-# Tạo branch từ specific commit
+# Create branch from specific commit
 git checkout -b feature/xyz abc123
 
-# Tạo branch và track remote
+# Create branch and track remote
 git checkout -b feature/xyz origin/feature/xyz
 
 # Rename branch
@@ -218,10 +218,10 @@ git remote prune origin
 ### History Analysis
 
 ```bash
-# Log với graph
+# Log with graph
 git log --oneline --graph --all -20
 
-# Log của specific file
+# Log of specific file
 git log --oneline --follow -- path/to/file
 
 # Search commits by message
@@ -243,7 +243,7 @@ git log --stat --oneline -10
 ### Stash Operations
 
 ```bash
-# Stash với message
+# Stash with message
 git stash push -m "WIP: feature xyz"
 
 # Stash including untracked
@@ -252,10 +252,10 @@ git stash push -u -m "WIP: feature xyz"
 # List stashes
 git stash list
 
-# Apply và keep stash
+# Apply and keep stash
 git stash apply stash@{0}
 
-# Apply và remove stash
+# Apply and remove stash
 git stash pop stash@{0}
 
 # Show stash contents
@@ -274,13 +274,13 @@ git rebase -i HEAD~5
 # Rebase onto specific branch
 git rebase -i main
 
-# Commands trong interactive mode:
-# pick   - giữ commit
-# reword - đổi message
-# edit   - stop để amend
-# squash - gộp với commit trước
-# fixup  - gộp, discard message
-# drop   - xóa commit
+# Commands in interactive mode:
+# pick   - keep commit
+# reword - change message
+# edit   - stop to amend
+# squash - combine with previous commit
+# fixup  - combine, discard message
+# drop   - remove commit
 ```
 
 ### Cherry-pick
@@ -299,7 +299,7 @@ git cherry-pick -n abc123
 git cherry-pick abc123..def456
 ```
 
-### Reset và Revert
+### Reset and Revert
 
 ```bash
 # Soft reset (keep changes staged)
@@ -423,18 +423,18 @@ git rebase --abort
 
 ### DO:
 
-- Commit thường xuyên với atomic changes
+- Commit frequently with atomic changes
 - Write meaningful commit messages
-- Use branches cho features/fixes
-- Pull/rebase trước khi push
-- Review changes trước khi commit
+- Use branches for features/fixes
+- Pull/rebase before pushing
+- Review changes before committing
 
 ### DON'T:
 
-- Commit trực tiếp vào main/master
+- Commit directly to main/master
 - Force push shared branches
 - Commit sensitive data (passwords, keys)
-- Mix multiple changes trong một commit
+- Mix multiple changes in one commit
 - Leave merge commits messy
 
 ---
@@ -485,25 +485,25 @@ git config --global alias.amend "commit --amend --no-edit"
 
 ---
 
-## Checklist trước Commit
+## Pre-Commit Checklist
 
 ```
-[ ] Đã review tất cả changes (git diff --cached)
-[ ] Không commit files không cần thiết
-[ ] Không commit sensitive data
-[ ] Commit message theo conventions
-[ ] Tests pass (nếu có)
-[ ] Code đã format đúng
+[ ] Reviewed all changes (git diff --cached)
+[ ] No unnecessary files
+[ ] No sensitive data
+[ ] Commit message follows conventions
+[ ] Tests pass (if any)
+[ ] Code formatted correctly
 ```
 
-## Checklist trước Push
+## Pre-Push Checklist
 
 ```
 [ ] Pull/rebase latest changes
-[ ] Resolve conflicts (nếu có)
+[ ] Resolved conflicts (if any)
 [ ] Run tests locally
 [ ] Review commit history
-[ ] Đúng branch
+[ ] Correct branch
 ```
 
 ---
@@ -516,5 +516,5 @@ git config --global alias.amend "commit --amend --no-edit"
 
 ## Scripts
 
-- `scripts/analyze-repo.sh` - Phân tích repository status
-- `scripts/generate-commit-msg.py` - Generate commit message từ changes
+- `scripts/analyze-repo.sh` - Analyze repository status
+- `scripts/generate-commit-msg.py` - Generate commit message from changes

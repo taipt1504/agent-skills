@@ -2,7 +2,7 @@
 
 ## 1. GitHub Flow
 
-Simple workflow cho continuous deployment.
+Simple workflow for continuous deployment.
 
 ### Structure
 
@@ -14,12 +14,12 @@ feature     ●───●───●         ●───●───●
 
 ### Rules
 
-1. `main` luôn deployable
-2. Tạo branch từ `main` cho mỗi feature/fix
-3. Commit thường xuyên vào feature branch
-4. Open Pull Request để review
-5. Merge vào `main` sau khi approved
-6. Deploy ngay sau merge
+1. `main` is always deployable
+2. Create branch from `main` for each feature/fix
+3. Commit frequently to feature branch
+4. Open Pull Request for review
+5. Merge into `main` after approval
+6. Deploy immediately after merge
 
 ### Commands
 
@@ -33,7 +33,7 @@ git checkout -b feature/user-auth
 git add .
 git commit -m "feat(auth): add login form"
 
-# Push và tạo PR
+# Push and create PR
 git push -u origin feature/user-auth
 
 # After merge, cleanup
@@ -46,7 +46,7 @@ git branch -d feature/user-auth
 
 ## 2. GitFlow
 
-Workflow phức tạp hơn cho scheduled releases.
+More complex workflow for scheduled releases.
 
 ### Structure
 
@@ -110,7 +110,7 @@ git branch -d hotfix/1.2.1
 
 ## 3. Trunk-Based Development
 
-Continuous integration với short-lived branches.
+Continuous integration with short-lived branches.
 
 ### Structure
 
@@ -126,7 +126,7 @@ main  ───●───●───●───●───●───●�
 1. Single `main` branch
 2. Feature branches live < 2 days
 3. Frequent integration (multiple times/day)
-4. Feature flags cho incomplete features
+4. Feature flags for incomplete features
 5. Automated testing required
 
 ### Commands
@@ -153,7 +153,7 @@ git branch -d short-feature
 
 ## 4. Forking Workflow
 
-Cho open source projects.
+For open source projects.
 
 ### Structure
 
@@ -207,7 +207,7 @@ git branch -d feature/xyz
 
 ## 5. Release Branches
 
-Cho projects với multiple supported versions.
+For projects with multiple supported versions.
 
 ### Structure
 

@@ -1,4 +1,4 @@
-# Advanced Skill Template (English)
+# Skill Template (English)
 
 ---
 name: skill-name
@@ -11,12 +11,11 @@ tools:
   - Write
   - Edit
   - Bash
-references:
-  - references/api-docs.md
-  - references/examples.md
-scripts:
-  - scripts/setup.sh
-  - scripts/helper.py
+# Uncomment if the skill has references or scripts:
+# references:
+#   - references/api-docs.md
+# scripts:
+#   - scripts/helper.py
 ---
 
 # Skill Name
@@ -35,33 +34,15 @@ Describe what this skill does and what problem it solves for the user.
 - Anti-pattern 1: ...
 - Anti-pattern 2: ...
 
-## Prerequisites
-
-Before using this skill, run the setup script:
-```bash
-./scripts/setup.sh
-```
-
 ## How to Execute
 
 ### Step 1: [Step Name]
 
 Detailed description of what to do.
 
-Use the helper script if needed:
-```bash
-python scripts/helper.py --option value
-```
-
 ### Step 2: [Step Name]
 
 Detailed description of what to do.
-
-## References
-
-See additional documentation in:
-- `references/api-docs.md` - API documentation
-- `references/examples.md` - Detailed examples
 
 ## Examples
 
@@ -76,6 +57,16 @@ User request example
 ```
 Expected result
 ```
+
+### Example 2: [Edge case]
+
+**Input:**
+```
+Edge case input
+```
+
+**Handling:**
+Explain how to handle this edge case.
 
 ## Error Handling
 

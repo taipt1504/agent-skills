@@ -2,7 +2,7 @@
 
 ## Overview
 
-Apache Kafka là distributed streaming platform được thiết kế cho high-throughput, fault-tolerant messaging. Document này cung cấp deep-dive vào Kafka patterns cho Java applications.
+Apache Kafka is a distributed streaming platform designed for high-throughput, fault-tolerant messaging. This document provides a deep-dive into Kafka patterns for Java applications.
 
 ---
 
@@ -35,7 +35,7 @@ Apache Kafka là distributed streaming platform được thiết kế cho high-t
         └─────────────┘         └─────────────┘         └─────────────┘
 ```
 
-### Partition và Replication
+### Partitions and Replication
 
 ```java
 // Topic configuration
@@ -533,7 +533,7 @@ public class BatchOrderConsumer {
 }
 ```
 
-### Seek và Replay
+### Seek and Replay
 
 ```java
 @Service
@@ -769,7 +769,7 @@ public class DltConsumer {
 }
 ```
 
-### Retry với Custom Logic
+### Retry with Custom Logic
 
 ```java
 @Service
@@ -859,7 +859,7 @@ JAVA_OPTS="$JAVA_OPTS -Xlog:gc*:file=/var/log/gc.log:time,tags:filecount=5,files
 
 ---
 
-## Monitoring và Metrics
+## Monitoring and Metrics
 
 ### Micrometer Metrics
 
@@ -1011,7 +1011,7 @@ class KafkaIntegrationTest {
 
 ---
 
-## Common Issues và Solutions
+## Common Issues and Solutions
 
 ### Issue: Consumer Rebalancing Too Frequent
 
@@ -1052,3 +1052,4 @@ props.put(ErrorHandlingDeserializer.KEY_DESERIALIZER_CLASS,
 props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS,
     JsonDeserializer.class);
 ```
+

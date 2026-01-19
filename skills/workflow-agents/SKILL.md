@@ -29,29 +29,29 @@ scripts:
 
 Expert skill for designing and orchestrating multi-agent workflows to build products with Claude Agent SDK.
 
-## Mục đích
+## Purpose
 
-Skill này giúp agent:
+This skill helps the agent:
 
-- Thiết kế kiến trúc multi-agent cho products
-- Tạo và configure agent definitions
-- Orchestrate workflows với multiple specialized agents
-- Apply best practices cho agent coordination
-- Scaffold project structure cho agent-based products
+- Design multi-agent architecture for products
+- Create and configure agent definitions
+- Orchestrate workflows with multiple specialized agents
+- Apply best practices for agent coordination
+- Scaffold project structure for agent-based products
 
-## Khi nào sử dụng
+## When to Use
 
-- Thiết kế hệ thống multi-agent
-- Tạo workflow automation với Claude agents
-- Build products sử dụng Agent SDK
-- Configure agent permissions và tools
-- Orchestrate complex tasks với subagents
+- Designing multi-agent systems
+- Creating workflow automation with Claude agents
+- Building products using Agent SDK
+- Configuring agent permissions and tools
+- Orchestrating complex tasks with subagents
 
-## Khi nào KHÔNG sử dụng
+## When NOT to Use
 
-- Single-task operations không cần coordination
-- Simple scripts không cần agent intelligence
-- Tasks không liên quan đến Claude Agent SDK
+- Single-task operations not requiring coordination
+- Simple scripts not requiring agent intelligence
+- Tasks unrelated to Claude Agent SDK
 
 ---
 

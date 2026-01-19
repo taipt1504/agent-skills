@@ -2,7 +2,7 @@
 
 ## Overview
 
-RabbitMQ là feature-rich message broker implement AMQP protocol, cung cấp flexible routing, reliable delivery, và mature ecosystem. Document này covers RabbitMQ patterns cho Java applications với Spring AMQP.
+RabbitMQ is a mature, robust message broker that implements the Advanced Message Queuing Protocol (AMQP 0-9-1). This document provides a reference for RabbitMQ patterns for Java applications using Spring AMQP.
 
 ---
 
@@ -11,283 +11,95 @@ RabbitMQ là feature-rich message broker implement AMQP protocol, cung cấp fle
 ### RabbitMQ Components
 
 ```
-Producer                    RabbitMQ                        Consumer
-   │                          │                                │
-   │    ┌─────────────────────┼─────────────────────┐          │
-   │    │                     │                     │          │
-   │    │  ┌──────────────────┴──────────────────┐ │          │
-   │    │  │            Exchange                  │ │          │
-   └────┼──┤  (direct, topic, fanout, headers)   ├─┼──────────┘
-        │  └──────────┬───────────┬──────────────┘ │
-        │             │  Bindings │                │
-        │             ▼           ▼                │
-        │      ┌──────────┐ ┌──────────┐          │
-        │      │  Queue 1 │ │  Queue 2 │          │
-        │      └──────────┘ └──────────┘          │
-        │                                          │
-        └──────────────────────────────────────────┘
+Publisher -> Exchange -> [Bindings] -> Queue -> Consumer
 ```
+
+- **Exchange**: Message routing agent (the mailbox)
+- **Queue**: Message buffer
+- **Binding**: Rules connecting exchanges to queues
+- **Routing Key**: Address on the message used for routing
 
 ### Exchange Types
 
 | Type | Routing Logic | Use Case |
 |------|---------------|----------|
-| **Direct** | Exact routing key match | Point-to-point, task distribution |
-| **Topic** | Pattern matching with wildcards | Event filtering by type/category |
-| **Fanout** | Broadcast to all bound queues | Pub/Sub, notifications |
-| **Headers** | Header attribute matching | Complex routing rules |
+| **Direct** | Exact match of routing key | 1:1, Point-to-Point |
+| **Topic** | Pattern match (`*` word, `#` zero+ words) | 1:N, Pub/Sub with routing |
+| **Fanout** | Broadcast to all bound queues | 1:N, Broadcast |
+| **Headers** | Match on message headers | Complex routing rules |
 
 ---
 
 ## Spring AMQP Configuration
 
-### Complete Configuration
+### Basic Configuration
 
 ```java
 @Configuration
-public class RabbitMQConfig {
+public class RabbitConfig {
 
-    @Value("${rabbitmq.host}")
-    private String host;
-
-    @Value("${rabbitmq.port}")
-    private int port;
-
-    @Value("${rabbitmq.username}")
-    private String username;
-
-    @Value("${rabbitmq.password}")
-    private String password;
-
-    @Value("${rabbitmq.virtual-host:/}")
-    private String virtualHost;
-
-    // Connection Factory
     @Bean
-    public ConnectionFactory connectionFactory() {
-        CachingConnectionFactory factory = new CachingConnectionFactory();
-        factory.setHost(host);
-        factory.setPort(port);
-        factory.setUsername(username);
-        factory.setPassword(password);
-        factory.setVirtualHost(virtualHost);
-
-        // Connection pooling
-        factory.setCacheMode(CachingConnectionFactory.CacheMode.CHANNEL);
-        factory.setChannelCacheSize(25);
-        factory.setChannelCheckoutTimeout(1000);
-
-        // Heartbeat and timeouts
-        factory.getRabbitConnectionFactory().setRequestedHeartbeat(60);
-        factory.getRabbitConnectionFactory().setConnectionTimeout(30000);
-
-        // Recovery
-        factory.getRabbitConnectionFactory().setAutomaticRecoveryEnabled(true);
-        factory.getRabbitConnectionFactory().setNetworkRecoveryInterval(5000);
-
-        // Publisher confirms
-        factory.setPublisherConfirmType(
-            CachingConnectionFactory.ConfirmType.CORRELATED);
+    public CachingConnectionFactory connectionFactory() {
+        CachingConnectionFactory factory = new CachingConnectionFactory("localhost");
+        factory.setUsername("guest");
+        factory.setPassword("guest");
+        factory.setPort(5672);
+        
+        // Enable publisher confirms and returns
+        factory.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
         factory.setPublisherReturns(true);
-
+        
         return factory;
     }
 
-    // Exchanges
-    @Bean
-    public TopicExchange orderExchange() {
-        return ExchangeBuilder
-            .topicExchange("order.exchange")
-            .durable(true)
-            .build();
-    }
-
-    @Bean
-    public DirectExchange dlxExchange() {
-        return ExchangeBuilder
-            .directExchange("dlx.exchange")
-            .durable(true)
-            .build();
-    }
-
-    @Bean
-    public FanoutExchange notificationExchange() {
-        return ExchangeBuilder
-            .fanoutExchange("notification.exchange")
-            .durable(true)
-            .build();
-    }
-
-    // Queues
-    @Bean
-    public Queue orderQueue() {
-        return QueueBuilder
-            .durable("order.queue")
-            .withArgument("x-dead-letter-exchange", "dlx.exchange")
-            .withArgument("x-dead-letter-routing-key", "order.dlq")
-            .withArgument("x-message-ttl", 86400000)  // 24 hours
-            .withArgument("x-max-length", 100000)
-            .withArgument("x-overflow", "reject-publish")
-            .build();
-    }
-
-    @Bean
-    public Queue orderDlq() {
-        return QueueBuilder
-            .durable("order.dlq")
-            .withArgument("x-message-ttl", 604800000)  // 7 days
-            .build();
-    }
-
-    @Bean
-    public Queue orderRetryQueue() {
-        return QueueBuilder
-            .durable("order.retry.queue")
-            .withArgument("x-dead-letter-exchange", "order.exchange")
-            .withArgument("x-dead-letter-routing-key", "order.created")
-            .withArgument("x-message-ttl", 30000)  // 30 seconds delay
-            .build();
-    }
-
-    // Quorum queue for high availability
-    @Bean
-    public Queue highAvailabilityQueue() {
-        return QueueBuilder
-            .durable("ha.queue")
-            .quorum()
-            .withArgument("x-quorum-initial-group-size", 3)
-            .withArgument("x-delivery-limit", 5)
-            .build();
-    }
-
-    // Bindings
-    @Bean
-    public Binding orderBinding() {
-        return BindingBuilder
-            .bind(orderQueue())
-            .to(orderExchange())
-            .with("order.#");  // Matches order.created, order.updated, etc.
-    }
-
-    @Bean
-    public Binding orderDlqBinding() {
-        return BindingBuilder
-            .bind(orderDlq())
-            .to(dlxExchange())
-            .with("order.dlq");
-    }
-
-    // RabbitTemplate
     @Bean
     public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
-
-        template.setMessageConverter(jackson2JsonMessageConverter());
-        template.setMandatory(true);  // Return unroutable messages
-
-        // Confirm callback
-        template.setConfirmCallback((correlationData, ack, cause) -> {
-            if (correlationData != null) {
-                if (ack) {
-                    log.debug("Message confirmed: {}", correlationData.getId());
-                } else {
-                    log.error("Message not confirmed: {} - {}",
-                        correlationData.getId(), cause);
-                }
-            }
-        });
-
-        // Return callback
-        template.setReturnsCallback(returned -> {
-            log.error("Message returned: {} - {} - {}",
-                returned.getReplyCode(),
-                returned.getReplyText(),
-                returned.getRoutingKey());
-        });
-
+        template.setMessageConverter(messageConverter());
+        template.setMandatory(true); // Return unroutable messages
         return template;
     }
 
     @Bean
-    public MessageConverter jackson2JsonMessageConverter() {
-        Jackson2JsonMessageConverter converter =
-            new Jackson2JsonMessageConverter();
-        converter.setCreateMessageIds(true);
-        return converter;
+    public MessageConverter messageConverter() {
+        return new Jackson2JsonMessageConverter();
     }
 }
 ```
 
-### Listener Container Configuration
+### Topology Configuration
 
 ```java
 @Configuration
-public class RabbitListenerConfig {
+public class OrderTopology {
 
+    public static final String EXCHANGE = "orders.exchange";
+    public static final String QUEUE_CREATED = "orders.created.queue";
+    public static final String ROUTING_KEY_CREATED = "orders.created";
+
+    // Exchange
     @Bean
-    public SimpleRabbitListenerContainerFactory
-            rabbitListenerContainerFactory(ConnectionFactory connectionFactory) {
-
-        SimpleRabbitListenerContainerFactory factory =
-            new SimpleRabbitListenerContainerFactory();
-
-        factory.setConnectionFactory(connectionFactory);
-        factory.setMessageConverter(new Jackson2JsonMessageConverter());
-
-        // Concurrency
-        factory.setConcurrentConsumers(3);
-        factory.setMaxConcurrentConsumers(10);
-
-        // Prefetch
-        factory.setPrefetchCount(10);
-
-        // Acknowledgment
-        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
-
-        // Error handling
-        factory.setDefaultRequeueRejected(false);
-        factory.setErrorHandler(new ConditionalRejectingErrorHandler(
-            new DefaultExceptionStrategy() {
-                @Override
-                public boolean isFatal(Throwable t) {
-                    // Don't retry these
-                    return t instanceof ValidationException ||
-                           t instanceof JsonParseException;
-                }
-            }
-        ));
-
-        // Retry
-        factory.setAdviceChain(retryInterceptor());
-
-        return factory;
-    }
-
-    @Bean
-    public RetryOperationsInterceptor retryInterceptor() {
-        return RetryInterceptorBuilder
-            .stateless()
-            .maxAttempts(3)
-            .backOffOptions(1000, 2.0, 10000)
-            .recoverer(new RejectAndDontRequeueRecoverer())
+    public TopicExchange ordersExchange() {
+        return ExchangeBuilder.topicExchange(EXCHANGE)
+            .durable(true)
             .build();
     }
 
-    // Container for priority messages
+    // Key
     @Bean
-    public SimpleRabbitListenerContainerFactory
-            priorityListenerContainerFactory(ConnectionFactory connectionFactory) {
+    public Queue ordersCreatedQueue() {
+        return QueueBuilder.durable(QUEUE_CREATED)
+            .withArgument("x-dead-letter-exchange", "dlx.exchange")
+            .withArgument("x-dead-letter-routing-key", "dlq")
+            .build();
+    }
 
-        SimpleRabbitListenerContainerFactory factory =
-            new SimpleRabbitListenerContainerFactory();
-
-        factory.setConnectionFactory(connectionFactory);
-        factory.setMessageConverter(new Jackson2JsonMessageConverter());
-        factory.setConcurrentConsumers(5);
-        factory.setPrefetchCount(1);  // Lower prefetch for fairness
-        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
-
-        return factory;
+    // Binding
+    @Bean
+    public Binding bindingCreated() {
+        return BindingBuilder.bind(ordersCreatedQueue())
+            .to(ordersExchange())
+            .with(ROUTING_KEY_CREATED);
     }
 }
 ```
@@ -296,103 +108,45 @@ public class RabbitListenerConfig {
 
 ## Producer Patterns
 
-### Reliable Producer with Confirms
+### Reliable Producer (Publisher Confirms)
 
 ```java
 @Service
 @Slf4j
-public class ReliableRabbitProducer {
+public class ReliableProducer {
 
     private final RabbitTemplate rabbitTemplate;
-    private final MeterRegistry meterRegistry;
 
-    public void sendWithConfirm(String exchange, String routingKey,
-                                 Object message) {
-        String messageId = UUID.randomUUID().toString();
-        CorrelationData correlationData = new CorrelationData(messageId);
+    @PostConstruct
+    public void init() {
+        // Callback for confirms (Ack/Nack from Broker)
+        rabbitTemplate.setConfirmCallback((correlation, ack, reason) -> {
+            if (ack) {
+                log.info("Message confirmed: id={}",
+                    correlation != null ? correlation.getId() : "null");
+            } else {
+                log.error("Message nacked: id={}, reason={}",
+                    correlation != null ? correlation.getId() : "null", reason);
+                // Handle Nack (retry, alert)
+            }
+        });
 
+        // Callback for returned messages (Unroutable)
+        rabbitTemplate.setReturnsCallback(returned -> {
+            log.error("Message returned: replyText={}, exchange={}, routingKey={}",
+                returned.getReplyText(), returned.getExchange(), returned.getRoutingKey());
+        });
+    }
+
+    public void sendOrder(OrderEvent event) {
+        CorrelationData correlationData = new CorrelationData(event.getOrderId());
+        
         rabbitTemplate.convertAndSend(
-            exchange,
-            routingKey,
-            message,
-            msg -> {
-                MessageProperties props = msg.getMessageProperties();
-                props.setMessageId(messageId);
-                props.setTimestamp(new Date());
-                props.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-                props.setContentType("application/json");
-                return msg;
-            },
+            OrderTopology.EXCHANGE,
+            "orders.created",
+            event,
             correlationData
         );
-
-        // Wait for confirm
-        try {
-            CorrelationData.Confirm confirm =
-                correlationData.getFuture().get(5, TimeUnit.SECONDS);
-
-            if (confirm.isAck()) {
-                meterRegistry.counter("rabbitmq.send.confirmed").increment();
-                log.debug("Message confirmed: {}", messageId);
-            } else {
-                meterRegistry.counter("rabbitmq.send.nacked").increment();
-                throw new MessageNotConfirmedException(
-                    "Message nacked: " + confirm.getReason());
-            }
-        } catch (TimeoutException e) {
-            meterRegistry.counter("rabbitmq.send.timeout").increment();
-            throw new MessageSendException("Confirm timeout for: " + messageId, e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new MessageSendException("Interrupted", e);
-        } catch (ExecutionException e) {
-            throw new MessageSendException("Execution error", e);
-        }
-    }
-
-    // Async with CompletableFuture
-    public CompletableFuture<Boolean> sendAsync(String exchange,
-                                                 String routingKey,
-                                                 Object message) {
-        String messageId = UUID.randomUUID().toString();
-        CorrelationData correlationData = new CorrelationData(messageId);
-
-        rabbitTemplate.convertAndSend(exchange, routingKey, message,
-            correlationData);
-
-        return correlationData.getFuture()
-            .thenApply(confirm -> {
-                if (!confirm.isAck()) {
-                    log.error("Message not acked: {}", confirm.getReason());
-                }
-                return confirm.isAck();
-            });
-    }
-
-    // Batch sending
-    public void sendBatch(String exchange, String routingKey,
-                          List<Object> messages) {
-        List<CompletableFuture<Boolean>> futures = new ArrayList<>();
-
-        for (Object message : messages) {
-            futures.add(sendAsync(exchange, routingKey, message));
-        }
-
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-            .join();
-
-        long confirmed = futures.stream()
-            .filter(f -> {
-                try {
-                    return f.get();
-                } catch (Exception e) {
-                    return false;
-                }
-            })
-            .count();
-
-        log.info("Batch complete: {}/{} confirmed",
-            confirmed, messages.size());
     }
 }
 ```
@@ -401,132 +155,69 @@ public class ReliableRabbitProducer {
 
 ```java
 @Service
-public class TransactionalRabbitProducer {
+public class TransactionalProducer {
 
     private final RabbitTemplate rabbitTemplate;
 
-    public void sendInTransaction(String exchange, String routingKey,
-                                   List<Object> messages) {
-        rabbitTemplate.invoke(operations -> {
-            for (Object message : messages) {
-                operations.convertAndSend(exchange, routingKey, message);
-            }
-            return null;
-        });
-        // All messages sent atomically
+    public TransactionalProducer(RabbitTemplate rabbitTemplate) {
+        this.rabbitTemplate = rabbitTemplate;
+        this.rabbitTemplate.setChannelTransacted(true);
     }
 
-    // Mixed transaction with database
     @Transactional
-    public void processAndSend(Order order) {
+    public void processOrder(Order order) {
         // Database operation
         orderRepository.save(order);
 
-        // RabbitMQ send in same transaction context
-        rabbitTemplate.convertAndSend("order.exchange", "order.created", order);
-
-        // If database commit fails, message won't be sent
+        // Message send - committed only if transaction commits
+        rabbitTemplate.convertAndSend(
+            OrderTopology.EXCHANGE,
+            "orders.created",
+            new OrderEvent(order)
+        );
     }
 }
 ```
 
-### Priority Messages
+### Priority Queue Producer
 
 ```java
-@Service
-public class PriorityRabbitProducer {
-
-    private final RabbitTemplate rabbitTemplate;
-
-    public void sendWithPriority(String exchange, String routingKey,
-                                  Object message, int priority) {
-        rabbitTemplate.convertAndSend(
-            exchange,
-            routingKey,
-            message,
-            msg -> {
-                msg.getMessageProperties().setPriority(priority);
-                return msg;
-            }
-        );
-    }
-
-    public void sendHighPriority(Object message) {
-        sendWithPriority("order.exchange", "order.urgent", message, 10);
-    }
-
-    public void sendNormalPriority(Object message) {
-        sendWithPriority("order.exchange", "order.normal", message, 5);
-    }
-
-    public void sendLowPriority(Object message) {
-        sendWithPriority("order.exchange", "order.batch", message, 1);
-    }
-}
-
-// Priority queue configuration
+// Configuration
 @Bean
 public Queue priorityQueue() {
-    return QueueBuilder
-        .durable("priority.queue")
-        .withArgument("x-max-priority", 10)
+    return QueueBuilder.durable("priority.queue")
+        .withArgument("x-max-priority", 10) // Enable priority (0-10)
         .build();
+}
+
+// Producer
+public void sendUrgent(String message) {
+    rabbitTemplate.convertAndSend("priority.queue", message, m -> {
+        m.getMessageProperties().setPriority(10); // Highest
+        return m;
+    });
 }
 ```
 
-### Delayed Messages
+### Delayed Message Producer
+
+Requires `rabbitmq_delayed_message_exchange` plugin.
 
 ```java
-@Configuration
-public class DelayedExchangeConfig {
-
-    // Requires rabbitmq_delayed_message_exchange plugin
-    @Bean
-    public CustomExchange delayedExchange() {
-        Map<String, Object> args = new HashMap<>();
-        args.put("x-delayed-type", "direct");
-        return new CustomExchange(
-            "delayed.exchange",
-            "x-delayed-message",
-            true,
-            false,
-            args
-        );
-    }
+// Configuration
+@Bean
+public CustomExchange delayedExchange() {
+    Map<String, Object> args = new HashMap<>();
+    args.put("x-delayed-type", "direct");
+    return new CustomExchange("delayed.exchange", "x-delayed-message", true, false, args);
 }
 
-@Service
-public class DelayedMessageProducer {
-
-    private final RabbitTemplate rabbitTemplate;
-
-    // Using delayed exchange plugin
-    public void sendDelayed(Object message, Duration delay) {
-        rabbitTemplate.convertAndSend(
-            "delayed.exchange",
-            "delayed.routing.key",
-            message,
-            msg -> {
-                msg.getMessageProperties()
-                    .setDelay((int) delay.toMillis());
-                return msg;
-            }
-        );
-    }
-
-    // Using TTL + DLX pattern (no plugin needed)
-    public void sendDelayedViaTtl(Object message, long delayMs) {
-        rabbitTemplate.convertAndSend(
-            "delay.exchange",  // Routes to delay queue
-            "delay." + delayMs,
-            message,
-            msg -> {
-                msg.getMessageProperties().setExpiration(String.valueOf(delayMs));
-                return msg;
-            }
-        );
-        // Delay queue has DLX that routes to actual processing queue
-    }
+// Producer
+public void sendDelayed(String message, Integer delayMs) {
+    rabbitTemplate.convertAndSend("delayed.exchange", "key", message, m -> {
+        m.getMessageProperties().setHeader("x-delay", delayMs);
+        return m;
+    });
 }
 ```
 
@@ -534,64 +225,32 @@ public class DelayedMessageProducer {
 
 ## Consumer Patterns
 
-### Manual Acknowledgment Consumer
+### Manual Acknowledgment
 
 ```java
 @Service
 @Slf4j
 public class ManualAckConsumer {
 
-    private final OrderService orderService;
-
-    @RabbitListener(
-        queues = "${rabbitmq.queues.orders}",
-        containerFactory = "rabbitListenerContainerFactory"
-    )
-    public void handleOrder(
-            @Payload OrderEvent event,
-            @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag,
-            @Header(AmqpHeaders.REDELIVERED) boolean redelivered,
-            @Header(AmqpHeaders.MESSAGE_ID) String messageId,
-            Channel channel) throws IOException {
-
-        MDC.put("messageId", messageId);
-
+    @RabbitListener(queues = "orders.created.queue", ackMode = "MANUAL")
+    public void receive(OrderEvent event, Channel channel, 
+                        @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {
-            log.info("Processing order: {}, redelivered: {}",
-                event.getOrderId(), redelivered);
-
-            // Check if already processed (idempotency)
-            if (orderService.isProcessed(messageId)) {
-                log.info("Already processed, acknowledging");
-                channel.basicAck(deliveryTag, false);
-                return;
-            }
-
-            // Process
-            orderService.process(event, messageId);
-
-            // Acknowledge
-            channel.basicAck(deliveryTag, false);
-            log.info("Order processed successfully");
-
-        } catch (RetryableException e) {
-            log.warn("Retryable error: {}", e.getMessage());
-
-            if (redelivered) {
-                // Already retried, send to DLQ
-                log.error("Redelivery failed, rejecting to DLQ");
-                channel.basicReject(deliveryTag, false);
-            } else {
-                // Requeue for retry
-                channel.basicNack(deliveryTag, false, true);
-            }
-
+            log.info("Processing order: {}", event.getOrderId());
+            processOrder(event);
+            
+            // Ack: tag, multiple=false
+            channel.basicAck(tag, false);
+            
         } catch (Exception e) {
-            log.error("Non-retryable error, rejecting to DLQ", e);
-            channel.basicReject(deliveryTag, false);
-
-        } finally {
-            MDC.clear();
+            log.error("Error processing order", e);
+            
+            // Nack: tag, multiple=false, requeue=false (send to DLQ)
+            try {
+                channel.basicNack(tag, false, false);
+            } catch (IOException ioException) {
+                log.error("Failed to nack", ioException);
+            }
         }
     }
 }
@@ -599,204 +258,114 @@ public class ManualAckConsumer {
 
 ### Batch Consumer
 
+Requires `spring.rabbitmq.listener.simple.batch-size` configuration.
+
 ```java
+// Properties
+// spring.rabbitmq.listener.type=simple
+// spring.rabbitmq.listener.simple.batch-size=10
+// spring.rabbitmq.listener.simple.consumer-batch-enabled=true
+
 @Service
-public class BatchRabbitConsumer {
+@Slf4j
+public class BatchConsumer {
 
-    private final OrderRepository orderRepository;
-
-    @RabbitListener(
-        queues = "order.batch.queue",
-        containerFactory = "batchListenerContainerFactory"
-    )
-    public void handleBatch(List<Message> messages, Channel channel)
-            throws IOException {
-
-        log.info("Received batch of {} messages", messages.size());
-
-        List<Long> toAck = new ArrayList<>();
-        List<Long> toReject = new ArrayList<>();
-
-        for (Message message : messages) {
-            long deliveryTag = message.getMessageProperties().getDeliveryTag();
-
-            try {
-                OrderEvent event = deserialize(message);
-                orderRepository.save(Order.from(event));
-                toAck.add(deliveryTag);
-
-            } catch (Exception e) {
-                log.error("Failed to process message: {}", e.getMessage());
-                toReject.add(deliveryTag);
+    @RabbitListener(queues = "batch.queue")
+    public void receiveBatch(List<Message> messages, Channel channel) {
+        log.info("Received batch size: {}", messages.size());
+        
+        try {
+            for (Message message : messages) {
+                // Process each
+                process(message);
             }
+            
+            // Ack last message implies ack all previous in batch
+            long lastTag = messages.get(messages.size() - 1)
+                .getMessageProperties().getDeliveryTag();
+                
+            channel.basicAck(lastTag, true);
+            
+        } catch (Exception e) {
+            // Handle batch failure - basicNack(lastTag, true, true/false)
+            // Note: Nacking batch with requeue=true may cause loop
         }
-
-        // Acknowledge successful
-        if (!toAck.isEmpty()) {
-            // Ack up to the highest tag (multiple = true)
-            long maxTag = Collections.max(toAck);
-            channel.basicAck(maxTag, true);
-        }
-
-        // Reject failed
-        for (Long tag : toReject) {
-            channel.basicReject(tag, false);
-        }
-    }
-}
-
-@Configuration
-public class BatchListenerConfig {
-
-    @Bean
-    public SimpleRabbitListenerContainerFactory
-            batchListenerContainerFactory(ConnectionFactory connectionFactory) {
-
-        SimpleRabbitListenerContainerFactory factory =
-            new SimpleRabbitListenerContainerFactory();
-
-        factory.setConnectionFactory(connectionFactory);
-        factory.setBatchListener(true);
-        factory.setBatchSize(100);
-        factory.setConsumerBatchEnabled(true);
-        factory.setReceiveTimeout(5000L);  // Wait up to 5s to fill batch
-        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
-
-        return factory;
     }
 }
 ```
 
 ### Competing Consumers
 
+Simply run multiple instances of the application or configure concurrency.
+
 ```java
-@Service
-public class CompetingConsumer {
-
-    // Multiple instances of this service will compete for messages
-    @RabbitListener(
-        queues = "work.queue",
-        concurrency = "3-10"  // Dynamic scaling
-    )
-    public void handleWork(WorkItem work, Channel channel,
-                           @Header(AmqpHeaders.DELIVERY_TAG) long tag)
-            throws IOException {
-
-        try {
-            log.info("Processing work item: {}", work.getId());
-
-            // Simulate work
-            processWork(work);
-
-            channel.basicAck(tag, false);
-
-        } catch (Exception e) {
-            log.error("Work failed: {}", e.getMessage());
-            channel.basicNack(tag, false, true);  // Requeue
-        }
-    }
-
-    private void processWork(WorkItem work) {
-        // Processing logic
-    }
+@Bean
+public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+        ConnectionFactory connectionFactory) {
+    SimpleRabbitListenerContainerFactory factory = 
+        new SimpleRabbitListenerContainerFactory();
+    factory.setConnectionFactory(connectionFactory);
+    factory.setConcurrentConsumers(3); // Start 3 consumers
+    factory.setMaxConcurrentConsumers(10); // Scale up to 10
+    factory.setPrefetchCount(1); // Fair dispatch
+    return factory;
 }
 ```
 
----
-
-## Request-Reply Pattern (RPC)
-
-### RPC Client
+### Request-Reply (RPC)
 
 ```java
+// Configuration
+@Bean
+public RabbitTemplate amqpTemplate(ConnectionFactory connectionFactory) {
+    RabbitTemplate template = new RabbitTemplate(connectionFactory);
+    template.setReplyTimeout(5000);
+    return template;
+}
+
+// Client
 @Service
-public class RabbitRpcClient {
+public class RpcClient {
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
-    private final RabbitTemplate rabbitTemplate;
-
-    // Synchronous RPC
-    public OrderValidationResponse validateOrder(OrderValidationRequest request) {
+    public OrderStatus checkStatus(String orderId) {
         Object response = rabbitTemplate.convertSendAndReceive(
-            "rpc.exchange",
-            "order.validate",
-            request,
-            message -> {
-                message.getMessageProperties()
-                    .setReplyTo("order.validation.reply");
-                message.getMessageProperties()
-                    .setCorrelationId(UUID.randomUUID().toString());
-                message.getMessageProperties()
-                    .setExpiration("30000");  // 30 second timeout
-                return message;
-            }
-        );
-
+            "rpc.exchange", "rpc.status", orderId);
+            
         if (response == null) {
-            throw new RpcTimeoutException("No response received");
+            throw new RuntimeException("RPC Timeout");
         }
-
-        return (OrderValidationResponse) response;
-    }
-
-    // Async RPC with callback
-    public void validateOrderAsync(OrderValidationRequest request,
-                                    Consumer<OrderValidationResponse> callback) {
-        String correlationId = UUID.randomUUID().toString();
-
-        // Store callback for later
-        pendingCallbacks.put(correlationId, callback);
-
-        rabbitTemplate.convertAndSend(
-            "rpc.exchange",
-            "order.validate",
-            request,
-            message -> {
-                message.getMessageProperties()
-                    .setReplyTo("order.validation.reply");
-                message.getMessageProperties()
-                    .setCorrelationId(correlationId);
-                return message;
-            }
-        );
-    }
-
-    @RabbitListener(queues = "order.validation.reply")
-    public void handleReply(
-            @Payload OrderValidationResponse response,
-            @Header(AmqpHeaders.CORRELATION_ID) String correlationId) {
-
-        Consumer<OrderValidationResponse> callback =
-            pendingCallbacks.remove(correlationId);
-
-        if (callback != null) {
-            callback.accept(response);
-        }
+        
+        return (OrderStatus) response;
     }
 }
-```
 
-### RPC Server
-
-```java
+// Server
 @Service
-public class RabbitRpcServer {
+public class RpcServer {
 
-    private final OrderValidationService validationService;
+    @RabbitListener(queues = "rpc.status.queue")
+    public OrderStatus processRequest(String orderId) {
+        return getStatus(orderId);
+        // Return value is automatically sent to replyTo queue
+    }
+}
 
-    @RabbitListener(queues = "order.validate.queue")
-    public OrderValidationResponse handleValidation(
-            @Payload OrderValidationRequest request,
-            @Header(AmqpHeaders.CORRELATION_ID) String correlationId) {
+// Async API variant
+@Service
+public class AsyncRpcServer {
 
-        log.info("Validating order: {}, correlationId: {}",
-            request.getOrderId(), correlationId);
-
+    @RabbitListener(queues = "api.validation.queue")
+    public OrderValidationResponse validate(OrderValidationRequest request,
+                                          @Header(AmqpHeaders.CORRELATION_ID) String correlationId) {
         try {
-            boolean valid = validationService.validate(request);
+            // Simulate complex validation
+            boolean isValid = validateOrder(request);
 
             return OrderValidationResponse.builder()
                 .orderId(request.getOrderId())
-                .valid(valid)
+                .valid(isValid)
                 .correlationId(correlationId)
                 .timestamp(Instant.now())
                 .build();
@@ -1058,7 +627,7 @@ public class ClusterAwareConfig {
 
 ---
 
-## Monitoring và Metrics
+## Monitoring and Metrics
 
 ### Micrometer Integration
 
@@ -1141,7 +710,7 @@ public class RabbitHealthIndicator implements HealthIndicator {
 
 ---
 
-## Common Issues và Solutions
+## Common Issues and Solutions
 
 ### Issue: Messages Stuck in Unacked State
 
@@ -1215,3 +784,4 @@ factory.getRabbitConnectionFactory().setNetworkRecoveryInterval(5000);
 - [ ] Set queue limits to prevent memory issues
 - [ ] Implement health checks
 - [ ] Document exchange/queue topology
+

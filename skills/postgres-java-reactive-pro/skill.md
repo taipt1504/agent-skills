@@ -27,30 +27,30 @@ scripts:
 
 Expert skill for building high-performance reactive applications with PostgreSQL and R2DBC in Java.
 
-## Mục đích
+## Purpose
 
-Skill này giúp agent:
+This skill helps the agent:
 
-- Thiết kế và tối ưu hóa reactive database layer với R2DBC
-- Viết high-performance queries cho PostgreSQL
-- Apply best practices cho connection pooling, batching, và streaming
-- Debug và troubleshoot performance issues
+- Design and optimize reactive database layer with R2DBC
+- Write high-performance queries for PostgreSQL
+- Apply best practices for connection pooling, batching, and streaming
+- Debug and troubleshoot performance issues
 
-## Khi nào sử dụng
+## When to Use
 
-- Thiết kế reactive repository layer với Spring Data R2DBC
-- Tối ưu hóa queries cho high throughput/low latency
-- Configure connection pool cho production
-- Implement batch operations và bulk inserts
-- Stream large result sets efficiently
-- Handle transactions trong reactive context
+- Designing reactive repository layer with Spring Data R2DBC
+- Optimizing queries for high throughput/low latency
+- Configuring connection pool for production
+- Implementing batch operations and bulk inserts
+- Efficiently streaming large result sets
+- Handling transactions in reactive context
 
-## Khi nào KHÔNG sử dụng
+## When NOT to Use
 
-- Blocking JDBC applications (dùng Spring Data JDBC thay thế)
-- Simple CRUD không cần optimize
+- Blocking JDBC applications (use Spring Data JDBC instead)
+- Simple CRUD not requiring optimization
 - NoSQL databases
-- Non-PostgreSQL databases (một số patterns có thể khác)
+- Non-PostgreSQL databases (some patterns may differ)
 
 ---
 
@@ -58,14 +58,14 @@ Skill này giúp agent:
 
 ### 1. Non-blocking Everything
 
-R2DBC là fully non-blocking. KHÔNG BAO GIỜ:
+R2DBC is fully non-blocking. NEVER:
 
-- Block trong reactive chain (`.block()`, `.toFuture().get()`)
-- Sử dụng blocking I/O trong reactive pipeline
-- Mix blocking JDBC với R2DBC trong cùng transaction
+- Block in a reactive chain (`.block()`, `.toFuture().get()`)
+- Use blocking I/O in a reactive pipeline
+- Mix blocking JDBC with R2DBC in the same transaction
 
 ```java
-// BAD - blocking trong reactive chain
+// BAD - blocking in reactive chain
 public User getUser(Long id) {
     return userRepository.findById(id).block(); // NEVER DO THIS
 }
@@ -78,16 +78,16 @@ public Mono<User> getUser(Long id) {
 
 ### 2. Backpressure-aware
 
-Luôn xem xét backpressure khi làm việc với large datasets:
+Always consider backpressure when working with large datasets:
 
 ```java
-// GOOD - streaming với backpressure
+// GOOD - streaming with backpressure
 public Flux<User> getAllUsers() {
     return userRepository.findAll()
         .limitRate(100); // Control flow rate
 }
 
-// GOOD - batch processing với controlled concurrency
+// GOOD - batch processing with controlled concurrency
 public Flux<User> processUsers() {
     return userRepository.findAll()
         .buffer(50)
@@ -116,7 +116,7 @@ public class R2dbcConfig extends AbstractR2dbcConfiguration {
         PostgresqlConnectionFactory connectionFactory =
             new PostgresqlConnectionFactory(config);
 
-        // Connection pooling với r2dbc-pool
+        // Connection pooling with r2dbc-pool
         ConnectionPoolConfiguration poolConfig = ConnectionPoolConfiguration.builder()
             .connectionFactory(connectionFactory)
             .initialSize(10)                    // Initial connections
@@ -170,7 +170,7 @@ public Mono<Long> bulkInsertWithCopy(Publisher<User> users) {
 
 ```java
 // AVOID: Offset pagination for large datasets
-// SLOW với large offsets
+// SLOW with large offsets
 public Flux<User> getUsersOffset(int page, int size) {
     return userRepository.findAll()
         .skip((long) page * size)
@@ -188,10 +188,10 @@ public Flux<User> getUsersAfter(Long lastId, int size) {
 }
 ```
 
-### Pattern 3: Optimized Joins với Manual Mapping
+### Pattern 3: Optimized Joins with Manual Mapping
 
 ```java
-// Complex aggregates với single query
+// Complex aggregates with single query
 public Flux<OrderWithItems> getOrdersWithItems(Long userId) {
     String sql = """
         SELECT o.id as order_id, o.created_at, o.status,
@@ -236,7 +236,7 @@ public Mono<DashboardData> getDashboardData(Long userId) {
 ### 1. Use PostgreSQL Arrays
 
 ```java
-// Efficient IN clause với ANY
+// Efficient IN clause with ANY
 public Flux<User> getUsersByIds(List<Long> ids) {
     return databaseClient.sql(
         "SELECT * FROM users WHERE id = ANY(:ids)")
@@ -262,7 +262,7 @@ public Flux<User> getUsersByMetadata(String key, String value) {
 // CREATE INDEX idx_users_metadata ON users USING GIN (metadata);
 ```
 
-### 3. Upsert với ON CONFLICT
+### 3. Upsert with ON CONFLICT
 
 ```java
 public Mono<User> upsertUser(User user) {
@@ -286,11 +286,11 @@ public Mono<User> upsertUser(User user) {
 ### 4. Partial Indexes
 
 ```sql
--- Index chỉ cho active users (nhỏ hơn, nhanh hơn)
+-- Index only for active users (smaller, faster)
 CREATE INDEX idx_users_active_email ON users (email)
 WHERE status = 'ACTIVE';
 
--- Index cho recent data
+-- Index for recent data
 CREATE INDEX idx_orders_recent ON orders (created_at DESC)
 WHERE created_at > NOW() - INTERVAL '30 days';
 ```
@@ -315,7 +315,7 @@ public class OrderService {
             .as(transactionalOperator::transactional);
     }
 
-    // Hoặc với annotation
+    // Or with annotation
     @Transactional
     public Mono<Order> createOrderAnnotated(OrderRequest request) {
         return validateRequest(request)
@@ -325,7 +325,7 @@ public class OrderService {
 }
 ```
 
-### Savepoints cho Partial Rollback
+### Savepoints for Partial Rollback
 
 ```java
 public Mono<BatchResult> processBatchWithSavepoints(List<Item> items) {
@@ -413,7 +413,7 @@ public Flux<OrderDTO> getOrdersWithUser() {
         );
 }
 
-// GOOD - Single query với join
+// GOOD - Single query with join
 public Flux<OrderDTO> getOrdersWithUserOptimized() {
     return databaseClient.sql("""
         SELECT o.*, u.name as user_name, u.email as user_email
@@ -428,12 +428,12 @@ public Flux<OrderDTO> getOrdersWithUserOptimized() {
 ### 2. Unbounded Queries
 
 ```java
-// BAD - có thể return millions of rows
+// BAD - can return millions of rows
 public Flux<User> getAllUsers() {
     return userRepository.findAll();
 }
 
-// GOOD - always có limit
+// GOOD - always has limit
 public Flux<User> getAllUsers(int limit) {
     return userRepository.findAll()
         .take(Math.min(limit, 10000));
@@ -443,12 +443,12 @@ public Flux<User> getAllUsers(int limit) {
 ### 3. Over-fetching
 
 ```java
-// BAD - fetch tất cả columns
+// BAD - fetch all columns
 public Mono<User> getUserForDisplay(Long id) {
     return userRepository.findById(id);
 }
 
-// GOOD - chỉ fetch columns cần thiết
+// GOOD - fetch only necessary columns
 public Mono<UserSummary> getUserSummary(Long id) {
     return databaseClient.sql(
         "SELECT id, name, avatar_url FROM users WHERE id = :id")
@@ -464,30 +464,30 @@ public Mono<UserSummary> getUserSummary(Long id) {
 
 ---
 
-## Checklist trước Production
+## Pre-Production Checklist
 
 - [ ] Connection pool sized correctly (initialSize, maxSize)
 - [ ] Prepared statement cache enabled
-- [ ] All queries có proper indexes
+- [ ] All queries have proper indexes
 - [ ] No N+1 queries
-- [ ] Large result sets sử dụng streaming/pagination
-- [ ] Transactions có proper timeout
-- [ ] Metrics và logging configured
+- [ ] Large result sets use streaming/pagination
+- [ ] Transactions have proper timeouts
+- [ ] Metrics and logging configured
 - [ ] Slow query threshold set
-- [ ] Health check endpoint cho database connection
+- [ ] Health check endpoint for database connection
 - [ ] Graceful shutdown handling
 
 ---
 
 ## References
 
-Xem thêm chi tiết trong:
+See more details in:
 
-- `references/r2dbc-config.md` - Configuration chi tiết
-- `references/query-patterns.md` - Query patterns và examples
+- `references/r2dbc-config.md` - Detailed configuration
+- `references/query-patterns.md` - Query patterns and examples
 - `references/performance-tuning.md` - Performance tuning guide
 
 ## Scripts
 
-- `scripts/analyze-queries.py` - Phân tích slow queries từ PostgreSQL logs
+- `scripts/analyze-queries.py` - Analyze slow queries from PostgreSQL logs
 - `scripts/benchmark.sh` - Benchmark connection pool settings

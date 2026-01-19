@@ -2,134 +2,64 @@
 
 ## Overview
 
-NATS là lightweight, high-performance messaging system được thiết kế cho cloud-native applications. NATS cung cấp:
-
-- **Core NATS**: Simple pub/sub với at-most-once delivery
-- **JetStream**: Persistent messaging với at-least-once/exactly-once delivery
-
-Document này covers NATS patterns cho Java applications.
+NATS is a high-performance messaging system for cloud-native applications, IoT messaging, and microservices architectures. This document covers NATS patterns for Java applications, distinguishing between Core NATS and JetStream.
 
 ---
 
 ## Architecture Fundamentals
 
-### NATS vs JetStream
+### Core NATS vs JetStream
 
-```
-Core NATS                           JetStream
-┌─────────────────────────┐         ┌─────────────────────────┐
-│     In-Memory Only      │         │   Persistent Storage    │
-│     Fire and Forget     │         │   Acknowledgments       │
-│     At-Most-Once        │         │   At-Least-Once         │
-│     No Replay           │         │   Message Replay        │
-│     Queue Groups        │         │   Durable Consumers     │
-│     Request-Reply       │         │   Exactly-Once          │
-└─────────────────────────┘         └─────────────────────────┘
+| Feature | Core NATS | JetStream |
+|---------|-----------|-----------|
+| **Semantics** | At-most-once | At-least-once / Exactly-once |
+| **Persistence** | In-memory (Fire & Forget) | Disk / Memory (Persistent) |
+| **Consumer API** | Push | Push & Pull |
+| **Replay** | No | Yes (Time/Msg/Seq) |
+| **Key-Value** | No | Yes (KV Store) |
+| **Object Store** | No | Yes |
 
-When to use Core NATS:            When to use JetStream:
-- Real-time notifications         - Order processing
-- Metrics/Telemetry               - Event sourcing
-- Service discovery               - Audit logs
-- Ephemeral data                  - Durable workflows
-```
-
-### Subject-Based Addressing
-
-```
-Subject Hierarchy Example:
-orders
-orders.created
-orders.created.us
-orders.created.eu
-orders.updated
-orders.cancelled
-
-Wildcards:
-* - matches single token
-    orders.* matches orders.created, orders.updated
-    orders.*.us matches orders.created.us, orders.updated.us
-
-> - matches multiple tokens
-    orders.> matches orders.created, orders.created.us, orders.updated.eu
-```
-
----
-
-## Java Client Setup
-
-### Connection Configuration
+### NATS Java Client Setup
 
 ```java
 @Configuration
 public class NatsConfig {
 
-    @Value("${nats.servers}")
-    private String servers;
-
-    @Value("${nats.connection.name:default}")
-    private String connectionName;
+    @Value("${nats.servers:nats://localhost:4222}")
+    private String natsServers;
 
     @Bean
     public Connection natsConnection() throws IOException, InterruptedException {
         Options options = new Options.Builder()
-            // Server connections
-            .servers(servers.split(","))
-            .connectionName(connectionName)
-
-            // Reconnection settings
-            .maxReconnects(-1)  // Unlimited reconnects
-            .reconnectWait(Duration.ofSeconds(2))
-            .reconnectBufferSize(8 * 1024 * 1024)  // 8MB
-
-            // Timeouts
-            .connectionTimeout(Duration.ofSeconds(5))
-            .pingInterval(Duration.ofSeconds(30))
-            .requestCleanupInterval(Duration.ofSeconds(5))
-
-            // Authentication (if needed)
-            // .authHandler(new AuthHandler() { ... })
-            // .token("secret-token")
-            // .userInfo("user", "password")
-
-            // TLS (if needed)
-            // .sslContext(sslContext)
-
-            // Event handlers
+            .servers(natsServers.split(","))
             .connectionListener((conn, type) -> {
-                log.info("NATS connection event: {} - {}", type, conn.getServerInfo());
+                if (type == ConnectionListener.Events.CONNECTED) {
+                    System.out.println("Connected to NATS");
+                } else if (type == ConnectionListener.Events.DISCONNECTED) {
+                    System.out.println("Disconnected from NATS");
+                }
             })
+            .maxReconnects(-1) // Infinite reconnects
+            .reconnectWait(Duration.ofSeconds(2))
             .errorListener(new ErrorListener() {
                 @Override
                 public void errorOccurred(Connection conn, String error) {
-                    log.error("NATS error: {}", error);
+                    System.err.println("NATS Error: " + error);
                 }
 
                 @Override
                 public void exceptionOccurred(Connection conn, Exception exp) {
-                    log.error("NATS exception: {}", exp.getMessage(), exp);
-                }
-
-                @Override
-                public void slowConsumerDetected(Connection conn, Consumer consumer) {
-                    log.warn("Slow consumer detected: {}", consumer);
+                    System.err.println("NATS Exception: " + exp);
                 }
             })
-
             .build();
 
-        Connection connection = Nats.connect(options);
-        log.info("Connected to NATS: {}", connection.getServerInfo());
-
-        return connection;
+        return Nats.connect(options);
     }
 
     @Bean
     public JetStream jetStream(Connection connection) throws IOException {
-        JetStreamOptions options = JetStreamOptions.builder()
-            .requestTimeout(Duration.ofSeconds(10))
-            .build();
-
-        return connection.jetStream(options);
+        return connection.jetStream();
     }
 
     @Bean
@@ -137,41 +67,26 @@ public class NatsConfig {
             throws IOException {
         return connection.jetStreamManagement();
     }
-
-    @PreDestroy
-    public void closeConnection() throws InterruptedException {
-        if (natsConnection != null) {
-            natsConnection.close();
-        }
-    }
 }
 ```
 
-### Object Mapper Setup
+### Object Mapper for NATS
 
 ```java
-@Configuration
-public class NatsSerializationConfig {
-
-    @Bean
-    public ObjectMapper natsObjectMapper() {
-        return new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    }
-}
-
 @Component
 public class NatsMessageSerializer {
 
     private final ObjectMapper objectMapper;
 
+    public NatsMessageSerializer(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
     public byte[] serialize(Object object) {
         try {
             return objectMapper.writeValueAsBytes(object);
         } catch (JsonProcessingException e) {
-            throw new SerializationException("Failed to serialize", e);
+            throw new RuntimeException("Serialization failed", e);
         }
     }
 
@@ -179,7 +94,7 @@ public class NatsMessageSerializer {
         try {
             return objectMapper.readValue(data, type);
         } catch (IOException e) {
-            throw new DeserializationException("Failed to deserialize", e);
+            throw new RuntimeException("Deserialization failed", e);
         }
     }
 }
@@ -189,108 +104,34 @@ public class NatsMessageSerializer {
 
 ## Core NATS Patterns
 
-### Simple Pub/Sub
+### Publish-Subscribe (1-to-N)
 
 ```java
 @Service
-@Slf4j
-public class NatsCorePublisher {
+public class PubSubService {
 
     private final Connection connection;
     private final NatsMessageSerializer serializer;
 
-    // Simple publish (fire and forget)
-    public void publish(String subject, Object payload) {
-        byte[] data = serializer.serialize(payload);
+    // Publisher
+    public void publishEvent(String subject, OrderEvent event) {
+        byte[] data = serializer.serialize(event);
         connection.publish(subject, data);
-        log.debug("Published to {}: {} bytes", subject, data.length);
     }
 
-    // Publish with headers
-    public void publishWithHeaders(String subject, Object payload,
-                                    Map<String, String> headers) {
-        byte[] data = serializer.serialize(payload);
-
-        Headers natsHeaders = new Headers();
-        headers.forEach(natsHeaders::add);
-
-        connection.publish(subject, natsHeaders, data);
-    }
-
-    // Publish with reply subject
-    public void publishWithReply(String subject, String replyTo,
-                                  Object payload) {
-        byte[] data = serializer.serialize(payload);
-        connection.publish(subject, replyTo, data);
-    }
-}
-```
-
-### Simple Subscribe
-
-```java
-@Service
-@Slf4j
-public class NatsCoreSubscriber {
-
-    private final Connection connection;
-    private final NatsMessageSerializer serializer;
-    private final List<Dispatcher> dispatchers = new ArrayList<>();
-
-    // Basic subscription
-    public void subscribe(String subject, Consumer<Message> handler) {
-        Dispatcher dispatcher = connection.createDispatcher(message -> {
-            try {
-                handler.accept(message);
-            } catch (Exception e) {
-                log.error("Error handling message on {}: {}", subject, e.getMessage());
-            }
+    // Async Subscriber
+    @PostConstruct
+    public void subscribe() {
+        Dispatcher dispatcher = connection.createDispatcher(msg -> {
+            OrderEvent event = serializer.deserialize(
+                msg.getData(), OrderEvent.class);
+            System.out.println("Received: " + event);
         });
 
-        dispatcher.subscribe(subject);
-        dispatchers.add(dispatcher);
-
-        log.info("Subscribed to: {}", subject);
-    }
-
-    // Typed subscription
-    public <T> void subscribe(String subject, Class<T> type,
-                               Consumer<T> handler) {
-        Dispatcher dispatcher = connection.createDispatcher(message -> {
-            try {
-                T payload = serializer.deserialize(message.getData(), type);
-                handler.accept(payload);
-            } catch (Exception e) {
-                log.error("Error handling message on {}: {}", subject, e.getMessage());
-            }
-        });
-
-        dispatcher.subscribe(subject);
-        dispatchers.add(dispatcher);
-    }
-
-    // Wildcard subscription
-    public void subscribeWildcard(String pattern, Consumer<Message> handler) {
-        // pattern can be "orders.*" or "orders.>"
-        Dispatcher dispatcher = connection.createDispatcher(message -> {
-            try {
-                log.debug("Received on {}: {} bytes",
-                    message.getSubject(), message.getData().length);
-                handler.accept(message);
-            } catch (Exception e) {
-                log.error("Error handling wildcard message: {}", e.getMessage());
-            }
-        });
-
-        dispatcher.subscribe(pattern);
-        dispatchers.add(dispatcher);
-
-        log.info("Subscribed to pattern: {}", pattern);
-    }
-
-    @PreDestroy
-    public void cleanup() {
-        dispatchers.forEach(Dispatcher::unsubscribe);
+        dispatcher.subscribe("orders.created");
+        dispatcher.subscribe("orders.updated");
+        // Wildcard subscription
+        dispatcher.subscribe("orders.>");
     }
 }
 ```
@@ -299,167 +140,62 @@ public class NatsCoreSubscriber {
 
 ```java
 @Service
-@Slf4j
-public class NatsQueueGroupSubscriber {
+public class QueueGroupWorker {
 
     private final Connection connection;
-    private final NatsMessageSerializer serializer;
-
-    // Queue group subscription - messages distributed among subscribers
-    public <T> void subscribeQueue(String subject, String queueGroup,
-                                    Class<T> type, Consumer<T> handler) {
-
-        Dispatcher dispatcher = connection.createDispatcher(message -> {
-            try {
-                T payload = serializer.deserialize(message.getData(), type);
-                handler.accept(payload);
-            } catch (Exception e) {
-                log.error("Error in queue handler: {}", e.getMessage());
-            }
-        });
-
-        // Subscribe with queue group
-        dispatcher.subscribe(subject, queueGroup);
-
-        log.info("Subscribed to {} as queue group member: {}", subject, queueGroup);
-    }
-}
-
-// Usage example
-@Component
-public class OrderProcessor {
-
-    private final NatsQueueGroupSubscriber subscriber;
 
     @PostConstruct
-    public void setup() {
-        // All instances of this service share the work
-        subscriber.subscribeQueue(
-            "orders.process",
-            "order-processors",
-            OrderEvent.class,
-            this::processOrder
-        );
-    }
+    public void startWorkers() {
+        // Create 3 worker threads sharing the load
+        for (int i = 0; i < 3; i++) {
+            Dispatcher dispatcher = connection.createDispatcher(msg -> {
+                // Simulate processing
+                String data = new String(msg.getData(), StandardCharsets.UTF_8);
+                System.out.println("Worker processed: " + data);
+            });
 
-    private void processOrder(OrderEvent event) {
-        log.info("Processing order: {}", event.getOrderId());
-        // Process...
+            // "order-processors" is the queue group name
+            // Messages will be distributed randomly among members
+            dispatcher.subscribe("orders.process", "order-processors");
+        }
     }
 }
 ```
 
-### Request-Reply
+### Request-Reply (Sync/Async)
 
 ```java
 @Service
-@Slf4j
-public class NatsRequestReplyService {
+public class RequestReplyService {
 
     private final Connection connection;
-    private final NatsMessageSerializer serializer;
 
-    // Synchronous request-reply
-    public <REQ, RES> RES request(String subject, REQ request,
-                                   Class<RES> responseType,
-                                   Duration timeout) {
+    // Requester
+    public UserProfile getUserProfile(String userId, Duration timeout) {
         try {
-            byte[] data = serializer.serialize(request);
-            Message response = connection.request(subject, data, timeout);
+            CompletableFuture<Message> future =
+                connection.request("users.get", userId.getBytes());
 
-            if (response == null) {
-                throw new TimeoutException("No response received within " + timeout);
-            }
+            Message response = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            return deserialize(response.getData());
 
-            return serializer.deserialize(response.getData(), responseType);
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new NatsRequestException("Request interrupted", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Request timeout or failed", e);
         }
     }
 
-    // Async request-reply
-    public <REQ, RES> CompletableFuture<RES> requestAsync(
-            String subject, REQ request, Class<RES> responseType) {
+    // Responder
+    @PostConstruct
+    public void startResponder() {
+        Dispatcher dispatcher = connection.createDispatcher(msg -> {
+            String userId = new String(msg.getData());
+            UserProfile profile = findUser(userId);
 
-        byte[] data = serializer.serialize(request);
-
-        return connection.request(subject, data)
-            .thenApply(response -> {
-                if (response == null) {
-                    throw new CompletionException(
-                        new TimeoutException("No response received"));
-                }
-                return serializer.deserialize(response.getData(), responseType);
-            });
-    }
-
-    // Request with multiple responses (scatter-gather)
-    public <REQ, RES> List<RES> requestMany(String subject, REQ request,
-                                             Class<RES> responseType,
-                                             int expectedResponses,
-                                             Duration timeout) throws Exception {
-        byte[] data = serializer.serialize(request);
-        List<RES> responses = new ArrayList<>();
-        CountDownLatch latch = new CountDownLatch(expectedResponses);
-
-        // Create unique reply subject
-        String replySubject = connection.createInbox();
-
-        Dispatcher dispatcher = connection.createDispatcher(message -> {
-            try {
-                RES response = serializer.deserialize(
-                    message.getData(), responseType);
-                responses.add(response);
-                latch.countDown();
-            } catch (Exception e) {
-                log.error("Error deserializing response", e);
-            }
+            // Send reply to the inbox specified in the request
+            connection.publish(msg.getReplyTo(), serialize(profile));
         });
 
-        dispatcher.subscribe(replySubject);
-
-        try {
-            connection.publish(subject, replySubject, data);
-            latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
-        } finally {
-            dispatcher.unsubscribe(replySubject);
-        }
-
-        return responses;
-    }
-}
-
-// Request responder
-@Service
-public class NatsRequestResponder {
-
-    private final Connection connection;
-    private final NatsMessageSerializer serializer;
-
-    public <REQ, RES> void respondTo(String subject, Class<REQ> requestType,
-                                      Function<REQ, RES> handler) {
-
-        Dispatcher dispatcher = connection.createDispatcher(message -> {
-            try {
-                REQ request = serializer.deserialize(message.getData(), requestType);
-                RES response = handler.apply(request);
-
-                byte[] responseData = serializer.serialize(response);
-                connection.publish(message.getReplyTo(), responseData);
-
-            } catch (Exception e) {
-                log.error("Error handling request on {}: {}", subject, e.getMessage());
-                // Send error response
-                ErrorResponse error = new ErrorResponse(e.getMessage());
-                connection.publish(message.getReplyTo(),
-                    serializer.serialize(error));
-            }
-        });
-
-        dispatcher.subscribe(subject);
-        log.info("Responding to requests on: {}", subject);
+        dispatcher.subscribe("users.get");
     }
 }
 ```
@@ -472,84 +208,33 @@ public class NatsRequestResponder {
 
 ```java
 @Service
-@Slf4j
-public class JetStreamSetup {
+public class StreamSetupService {
 
     private final JetStreamManagement jsm;
 
     @PostConstruct
-    public void setupStreams() throws Exception {
-        createOrdersStream();
-        createEventsStream();
-    }
-
-    private void createOrdersStream() throws Exception {
-        StreamConfiguration config = StreamConfiguration.builder()
+    public void createOrderStream() throws IOException, JetStreamApiException {
+        StreamConfiguration streamConfig = StreamConfiguration.builder()
             .name("ORDERS")
-            .subjects("orders.*", "orders.>")
-            .retentionPolicy(RetentionPolicy.Limits)
-            .maxBytes(1024 * 1024 * 1024)  // 1GB
-            .maxAge(Duration.ofDays(7))
-            .maxMsgSize(1024 * 1024)  // 1MB per message
-            .maxMsgsPerSubject(100000)
-            .replicas(3)
+            .subjects("orders.*")
             .storageType(StorageType.File)
-            .duplicateWindow(Duration.ofMinutes(2))  // Dedup window
-            .discardPolicy(DiscardPolicy.Old)
+            .replicas(1)
+            .retentionPolicy(RetentionPolicy.WorkQueue) // or Limits
+            .maxAge(Duration.ofDays(7))
+            .maxBytes(1024 * 1024 * 1024) // 1GB
             .build();
 
         try {
-            jsm.addStream(config);
-            log.info("Stream ORDERS created");
+            // Update if exists, create if not
+            StreamInfo streamInfo = jsm.getStreamInfo("ORDERS");
+            jsm.updateStream(streamConfig);
         } catch (JetStreamApiException e) {
-            if (e.getApiErrorCode() == 10058) {  // Stream exists
-                jsm.updateStream(config);
-                log.info("Stream ORDERS updated");
+            if (e.getErrorCode() == 404) {
+                jsm.addStream(streamConfig);
             } else {
                 throw e;
             }
         }
-    }
-
-    private void createEventsStream() throws Exception {
-        // Work queue stream - messages removed after ack
-        StreamConfiguration config = StreamConfiguration.builder()
-            .name("EVENTS")
-            .subjects("events.*")
-            .retentionPolicy(RetentionPolicy.WorkQueue)
-            .maxBytes(512 * 1024 * 1024)  // 512MB
-            .maxAge(Duration.ofDays(1))
-            .replicas(3)
-            .storageType(StorageType.File)
-            .build();
-
-        try {
-            jsm.addStream(config);
-            log.info("Stream EVENTS created");
-        } catch (JetStreamApiException e) {
-            if (e.getApiErrorCode() != 10058) {
-                throw e;
-            }
-        }
-    }
-
-    // Get stream info
-    public StreamInfo getStreamInfo(String streamName) throws Exception {
-        return jsm.getStreamInfo(streamName);
-    }
-
-    // Purge stream
-    public void purgeStream(String streamName) throws Exception {
-        jsm.purgeStream(streamName);
-        log.warn("Stream {} purged", streamName);
-    }
-
-    // Purge by subject
-    public void purgeBySubject(String streamName, String subject) throws Exception {
-        PurgeOptions options = PurgeOptions.builder()
-            .subject(subject)
-            .build();
-        jsm.purgeStream(streamName, options);
     }
 }
 ```
@@ -558,130 +243,33 @@ public class JetStreamSetup {
 
 ```java
 @Service
-@Slf4j
 public class JetStreamPublisher {
 
     private final JetStream jetStream;
     private final NatsMessageSerializer serializer;
-    private final MeterRegistry meterRegistry;
 
-    // Synchronous publish with ack
-    public void publish(String subject, Object payload) {
-        try {
-            byte[] data = serializer.serialize(payload);
+    // Sync publish with confirmation
+    public void publishOrder(OrderEvent event) throws IOException, JetStreamApiException {
+        byte[] data = serializer.serialize(event);
+        
+        PublishAck ack = jetStream.publish("orders.created", data);
 
-            PublishOptions options = PublishOptions.builder()
-                .messageId(UUID.randomUUID().toString())  // Deduplication
-                .build();
-
-            PublishAck ack = jetStream.publish(subject, data, options);
-
-            log.debug("Published to stream {} seq {} duplicate {}",
-                ack.getStream(), ack.getSeqno(), ack.isDuplicate());
-
-            meterRegistry.counter("nats.jetstream.publish.success",
-                "subject", subject).increment();
-
-        } catch (Exception e) {
-            meterRegistry.counter("nats.jetstream.publish.error",
-                "subject", subject).increment();
-            throw new PublishException("Failed to publish to " + subject, e);
+        if (ack.isDuplicate()) {
+            // Handle duplicate
         }
-    }
-
-    // Publish with custom message ID (for deduplication)
-    public void publishWithId(String subject, String messageId, Object payload) {
-        try {
-            byte[] data = serializer.serialize(payload);
-
-            PublishOptions options = PublishOptions.builder()
-                .messageId(messageId)
-                .build();
-
-            PublishAck ack = jetStream.publish(subject, data, options);
-
-            if (ack.isDuplicate()) {
-                log.warn("Duplicate message detected: {}", messageId);
-            }
-
-        } catch (Exception e) {
-            throw new PublishException("Failed to publish", e);
-        }
-    }
-
-    // Publish with expected stream
-    public void publishToStream(String stream, String subject, Object payload) {
-        try {
-            byte[] data = serializer.serialize(payload);
-
-            PublishOptions options = PublishOptions.builder()
-                .messageId(UUID.randomUUID().toString())
-                .expectedStream(stream)
-                .build();
-
-            jetStream.publish(subject, data, options);
-
-        } catch (Exception e) {
-            throw new PublishException("Failed to publish to stream " + stream, e);
-        }
+        
+        System.out.println("Published seq: " + ack.getSeq());
     }
 
     // Async publish
-    public CompletableFuture<PublishAck> publishAsync(String subject,
-                                                       Object payload) {
-        try {
-            byte[] data = serializer.serialize(payload);
-
-            PublishOptions options = PublishOptions.builder()
-                .messageId(UUID.randomUUID().toString())
-                .build();
-
-            return jetStream.publishAsync(subject, data, options);
-
-        } catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    // Batch async publish
-    public CompletableFuture<List<PublishAck>> publishBatch(
-            String subject, List<Object> payloads) {
-
-        List<CompletableFuture<PublishAck>> futures = payloads.stream()
-            .map(payload -> publishAsync(subject, payload))
-            .toList();
-
-        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-            .thenApply(v -> futures.stream()
-                .map(CompletableFuture::join)
-                .toList());
-    }
-
-    // Publish with headers
-    public void publishWithHeaders(String subject, Object payload,
-                                    Map<String, String> headerMap) {
-        try {
-            byte[] data = serializer.serialize(payload);
-
-            Headers headers = new Headers();
-            headerMap.forEach(headers::add);
-
-            NatsMessage message = NatsMessage.builder()
-                .subject(subject)
-                .headers(headers)
-                .data(data)
-                .build();
-
-            jetStream.publish(message);
-
-        } catch (Exception e) {
-            throw new PublishException("Failed to publish with headers", e);
-        }
+    public CompletableFuture<PublishAck> publishAsync(OrderEvent event) {
+        byte[] data = serializer.serialize(event);
+        return jetStream.publishAsync("orders.created", data);
     }
 }
 ```
 
-### Push-Based Consumer
+### JetStream Push Consumer
 
 ```java
 @Service
@@ -689,89 +277,40 @@ public class JetStreamPublisher {
 public class JetStreamPushConsumer {
 
     private final JetStream jetStream;
-    private final Connection connection;
     private final NatsMessageSerializer serializer;
-    private JetStreamSubscription subscription;
 
     @PostConstruct
-    public void start() throws Exception {
-        ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
-            .durable("order-processor")
-            .deliverPolicy(DeliverPolicy.All)
-            .ackPolicy(AckPolicy.Explicit)
-            .ackWait(Duration.ofSeconds(30))
-            .maxDeliver(3)
-            .maxAckPending(1000)
-            .filterSubject("orders.created")
-            .build();
-
+    public void startPushConsumer() throws IOException, JetStreamApiException {
+        // Durable push consumer
         PushSubscribeOptions options = PushSubscribeOptions.builder()
-            .stream("ORDERS")
-            .configuration(consumerConfig)
+            .durable("order-processor-push")
+            .deliverSubject("orders.push.inbox") // Optional
             .build();
 
-        Dispatcher dispatcher = connection.createDispatcher();
+        Dispatcher dispatcher = jetStream.createDispatcher();
 
-        subscription = jetStream.subscribe(
-            "orders.created",
-            dispatcher,
-            this::handleMessage,
-            false,  // autoAck = false
-            options
-        );
-
-        log.info("Push consumer started for orders.created");
+        jetStream.subscribe("orders.created", dispatcher, this::handleMessage, false, options);
     }
 
     private void handleMessage(Message message) {
-        String subject = message.getSubject();
-        MessageMetaData meta = message.metaData();
-
-        log.info("Received: subject={}, stream={}, seq={}, deliveryCount={}",
-            subject, meta.getStream(), meta.streamSequence(),
-            meta.deliveredCount());
-
         try {
             OrderEvent event = serializer.deserialize(
                 message.getData(), OrderEvent.class);
-
+            
             processOrder(event);
-
+            
+            // Must acknowledge
             message.ack();
-            log.debug("Acknowledged message seq {}", meta.streamSequence());
-
-        } catch (RetryableException e) {
-            log.warn("Retryable error, will be redelivered: {}", e.getMessage());
-            message.nak();  // Negative ack - redelivery
 
         } catch (Exception e) {
-            log.error("Non-retryable error: {}", e.getMessage());
-
-            if (meta.deliveredCount() >= 3) {
-                // Max retries, terminate
-                message.term();
-                log.error("Max retries exceeded, terminated message");
-            } else {
-                message.nak();
-            }
-        }
-    }
-
-    private void processOrder(OrderEvent event) {
-        // Processing logic
-    }
-
-    @PreDestroy
-    public void stop() throws InterruptedException {
-        if (subscription != null) {
-            subscription.drain(Duration.ofSeconds(10));
-            subscription.unsubscribe();
+            log.error("Error: {}", e.getMessage());
+            message.nak();
         }
     }
 }
 ```
 
-### Pull-Based Consumer
+### JetStream Pull Consumer
 
 ```java
 @Service
@@ -784,18 +323,9 @@ public class JetStreamPullConsumer {
     private ExecutorService executor;
 
     @PostConstruct
-    public void start() throws Exception {
-        ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
-            .durable("batch-processor")
-            .deliverPolicy(DeliverPolicy.All)
-            .ackPolicy(AckPolicy.Explicit)
-            .ackWait(Duration.ofMinutes(1))
-            .maxAckPending(5000)
-            .build();
-
+    public void startPullConsumer() throws IOException, JetStreamApiException {
         PullSubscribeOptions options = PullSubscribeOptions.builder()
-            .stream("ORDERS")
-            .configuration(consumerConfig)
+            .durable("order-processor-pull")
             .build();
 
         JetStreamSubscription subscription =
@@ -1247,7 +777,7 @@ public class CircuitBreakerConsumer {
 
 ---
 
-## Monitoring và Metrics
+## Monitoring and Metrics
 
 ```java
 @Service
@@ -1333,3 +863,4 @@ public class NatsMetricsService {
 - [ ] Plan capacity based on retention
 - [ ] Document subject naming conventions
 - [ ] Test failure scenarios
+

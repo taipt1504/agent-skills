@@ -151,7 +151,7 @@ public class R2dbcConfiguration extends AbstractR2dbcConfiguration {
 max_connections = (core_count * 2) + effective_spindle_count
 ```
 
-Cho SSD:
+For SSD:
 ```
 max_connections = (CPU cores * 2) + 1
 ```
@@ -166,13 +166,13 @@ max_connections = (CPU cores * 2) + 1
 
 ### PostgreSQL max_connections
 
-Đảm bảo PostgreSQL có đủ connections:
+Ensure PostgreSQL has enough connections:
 ```sql
 -- Check current setting
 SHOW max_connections;
 
 -- Recommended: app_pool_max * number_of_instances + buffer
--- Ví dụ: 50 * 3 + 10 = 160
+-- Example: 50 * 3 + 10 = 160
 ALTER SYSTEM SET max_connections = 200;
 ```
 

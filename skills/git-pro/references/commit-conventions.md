@@ -2,7 +2,7 @@
 
 ## Conventional Commits
 
-Standard format được sử dụng rộng rãi.
+Standard format widely used.
 
 ### Format
 

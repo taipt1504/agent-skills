@@ -1,23 +1,23 @@
-# API Documentation
+# API Documentation (English)
 
 ## Overview
 
-Mô tả tổng quan về API/library mà skill này sử dụng.
+A concise overview of the API/library used by this skill.
 
 ## Endpoints / Functions
 
 ### Function 1
 
-```
+```python
 function_name(param1, param2) -> result
 ```
 
 **Parameters:**
-- `param1` (type): Mô tả
-- `param2` (type): Mô tả
+- `param1` (type): Description
+- `param2` (type): Description
 
 **Returns:**
-- `result` (type): Mô tả
+- `result` (type): Description
 
 **Example:**
 ```python
@@ -26,15 +26,15 @@ result = function_name("value1", "value2")
 
 ### Function 2
 
-...
+*(Add additional functions as needed)*
 
 ## Authentication
 
-Mô tả cách authenticate nếu cần.
+Description of authentication method if required.
 
 ## Rate Limits
 
-Thông tin về rate limits nếu có.
+Information about rate limits if applicable.
 
 ## Error Codes
 

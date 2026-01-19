@@ -1,35 +1,39 @@
 # Agent Skills
 
-Hệ thống quản lý skills cho Claude Code CLI.
+Skill management system for Claude Code CLI.
 
 ## Quick Links
 
-- [GUIDE.md](./GUIDE.md) - Hướng dẫn chi tiết sử dụng các skills
-- [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) - System prompt cho Skill Creator Agent
+- [GUIDE.md](./GUIDE_EN.md) - Detailed usage guide for skills
+- [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) - System prompt for Skill Creator Agent
 
-## Cấu trúc
+## Structure
 
 ```
 agent-skills/
-├── SYSTEM_PROMPT.md              # System prompt cho Skill Creator Agent
-├── GUIDE.md                      # Hướng dẫn sử dụng skills
-├── skills/                       # Chứa các skills đã tạo
+├── SYSTEM_PROMPT.md              # System prompt for Skill Creator Agent
+├── GUIDE.md                      # Usage guide for skills (Vietnamese)
+├── GUIDE_EN.md                   # Usage guide for skills (English)
+├── skills/                       # Created skills
 │   ├── postgres-java-reactive-pro/
 │   │   ├── SKILL.md
+│   │   ├── SKILL_EN.md
 │   │   ├── references/
 │   │   └── scripts/
 │   ├── git-pro/
 │   │   ├── SKILL.md
+│   │   ├── SKILL_EN.md
 │   │   ├── references/
 │   │   └── scripts/
 │   └── workflow-agents/
 │       ├── SKILL.md
+│       ├── SKILL_EN.md
 │       ├── references/
 │       ├── scripts/
 │       └── templates/
 ├── templates/
-│   ├── SKILL.md            # Template skill đơn giản
-│   └── advanced-skill/           # Template skill với refs & scripts
+│   ├── SKILL.md            # Simple skill template
+│   └── advanced-skill/     # Advanced skill template with refs & scripts
 └── README.md
 ```
 
@@ -40,31 +44,33 @@ agent-skills/
 | [postgres-java-reactive-pro](./skills/postgres-java-reactive-pro/) | High-performance PostgreSQL with R2DBC        | `/postgres-reactive` |
 | [git-pro](./skills/git-pro/)                                       | Advanced Git with intelligent commit messages | `/git-pro`           |
 | [workflow-agents](./skills/workflow-agents/)                       | Multi-agent workflow orchestration            | `/workflow-agents`   |
+| [java-spring-reactive-expert](./skills/java-spring-reactive-expert/) | Expert guidance for reactive Java with Spring WebFlux | `/reactive-java`     |
+| [message-queue-java-expert](./skills/message-queue-java-expert/)     | Expert guidance for Kafka, RabbitMQ, and NATS in Java | `/mq-java`           |
 
-## Sử dụng
+## Usage
 
-### Tạo skill đơn giản
+### Create a Simple Skill
 
-1. Copy `templates/SKILL.md` vào `skills/`
-2. Rename và điền nội dung
+1. Copy `templates/SKILL.md` to `skills/`
+2. Rename and fill in the content
 
-### Tạo skill phức tạp (với references và scripts)
+### Create an Advanced Skill (with references and scripts)
 
-1. Copy folder `templates/advanced-skill/` vào `skills/`
-2. Rename folder và cập nhật nội dung:
-   - `SKILL.md` - File chính
-   - `references/` - Tài liệu tham khảo
-   - `scripts/` - Scripts hỗ trợ
+1. Copy folder `templates/advanced-skill/` to `skills/`
+2. Rename folder and update content:
+   - `SKILL.md` - Main file
+   - `references/` - Reference documentation
+   - `scripts/` - Support scripts
 
-### Sử dụng Skill Creator Agent
+### Using Skill Creator Agent
 
-Load `SYSTEM_PROMPT.md` làm system prompt cho Claude để có AI assistant hỗ trợ tạo skills.
+Load `SYSTEM_PROMPT.md` as a system prompt for Claude to use the AI assistant for creating skills.
 
 ## Skill Components
 
-| Component     | Mô tả                              | Bắt buộc |
+| Component     | Description                        | Required |
 | ------------- | ---------------------------------- | -------- |
-| `SKILL.md`    | File chính chứa instructions       | Yes      |
+| `SKILL.md`    | Main file containing instructions  | Yes      |
 | `references/` | API docs, examples, external links | No       |
 | `scripts/`    | Setup, helpers, validators         | No       |
 
@@ -73,7 +79,7 @@ Load `SYSTEM_PROMPT.md` làm system prompt cho Claude để có AI assistant h�
 ```yaml
 ---
 name: skill-name
-description: Mô tả ngắn
+description: Short description
 triggers:
   - keyword
   - /command
@@ -87,25 +93,25 @@ scripts: # Optional
 ---
 ```
 
-## Tools hỗ trợ
+## Supported Tools
 
-| Tool      | Chức năng        |
+| Tool      | Function         |
 | --------- | ---------------- |
-| Read      | Đọc file         |
-| Write     | Tạo file         |
-| Edit      | Sửa file         |
-| Glob      | Tìm files        |
-| Grep      | Tìm nội dung     |
+| Read      | Read file        |
+| Write     | Create file      |
+| Edit      | Edit file        |
+| Glob      | Find files       |
+| Grep      | Find content     |
 | Bash      | Shell commands   |
 | WebFetch  | Fetch web        |
-| WebSearch | Tìm kiếm web     |
+| WebSearch | Web search       |
 | Task      | Spawn sub-agents |
 
 ## Documentation
 
-Xem [GUIDE.md](./GUIDE.md) để biết chi tiết về:
+See [GUIDE_EN.md](./GUIDE_EN.md) for details on:
 
-- Cách sử dụng từng skill
-- Scripts và commands
-- Quick reference và examples
-- Anti-patterns cần tránh
+- How to use each skill
+- Scripts and commands
+- Quick reference and examples
+- Anti-patterns to avoid

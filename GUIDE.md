@@ -1,66 +1,66 @@
 # Agent Skills Guide
 
-Hướng dẫn chi tiết sử dụng các skills trong hệ thống.
+Comprehensive guide for using skills within the system.
 
 ---
 
-## Mục lục
+## Table of Contents
 
-1. [Tổng quan](#tổng-quan)
-2. [Cách sử dụng Skills](#cách-sử-dụng-skills)
-3. [Danh sách Skills](#danh-sách-skills)
+1. [Overview](#overview)
+2. [How to Use Skills](#how-to-use-skills)
+3. [List of Skills](#list-of-skills)
    - [postgres-java-reactive-pro](#postgres-java-reactive-pro)
    - [git-pro](#git-pro)
    - [workflow-agents](#workflow-agents)
-4. [Tạo Skill mới](#tạo-skill-mới)
+4. [Creating New Skills](#creating-new-skills)
 
 ---
 
-## Tổng quan
+## Overview
 
-Skills là các module kiến thức chuyên biệt giúp AI agent thực hiện các tác vụ cụ thể một cách hiệu quả. Mỗi skill bao gồm:
+Skills are specialized knowledge modules that enable the AI agent to perform specific tasks efficiently. Each skill consists of:
 
-| Component     | Mô tả                                          |
-| ------------- | ---------------------------------------------- |
-| `SKILL.md`    | File chính chứa instructions và best practices |
-| `references/` | Tài liệu tham khảo, API docs, examples         |
-| `scripts/`    | Scripts hỗ trợ (setup, validation, benchmark)  |
+| Component     | Description                                           |
+| ------------- | ----------------------------------------------------- |
+| `SKILL.md`    | Main file containing instructions and best practices  |
+| `references/` | Reference documentation, API docs, and examples       |
+| `scripts/`    | Support scripts (setup, validation, benchmark)        |
 
-## Cách sử dụng Skills
+## How to Use Skills
 
-### 1. Kích hoạt bằng Triggers
+### 1. Activation via Triggers
 
-Mỗi skill có các trigger keywords. Khi user đề cập đến các keywords này, agent sẽ tự động áp dụng skill tương ứng.
+Each skill has trigger keywords. When a user mentions these keywords, the agent automatically applies the corresponding skill.
 
 ```
-User: "Giúp tôi optimize query r2dbc postgresql"
-Agent: [Áp dụng skill postgres-java-reactive-pro]
+User: "Help me optimize r2dbc postgresql query"
+Agent: [Applies skill postgres-java-reactive-pro]
 ```
 
-### 2. Kích hoạt bằng Slash Command
+### 2. Activation via Slash Command
 
-Một số skills hỗ trợ slash command để kích hoạt trực tiếp:
+Some skills support slash commands for direct activation:
 
 ```
 User: "/postgres-reactive"
-Agent: [Áp dụng skill postgres-java-reactive-pro]
+Agent: [Applies skill postgres-java-reactive-pro]
 ```
 
-### 3. Sử dụng Scripts
+### 3. Using Scripts
 
-Các scripts trong skill có thể được chạy độc lập:
+Scripts within a skill can be executed independently:
 
 ```bash
-# Chạy script phân tích
+# Run analysis script
 python skills/postgres-java-reactive-pro/scripts/analyze-queries.py --help
 
-# Chạy benchmark
+# Run benchmark
 ./skills/postgres-java-reactive-pro/scripts/benchmark.sh --help
 ```
 
 ---
 
-## Danh sách Skills
+## List of Skills
 
 ---
 
@@ -68,7 +68,7 @@ python skills/postgres-java-reactive-pro/scripts/analyze-queries.py --help
 
 **Expert guidance for high-performance PostgreSQL with Java Reactive using R2DBC**
 
-#### Thông tin
+#### Information
 
 | Field         | Value                                      |
 | ------------- | ------------------------------------------ |
@@ -78,7 +78,7 @@ python skills/postgres-java-reactive-pro/scripts/analyze-queries.py --help
 
 #### Triggers
 
-Skill được kích hoạt khi user đề cập:
+The skill is activated when the user mentions:
 
 - `r2dbc postgresql`
 - `reactive postgres java`
@@ -87,18 +87,18 @@ Skill được kích hoạt khi user đề cập:
 
 #### Use Cases
 
-| Scenario                  | Skill giúp gì                                                 |
+| Scenario                  | How the Skill Helps                                           |
 | ------------------------- | ------------------------------------------------------------- |
-| Thiết kế repository layer | Hướng dẫn patterns cho ReactiveCrudRepository, custom queries |
-| Tối ưu connection pool    | Config pool size, timeouts, validation                        |
-| Batch operations          | Patterns cho bulk insert, upsert, batch update                |
+| Repository layer design   | Guidance on patterns for ReactiveCrudRepository, custom queries |
+| Connection pool optim     | Configuring pool size, timeouts, validation                   |
+| Batch operations          | Patterns for bulk insert, upsert, batch update                |
 | Query optimization        | Keyset pagination, covering indexes, avoiding N+1             |
 | Streaming large data      | Backpressure handling, limitRate, buffer                      |
 | Transaction management    | Reactive transactions, savepoints                             |
 
 #### References
 
-| File                               | Nội dung                                                            |
+| File                               | Content                                                             |
 | ---------------------------------- | ------------------------------------------------------------------- |
 | `references/r2dbc-config.md`       | Dependencies, connection config, pool settings, SSL, converters     |
 | `references/query-patterns.md`     | Repository patterns, pagination, batch ops, joins, locking          |
@@ -108,19 +108,19 @@ Skill được kích hoạt khi user đề cập:
 
 ##### analyze-queries.py
 
-Phân tích slow queries từ PostgreSQL logs hoặc pg_stat_statements.
+Analyzes slow queries from PostgreSQL logs or `pg_stat_statements`.
 
 ```bash
-# Phân tích log file
+# Analyze log file
 python scripts/analyze-queries.py --log /var/log/postgresql/postgresql.log
 
-# Với threshold tùy chỉnh (mặc định 100ms)
+# With custom threshold (default 100ms)
 python scripts/analyze-queries.py --log postgresql.log --threshold 50
 
-# Lấy stats từ pg_stat_statements
+# Get stats from pg_stat_statements
 python scripts/analyze-queries.py --stats --host localhost --database mydb --user postgres
 
-# Xem top 30 slow queries
+# View top 30 slow queries
 python scripts/analyze-queries.py --log postgresql.log --top 30
 ```
 
@@ -143,10 +143,10 @@ Recommendations:
 
 ##### benchmark.sh
 
-Benchmark connection pool với các pool sizes khác nhau.
+Benchmarks connection pool with different pool sizes.
 
 ```bash
-# Chạy với defaults
+# Run with defaults
 ./scripts/benchmark.sh
 
 # Custom configuration
@@ -240,24 +240,24 @@ public Flux<User> streamUsers() {
 
 | Anti-pattern                    | Problem                | Solution                   |
 | ------------------------------- | ---------------------- | -------------------------- |
-| `.block()` trong reactive chain | Blocks event loop      | Keep chain fully reactive  |
+| `.block()` in reactive chain    | Blocks event loop      | Keep chain fully reactive  |
 | `SELECT *`                      | Over-fetching          | Select only needed columns |
-| Offset pagination               | Slow với large offsets | Use keyset pagination      |
-| N+1 queries                     | Multiple round trips   | Use JOINs hoặc batch fetch |
+| Offset pagination               | Slow with large offsets| Use keyset pagination      |
+| N+1 queries                     | Multiple round trips   | Use JOINs or batch fetch   |
 | Unbounded queries               | Memory exhaustion      | Always use LIMIT           |
 
-#### Checklist Production
+#### Production Checklist
 
 ```
 [ ] Connection pool sized correctly
 [ ] Prepared statement cache enabled
-[ ] All queries có proper indexes
+[ ] All queries have proper indexes
 [ ] No N+1 queries
-[ ] Large result sets dùng streaming/pagination
-[ ] Transactions có proper timeout
-[ ] Metrics và logging configured
+[ ] Large result sets use streaming/pagination
+[ ] Transactions have proper timeouts
+[ ] Metrics and logging configured
 [ ] Slow query threshold set
-[ ] Health check endpoint cho database
+[ ] Health check endpoint for database
 [ ] Graceful shutdown handling
 ```
 
@@ -267,7 +267,7 @@ public Flux<User> streamUsers() {
 
 **Advanced Git source control with intelligent commit message generation**
 
-#### Thông tin
+#### Information
 
 | Field         | Value              |
 | ------------- | ------------------ |
@@ -277,7 +277,7 @@ public Flux<User> streamUsers() {
 
 #### Triggers
 
-Skill được kích hoạt khi user đề cập:
+The skill is activated when the user mentions:
 
 - `git advanced`
 - `git workflow`
@@ -287,20 +287,20 @@ Skill được kích hoạt khi user đề cập:
 
 #### Use Cases
 
-| Scenario                | Skill giúp gì                                              |
+| Scenario                | How the Skill Helps                                        |
 | ----------------------- | ---------------------------------------------------------- |
-| Phân tích repo status   | Comprehensive analysis của working tree, branches, remotes |
-| Generate commit message | Tự động tạo message theo Conventional Commits              |
-| Branch management       | Patterns cho branching, merging, rebasing                  |
+| Repo status analysis    | Comprehensive analysis of working tree, branches, remotes  |
+| Generate commit message | Automatically generate messages following Conventional Commits |
+| Branch management       | Patterns for branching, merging, rebasing                  |
 | History analysis        | Search commits, blame, bisect                              |
-| Conflict resolution     | Strategies và commands cho merge conflicts                 |
+| Conflict resolution     | Strategies and commands for merge conflicts                |
 | Repository cleanup      | Prune, gc, stale branches                                  |
 
 #### References
 
-| File                               | Nội dung                                      |
+| File                               | Content                                       |
 | ---------------------------------- | --------------------------------------------- |
-| `references/commands.md`           | Full Git command reference với examples       |
+| `references/commands.md`           | Full Git command reference with examples      |
 | `references/workflows.md`          | GitFlow, GitHub Flow, Trunk-Based Development |
 | `references/commit-conventions.md` | Conventional Commits specification            |
 
@@ -308,7 +308,7 @@ Skill được kích hoạt khi user đề cập:
 
 ##### analyze-repo.sh
 
-Phân tích toàn diện trạng thái repository.
+Comprehensive repository status analysis.
 
 ```bash
 # Full analysis
@@ -360,13 +360,13 @@ Untracked:   2 files
 
 ##### generate-commit-msg.py
 
-Generate commit message tối ưu từ staged changes.
+Generates optimal commit messages from staged changes.
 
 ```bash
 # Generate message
 python scripts/generate-commit-msg.py
 
-# Analyze only (không generate)
+# Analyze only (do not generate)
 python scripts/generate-commit-msg.py --analyze
 
 # Force specific type
@@ -453,13 +453,13 @@ To use this message:
 ##### Useful Commands
 
 ```bash
-# Status với branch info
+# Status with branch info
 git status -sb
 
-# Log với graph
+# Log with graph
 git log --oneline --graph -20
 
-# Stash với message
+# Stash with message
 git stash push -m "WIP: feature"
 
 # Interactive rebase
@@ -472,13 +472,13 @@ git cherry-pick abc123
 git reset --soft HEAD~1
 ```
 
-##### Keyset Pagination
+##### History Search
 
 ```bash
-# Tìm commits by message
+# Find commits by message
 git log --grep="keyword" --oneline
 
-# Tìm commits by code
+# Find commits by code
 git log -S "function_name" --oneline
 
 # Blame specific lines
@@ -489,31 +489,31 @@ git blame -L 10,20 file.ts
 
 | Anti-pattern              | Problem                    | Solution                    |
 | ------------------------- | -------------------------- | --------------------------- |
-| Commit trực tiếp vào main | Risk, no review            | Use feature branches        |
+| Commit directly to main   | Risk, no review            | Use feature branches        |
 | Force push shared branch  | Overwrites others' work    | Use `--force-with-lease`    |
 | Vague commit messages     | Hard to understand history | Follow Conventional Commits |
 | Large commits             | Hard to review, revert     | Atomic commits              |
 | Commit secrets            | Security risk              | Use .gitignore, git-secrets |
 
-#### Checklist trước Commit
+#### Pre-Commit Checklist
 
 ```
-[ ] Review tất cả changes (git diff --cached)
-[ ] Không commit files không cần thiết
-[ ] Không commit sensitive data
-[ ] Commit message theo conventions
+[ ] Review all changes (git diff --cached)
+[ ] No unnecessary files
+[ ] No sensitive data
+[ ] Commit message follows conventions
 [ ] Tests pass
-[ ] Code đã format
+[ ] Code formatted
 ```
 
-#### Checklist trước Push
+#### Pre-Push Checklist
 
 ```
 [ ] Pull/rebase latest changes
 [ ] Resolve conflicts
 [ ] Run tests locally
 [ ] Review commit history
-[ ] Đúng branch
+[ ] Correct branch
 ```
 
 ---
@@ -522,7 +522,7 @@ git blame -L 10,20 file.ts
 
 **Design and orchestrate multi-agent workflows for building products with Claude Agent SDK**
 
-#### Thông tin
+#### Information
 
 | Field         | Value                                |
 | ------------- | ------------------------------------ |
@@ -532,7 +532,7 @@ git blame -L 10,20 file.ts
 
 #### Triggers
 
-Skill được kích hoạt khi user đề cập:
+The skill is activated when the user mentions:
 
 - `workflow agent`
 - `multi-agent`
@@ -542,28 +542,28 @@ Skill được kích hoạt khi user đề cập:
 
 #### Use Cases
 
-| Scenario                | Skill giúp gì                                                         |
+| Scenario                | How the Skill Helps                                                   |
 | ----------------------- | --------------------------------------------------------------------- |
-| Design agent hierarchy  | Patterns cho agent specialization, tool restrictions, model selection |
+| Design agent hierarchy  | Patterns for agent specialization, tool restrictions, model selection |
 | Orchestration patterns  | Sequential, Parallel, Conditional, Iterative, Supervisor patterns     |
-| Agent definitions       | Templates cho code-reviewer, bug-fixer, architect, test-runner        |
+| Agent definitions       | Templates for code-reviewer, bug-fixer, architect, test-runner        |
 | SDK integration         | Python/TypeScript SDK usage, programmatic control                     |
 | Permission management   | Tool restrictions, permission modes, security best practices          |
 | Workflow automation     | Event-driven pipelines, saga patterns, map-reduce                     |
 
 #### References
 
-| File                                | Nội dung                                                    |
+| File                                | Content                                                     |
 | ----------------------------------- | ----------------------------------------------------------- |
 | `references/sdk-guide.md`           | Claude Agent SDK overview, query function, options          |
-| `references/orchestration-patterns.md` | 8 orchestration patterns với implementation examples     |
-| `references/agent-definitions.md`   | Example agents với complete definitions                     |
+| `references/orchestration-patterns.md` | 8 orchestration patterns with implementation examples    |
+| `references/agent-definitions.md`   | Example agents with complete definitions                    |
 
 #### Scripts
 
 ##### scaffold-project.sh
 
-Scaffold một agent-based project mới với structure và templates.
+Scaffolds a new agent-based project with structure and templates.
 
 ```bash
 # Python project (default)
@@ -602,7 +602,7 @@ my-agent-product/
 
 ##### validate-agents.py
 
-Validate agent configurations cho correctness và best practices.
+Validates agent configurations for correctness and best practices.
 
 ```bash
 # Validate .claude/agents/ directory
@@ -733,14 +733,14 @@ async def run_workflow():
 
 | Anti-pattern                   | Problem                  | Solution                         |
 | ------------------------------ | ------------------------ | -------------------------------- |
-| Write tools cho reviewers      | Security risk            | Use read-only tools              |
-| Opus cho simple tasks          | Waste of resources       | Match model to task complexity   |
+| Write tools for reviewers      | Security risk            | Use read-only tools              |
+| Opus for simple tasks          | Waste of resources       | Match model to task complexity   |
 | No tool restrictions           | Agents do too much       | Least privilege principle        |
 | Vague agent descriptions       | Wrong agent selection    | Clear "Use when..." guidance     |
 | Missing output format          | Inconsistent results     | Define expected structure        |
 | Single monolithic agent        | Hard to maintain         | Specialize by responsibility     |
 
-#### Checklist Agent Definition
+#### Agent Definition Checklist
 
 ```
 [ ] Name is descriptive and unique
@@ -752,7 +752,7 @@ async def run_workflow():
 [ ] Anti-patterns documented
 ```
 
-#### Checklist Workflow Design
+#### Workflow Design Checklist
 
 ```
 [ ] Agents have clear responsibilities
@@ -766,15 +766,120 @@ async def run_workflow():
 
 ---
 
-## Tạo Skill mới
+### java-spring-reactive-expert
 
-### Sử dụng Template
+**Expert guidance for high-performance reactive Java with Spring WebFlux, Project Reactor, and reactive data access patterns**
+
+#### Information
+
+| Field         | Value                                                                 |
+| ------------- | --------------------------------------------------------------------- |
+| Name          | `java-spring-reactive-expert`                                         |
+| Slash Command | `/reactive-java`                                                      |
+| Stack         | Java, Spring WebFlux, Project Reactor, R2DBC, MongoDB Reactive, Redis |
+
+#### Triggers
+
+The skill is activated when the user mentions:
+
+- `spring webflux`
+- `java reactive`
+- `reactor`
+- `mono flux`
+- `reactive spring`
+
+#### Use Cases
+
+| Scenario                | How the Skill Helps                                          |
+| ----------------------- | ------------------------------------------------------------ |
+| REST API implementation | Patterns for Annotated Controllers and Functional Endpoints  |
+| Non-blocking I/O        | Optimizing throughput for high-concurrency applications      |
+| Reactive Data Access    | R2DBC, Reactive MongoDB, and Redis implementation patterns   |
+| Reactive Security       | JWT, OAuth2, and method-level security in WebFlux            |
+| Performance Integration | Backpressure handling, connection pooling, and optimizing GC |
+
+#### References
+
+| File                                 | Content                                                   |
+| ------------------------------------ | --------------------------------------------------------- |
+| `references/webflux-patterns.md`     | Controller patterns, WebClient, SSE, WebSocket, Error handling |
+| `references/reactive-data-access.md` | R2DBC, MongoDB, Redis configuration and patterns          |
+| `references/reactive-security.md`    | Security context, JWT, OAuth2, Method security            |
+| `references/performance-optimization.md`| Memory management, scheduler tuning, pooling, metrics    |
+
+#### Scripts
+
+##### analyze-blocking-calls.py
+
+Detects blocking calls in reactive code paths.
+
+##### benchmark-reactive.sh
+
+Benchmarks reactive endpoints to measure throughput and latency under load.
+
+---
+
+### message-queue-java-expert
+
+**Expert guidance for implementing message queue systems in Java (Kafka, RabbitMQ, NATS)**
+
+#### Information
+
+| Field         | Value                                                   |
+| ------------- | ------------------------------------------------------- |
+| Name          | `message-queue-java-expert`                             |
+| Slash Command | `/mq-java`                                              |
+| Stack         | Java, Kafka, RabbitMQ, NATS, Spring Cloud Stream        |
+
+#### Triggers
+
+The skill is activated when the user mentions:
+
+- `kafka java`
+- `rabbitmq java`
+- `nats java`
+- `message queue`
+- `event streaming`
+
+#### Use Cases
+
+| Scenario                  | How the Skill Helps                                              |
+| ------------------------- | ---------------------------------------------------------------- |
+| Event-Driven Architecture | Designing reliable event streams and messaging patterns          |
+| Reliable Delivery         | Implementing At-Least-Once, Exactly-Once, and transaction patterns |
+| High Throughput           | Tuning batch sizes, compression, and parallelism for performance |
+| Consumer Scaling          | Configuring consumer groups, partitions, and concurrency         |
+| Error Handling            | Dead Letter Queues (DLQ), retry strategies, and circuit breakers |
+
+#### References
+
+| File                            | Content                                                     |
+| ------------------------------- | ----------------------------------------------------------- |
+| `references/kafka-patterns.md`  | Producer/Consumer patterns, transactions, tuning for Kafka  |
+| `references/rabbitmq-patterns.md`| Exchanges, queues, reliability, and RPC patterns for RabbitMQ |
+| `references/nats-patterns.md`   | Core NATS and JetStream patterns for high-performance messaging |
+
+#### Scripts
+
+##### analyze-consumer-lag.py
+
+Monitors and analyzes consumer lag for Kafka/RabbitMQ.
+
+##### benchmark-throughput.sh
+
+Measures message throughput and latency for different broker configurations.
+
+---
+
+## Creating New Skills
+
+### Using Templates
 
 ```bash
-# Skill đơn giản
+# Simple skill
 cp templates/SKILL.md skills/SKILL.md
 
-# Skill phức tạp
+# Complex skill
 cp -r templates/advanced-skill skills/my-new-skill
 ```
 
@@ -798,35 +903,3 @@ skills/my-new-skill/
 name: my-new-skill
 description: Short description of the skill
 triggers:
-  - keyword 1
-  - keyword 2
-  - /slash-command
-tools:
-  - Read
-  - Write
-  - Edit
-references:
-  - references/api-docs.md
-scripts:
-  - scripts/setup.sh
----
-```
-
-### Best Practices
-
-1. **Clear triggers** - Chọn keywords cụ thể, tránh quá chung chung
-2. **Focused scope** - Một skill làm một việc tốt
-3. **Examples** - Cung cấp code examples cụ thể
-4. **Anti-patterns** - Liệt kê những gì KHÔNG nên làm
-5. **Scripts** - Tạo scripts hữu ích cho automation
-
----
-
-## Contributing
-
-Khi thêm skill mới:
-
-1. Tạo skill theo template
-2. Test skill với các scenarios khác nhau
-3. Cập nhật GUIDE.md với documentation
-4. Đảm bảo scripts có `--help` option
