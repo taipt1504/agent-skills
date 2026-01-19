@@ -18,10 +18,15 @@ agent-skills/
 │   │   ├── SKILL.md
 │   │   ├── references/
 │   │   └── scripts/
-│   └── git-pro/
+│   ├── git-pro/
+│   │   ├── SKILL.md
+│   │   ├── references/
+│   │   └── scripts/
+│   └── workflow-agents/
 │       ├── SKILL.md
 │       ├── references/
-│       └── scripts/
+│       ├── scripts/
+│       └── templates/
 ├── templates/
 │   ├── SKILL.md            # Template skill đơn giản
 │   └── advanced-skill/           # Template skill với refs & scripts
@@ -34,6 +39,7 @@ agent-skills/
 | ------------------------------------------------------------------ | --------------------------------------------- | -------------------- |
 | [postgres-java-reactive-pro](./skills/postgres-java-reactive-pro/) | High-performance PostgreSQL with R2DBC        | `/postgres-reactive` |
 | [git-pro](./skills/git-pro/)                                       | Advanced Git with intelligent commit messages | `/git-pro`           |
+| [workflow-agents](./skills/workflow-agents/)                       | Multi-agent workflow orchestration            | `/workflow-agents`   |
 
 ## Sử dụng
 

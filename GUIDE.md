@@ -11,6 +11,7 @@ Hướng dẫn chi tiết sử dụng các skills trong hệ thống.
 3. [Danh sách Skills](#danh-sách-skills)
    - [postgres-java-reactive-pro](#postgres-java-reactive-pro)
    - [git-pro](#git-pro)
+   - [workflow-agents](#workflow-agents)
 4. [Tạo Skill mới](#tạo-skill-mới)
 
 ---
@@ -513,6 +514,254 @@ git blame -L 10,20 file.ts
 [ ] Run tests locally
 [ ] Review commit history
 [ ] Đúng branch
+```
+
+---
+
+### workflow-agents
+
+**Design and orchestrate multi-agent workflows for building products with Claude Agent SDK**
+
+#### Thông tin
+
+| Field         | Value                                |
+| ------------- | ------------------------------------ |
+| Name          | `workflow-agents`                    |
+| Slash Command | `/workflow-agents`                   |
+| Stack         | Claude Agent SDK, Python, TypeScript |
+
+#### Triggers
+
+Skill được kích hoạt khi user đề cập:
+
+- `workflow agent`
+- `multi-agent`
+- `agent orchestration`
+- `agent hierarchy`
+- `claude agent sdk`
+
+#### Use Cases
+
+| Scenario                | Skill giúp gì                                                         |
+| ----------------------- | --------------------------------------------------------------------- |
+| Design agent hierarchy  | Patterns cho agent specialization, tool restrictions, model selection |
+| Orchestration patterns  | Sequential, Parallel, Conditional, Iterative, Supervisor patterns     |
+| Agent definitions       | Templates cho code-reviewer, bug-fixer, architect, test-runner        |
+| SDK integration         | Python/TypeScript SDK usage, programmatic control                     |
+| Permission management   | Tool restrictions, permission modes, security best practices          |
+| Workflow automation     | Event-driven pipelines, saga patterns, map-reduce                     |
+
+#### References
+
+| File                                | Nội dung                                                    |
+| ----------------------------------- | ----------------------------------------------------------- |
+| `references/sdk-guide.md`           | Claude Agent SDK overview, query function, options          |
+| `references/orchestration-patterns.md` | 8 orchestration patterns với implementation examples     |
+| `references/agent-definitions.md`   | Example agents với complete definitions                     |
+
+#### Scripts
+
+##### scaffold-project.sh
+
+Scaffold một agent-based project mới với structure và templates.
+
+```bash
+# Python project (default)
+./scripts/scaffold-project.sh my-agent-product --python
+
+# TypeScript project
+./scripts/scaffold-project.sh my-agent-product --typescript
+
+# Minimal setup
+./scripts/scaffold-project.sh my-agent-product --minimal
+
+# Help
+./scripts/scaffold-project.sh --help
+```
+
+**Output structure:**
+
+```
+my-agent-product/
+├── .claude/
+│   ├── agents/           # Agent definitions
+│   │   ├── code-reviewer.md
+│   │   ├── bug-fixer.md
+│   │   └── test-runner.md
+│   ├── CLAUDE.md         # Project context
+│   └── settings.json     # Permissions
+├── src/
+│   ├── agents/           # Agent code
+│   │   ├── definitions.py/ts
+│   │   └── orchestrator.py/ts
+│   └── main.py/ts
+├── tests/
+├── requirements.txt / package.json
+└── README.md
+```
+
+##### validate-agents.py
+
+Validate agent configurations cho correctness và best practices.
+
+```bash
+# Validate .claude/agents/ directory
+python scripts/validate-agents.py
+
+# Custom path
+python scripts/validate-agents.py --path /custom/path
+
+# Strict mode (fail on warnings)
+python scripts/validate-agents.py --strict
+
+# JSON output
+python scripts/validate-agents.py --json
+```
+
+**Output example:**
+
+```
+============================================================
+File: .claude/agents/code-reviewer.md
+Valid: ✓
+Agent: code-reviewer
+Tools: Read, Glob, Grep
+Model: sonnet
+
+Issues (2):
+  ℹ️  INFO: Description doesn't indicate when to use the agent
+          → Include 'Use when...' or 'Use for...' in description
+  ℹ️  INFO: No checklist or steps found in prompt
+          → Consider adding a checklist or step-by-step process
+
+============================================================
+Summary
+============================================================
+Files validated: 3
+Errors: 0
+Warnings: 0
+Info: 4
+
+✓ All validations passed
+```
+
+#### Quick Reference
+
+##### Agent Definition Format
+
+```markdown
+---
+name: agent-name
+description: When to use this agent. Use for specific tasks.
+tools: Read, Glob, Grep
+model: sonnet
+---
+
+You are an expert in [domain].
+
+## Process
+1. First step
+2. Second step
+3. Third step
+
+## Output Format
+[Define expected output structure]
+```
+
+##### Model Selection Guide
+
+| Model  | Use For                              | Cost    |
+| ------ | ------------------------------------ | ------- |
+| Haiku  | Simple tasks, test running, linting  | Lowest  |
+| Sonnet | Most development tasks, code review  | Medium  |
+| Opus   | Architecture, complex reasoning      | Highest |
+
+##### Tool Restriction Patterns
+
+```markdown
+# Read-only agent (reviewers, analyzers)
+tools: Read, Glob, Grep
+
+# Development agent (builders, fixers)
+tools: Read, Write, Edit, Bash, Glob, Grep
+
+# Orchestrator agent (coordinators)
+tools: Read, Glob, Grep, Task
+```
+
+##### Permission Modes
+
+| Mode              | Description                          |
+| ----------------- | ------------------------------------ |
+| `default`         | Prompt for each tool use             |
+| `acceptEdits`     | Auto-accept file edits               |
+| `bypassPermissions` | Skip all permission prompts        |
+| `plan`            | Planning mode only                   |
+
+##### Basic Orchestration
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions
+
+async def run_workflow():
+    options = ClaudeAgentOptions(
+        allowed_tools=["Read", "Write", "Task"],
+        permission_mode="acceptEdits",
+        agents=AGENTS,
+        model="sonnet"
+    )
+
+    async for message in query(prompt="...", options=options):
+        if hasattr(message, 'result'):
+            print(message.result)
+```
+
+#### Orchestration Patterns
+
+| Pattern               | Use Case                              |
+| --------------------- | ------------------------------------- |
+| Sequential Pipeline   | Step-by-step processes                |
+| Parallel Fan-out      | Independent parallel tasks            |
+| Conditional Branching | Decision-based routing                |
+| Iterative Refinement  | Quality improvement loops             |
+| Supervisor            | Complex coordination                  |
+| Event-Driven          | Reactive automation                   |
+| Map-Reduce            | Batch processing                      |
+| Saga                  | Reversible operations                 |
+
+#### Anti-patterns to Avoid
+
+| Anti-pattern                   | Problem                  | Solution                         |
+| ------------------------------ | ------------------------ | -------------------------------- |
+| Write tools cho reviewers      | Security risk            | Use read-only tools              |
+| Opus cho simple tasks          | Waste of resources       | Match model to task complexity   |
+| No tool restrictions           | Agents do too much       | Least privilege principle        |
+| Vague agent descriptions       | Wrong agent selection    | Clear "Use when..." guidance     |
+| Missing output format          | Inconsistent results     | Define expected structure        |
+| Single monolithic agent        | Hard to maintain         | Specialize by responsibility     |
+
+#### Checklist Agent Definition
+
+```
+[ ] Name is descriptive and unique
+[ ] Description includes "Use when..." guidance
+[ ] Tools follow least privilege principle
+[ ] Model matches task complexity
+[ ] Prompt includes clear process/checklist
+[ ] Output format defined
+[ ] Anti-patterns documented
+```
+
+#### Checklist Workflow Design
+
+```
+[ ] Agents have clear responsibilities
+[ ] Tool permissions properly restricted
+[ ] Orchestration pattern matches use case
+[ ] Error handling planned
+[ ] Session management considered
+[ ] Testing strategy defined
+[ ] Permissions configured in settings.json
 ```
 
 ---
