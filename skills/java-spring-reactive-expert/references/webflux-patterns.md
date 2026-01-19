@@ -1,6 +1,7 @@
 # WebFlux Patterns Reference
 
 ## Table of Contents
+- [Annotated Controller Patterns](#annotated-controller-patterns)
 - [Router Function Patterns](#router-function-patterns)
 - [Handler Patterns](#handler-patterns)
 - [WebClient Advanced Patterns](#webclient-advanced-patterns)
@@ -8,6 +9,983 @@
 - [Request/Response Processing](#requestresponse-processing)
 - [Error Handling Strategies](#error-handling-strategies)
 - [Filter Patterns](#filter-patterns)
+
+---
+
+## Annotated Controller Patterns
+
+### Basic Controller với @RestController
+
+```java
+@RestController
+@RequestMapping("/api/v1/users")
+@RequiredArgsConstructor
+@Slf4j
+public class UserController {
+
+    private final UserService userService;
+
+    // GET - Lấy tất cả users
+    @GetMapping
+    public Flux<UserDto> getAllUsers() {
+        return userService.findAll()
+            .map(UserMapper::toDto);
+    }
+
+    // GET - Lấy user theo ID
+    @GetMapping("/{id}")
+    public Mono<UserDto> getUserById(@PathVariable String id) {
+        return userService.findById(id)
+            .map(UserMapper::toDto)
+            .switchIfEmpty(Mono.error(new NotFoundException("User not found: " + id)));
+    }
+
+    // POST - Tạo user mới
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Mono<UserDto> createUser(@Valid @RequestBody CreateUserRequest request) {
+        return userService.create(request)
+            .map(UserMapper::toDto);
+    }
+
+    // PUT - Update toàn bộ user
+    @PutMapping("/{id}")
+    public Mono<UserDto> updateUser(
+            @PathVariable String id,
+            @Valid @RequestBody UpdateUserRequest request) {
+        return userService.update(id, request)
+            .map(UserMapper::toDto);
+    }
+
+    // PATCH - Update một phần user
+    @PatchMapping("/{id}")
+    public Mono<UserDto> patchUser(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> updates) {
+        return userService.patch(id, updates)
+            .map(UserMapper::toDto);
+    }
+
+    // DELETE - Xóa user
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> deleteUser(@PathVariable String id) {
+        return userService.deleteById(id);
+    }
+}
+```
+
+### @RequestMapping Advanced Options
+
+```java
+@RestController
+@RequestMapping(
+    path = "/api/v1/products",
+    produces = MediaType.APPLICATION_JSON_VALUE
+)
+public class ProductController {
+
+    // Multiple HTTP methods
+    @RequestMapping(
+        path = "/{id}",
+        method = {RequestMethod.GET, RequestMethod.HEAD}
+    )
+    public Mono<Product> getProduct(@PathVariable String id) {
+        return productService.findById(id);
+    }
+
+    // Consume specific content types
+    @PostMapping(
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public Mono<Product> createProduct(@RequestBody CreateProductRequest request) {
+        return productService.create(request);
+    }
+
+    // Multiple consumes types
+    @PostMapping(
+        path = "/import",
+        consumes = {MediaType.APPLICATION_JSON_VALUE, "application/x-ndjson"}
+    )
+    public Flux<Product> importProducts(@RequestBody Flux<Product> products) {
+        return productService.importAll(products);
+    }
+
+    // Request mapping với params condition
+    @GetMapping(params = "category")
+    public Flux<Product> getByCategory(@RequestParam String category) {
+        return productService.findByCategory(category);
+    }
+
+    // Request mapping với headers condition
+    @GetMapping(headers = "X-API-Version=2")
+    public Flux<ProductV2Dto> getAllProductsV2() {
+        return productService.findAllV2();
+    }
+
+    // Combine multiple conditions
+    @PostMapping(
+        path = "/bulk",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        headers = "X-Bulk-Operation=true"
+    )
+    public Flux<Product> bulkCreate(@RequestBody List<CreateProductRequest> requests) {
+        return productService.bulkCreate(requests);
+    }
+}
+```
+
+### Path Variables và Patterns
+
+```java
+@RestController
+@RequestMapping("/api/v1")
+public class PathVariableController {
+
+    // Basic path variable
+    @GetMapping("/users/{userId}")
+    public Mono<User> getUser(@PathVariable String userId) {
+        return userService.findById(userId);
+    }
+
+    // Multiple path variables
+    @GetMapping("/users/{userId}/orders/{orderId}")
+    public Mono<Order> getUserOrder(
+            @PathVariable String userId,
+            @PathVariable String orderId) {
+        return orderService.findByUserIdAndOrderId(userId, orderId);
+    }
+
+    // Path variable với regex pattern
+    @GetMapping("/users/{id:\\d+}")  // Chỉ match số
+    public Mono<User> getUserByNumericId(@PathVariable Long id) {
+        return userService.findById(id);
+    }
+
+    // Path variable với custom name
+    @GetMapping("/products/{product-id}")
+    public Mono<Product> getProduct(
+            @PathVariable("product-id") String productId) {
+        return productService.findById(productId);
+    }
+
+    // Optional path variable (Spring 4.3.3+)
+    @GetMapping({"/categories", "/categories/{id}"})
+    public Flux<Category> getCategories(
+            @PathVariable(required = false) String id) {
+        if (id != null) {
+            return categoryService.findById(id).flux();
+        }
+        return categoryService.findAll();
+    }
+
+    // Wildcard patterns
+    @GetMapping("/files/**")
+    public Mono<Resource> getFile(ServerHttpRequest request) {
+        String path = request.getPath().pathWithinApplication().value();
+        String filePath = path.substring("/files/".length());
+        return fileService.getFile(filePath);
+    }
+
+    // URI template variables
+    @GetMapping("/search/{*query}")  // Capture remaining path
+    public Flux<SearchResult> search(@PathVariable String query) {
+        return searchService.search(query);
+    }
+}
+```
+
+### Query Parameters (@RequestParam)
+
+```java
+@RestController
+@RequestMapping("/api/v1/products")
+public class QueryParamController {
+
+    // Basic query param
+    @GetMapping("/search")
+    public Flux<Product> search(@RequestParam String keyword) {
+        return productService.search(keyword);
+    }
+
+    // Optional query param với default value
+    @GetMapping
+    public Flux<Product> getProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+
+        Sort sort = sortDir.equalsIgnoreCase("asc")
+            ? Sort.by(sortBy).ascending()
+            : Sort.by(sortBy).descending();
+
+        return productService.findAll(PageRequest.of(page, size, sort));
+    }
+
+    // Optional query param (có thể null)
+    @GetMapping("/filter")
+    public Flux<Product> filter(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Boolean inStock) {
+
+        return productService.filter(ProductFilter.builder()
+            .category(category)
+            .minPrice(minPrice)
+            .maxPrice(maxPrice)
+            .inStock(inStock)
+            .build());
+    }
+
+    // Multiple values (List/Array)
+    @GetMapping("/by-ids")
+    public Flux<Product> getByIds(@RequestParam List<String> ids) {
+        return productService.findByIds(ids);
+    }
+
+    // Map all query params
+    @GetMapping("/dynamic-search")
+    public Flux<Product> dynamicSearch(@RequestParam Map<String, String> params) {
+        return productService.dynamicSearch(params);
+    }
+
+    // Query param với custom name
+    @GetMapping("/by-category")
+    public Flux<Product> getByCategory(
+            @RequestParam("cat") String category,
+            @RequestParam("sub-cat") String subCategory) {
+        return productService.findByCategory(category, subCategory);
+    }
+
+    // MultiValueMap cho duplicate keys
+    @GetMapping("/multi-filter")
+    public Flux<Product> multiFilter(
+            @RequestParam MultiValueMap<String, String> params) {
+        // params.get("tag") returns List<String> for ?tag=a&tag=b&tag=c
+        return productService.filterByMultipleValues(params);
+    }
+}
+```
+
+### Request Headers (@RequestHeader)
+
+```java
+@RestController
+@RequestMapping("/api/v1")
+public class HeaderController {
+
+    // Required header
+    @GetMapping("/protected")
+    public Mono<Data> getProtectedData(
+            @RequestHeader("Authorization") String authorization) {
+        return dataService.getProtected(authorization);
+    }
+
+    // Optional header với default
+    @GetMapping("/data")
+    public Flux<Data> getData(
+            @RequestHeader(value = "Accept-Language", defaultValue = "en") String language,
+            @RequestHeader(value = "X-Request-ID", required = false) String requestId) {
+
+        return dataService.getData(language)
+            .contextWrite(ctx -> requestId != null
+                ? ctx.put("requestId", requestId)
+                : ctx);
+    }
+
+    // All headers as Map
+    @GetMapping("/debug/headers")
+    public Mono<Map<String, String>> getHeaders(
+            @RequestHeader Map<String, String> headers) {
+        return Mono.just(headers);
+    }
+
+    // HttpHeaders object
+    @GetMapping("/info")
+    public Mono<RequestInfo> getInfo(@RequestHeader HttpHeaders headers) {
+        return Mono.just(RequestInfo.builder()
+            .contentType(headers.getContentType())
+            .acceptLanguage(headers.getAcceptLanguage())
+            .userAgent(headers.getFirst(HttpHeaders.USER_AGENT))
+            .build());
+    }
+
+    // API versioning via header
+    @GetMapping("/resource")
+    public Mono<ResponseEntity<?>> getResource(
+            @RequestHeader(value = "X-API-Version", defaultValue = "1") int version) {
+
+        return switch (version) {
+            case 1 -> resourceService.getV1().map(ResponseEntity::ok);
+            case 2 -> resourceService.getV2().map(ResponseEntity::ok);
+            default -> Mono.just(ResponseEntity.badRequest()
+                .body("Unsupported API version: " + version));
+        };
+    }
+
+    // Conditional processing based on headers
+    @GetMapping("/content")
+    public Mono<ResponseEntity<byte[]>> getContent(
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
+            @RequestHeader(value = HttpHeaders.IF_MODIFIED_SINCE, required = false)
+                @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant ifModifiedSince) {
+
+        return contentService.getWithETag()
+            .flatMap(content -> {
+                if (ifNoneMatch != null && ifNoneMatch.equals(content.getEtag())) {
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_MODIFIED).build());
+                }
+                if (ifModifiedSince != null && !content.getLastModified().isAfter(ifModifiedSince)) {
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_MODIFIED).build());
+                }
+                return Mono.just(ResponseEntity.ok()
+                    .eTag(content.getEtag())
+                    .lastModified(content.getLastModified())
+                    .body(content.getData()));
+            });
+    }
+}
+```
+
+### Request Body (@RequestBody)
+
+```java
+@RestController
+@RequestMapping("/api/v1/orders")
+public class RequestBodyController {
+
+    // JSON body
+    @PostMapping
+    public Mono<Order> createOrder(@Valid @RequestBody CreateOrderRequest request) {
+        return orderService.create(request);
+    }
+
+    // Reactive body - streaming JSON
+    @PostMapping(
+        path = "/batch",
+        consumes = "application/x-ndjson"  // Newline-delimited JSON
+    )
+    public Flux<OrderResult> processBatch(@RequestBody Flux<CreateOrderRequest> requests) {
+        return requests
+            .flatMap(orderService::create)
+            .map(order -> OrderResult.success(order.getId()))
+            .onErrorResume(e -> Mono.just(OrderResult.error(e.getMessage())));
+    }
+
+    // Raw body as String
+    @PostMapping(path = "/webhook", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public Mono<Void> handleWebhook(@RequestBody String payload) {
+        return webhookService.process(payload);
+    }
+
+    // Raw body as byte[]
+    @PostMapping(path = "/binary", consumes = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public Mono<String> processBinary(@RequestBody byte[] data) {
+        return binaryService.process(data);
+    }
+
+    // Body với custom deserialization
+    @PostMapping("/custom")
+    public Mono<Response> processCustom(
+            @RequestBody Mono<CustomRequest> requestMono) {
+        return requestMono
+            .flatMap(customService::process);
+    }
+
+    // Optional body
+    @PatchMapping("/{id}")
+    public Mono<Order> patchOrder(
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, Object> updates) {
+
+        if (updates == null || updates.isEmpty()) {
+            return orderService.findById(id);
+        }
+        return orderService.patch(id, updates);
+    }
+
+    // Body validation với custom validator
+    @PostMapping("/validated")
+    public Mono<Order> createValidatedOrder(
+            @RequestBody @Validated(OnCreate.class) CreateOrderRequest request) {
+        return orderService.create(request);
+    }
+}
+```
+
+### Cookie và Session (@CookieValue)
+
+```java
+@RestController
+@RequestMapping("/api/v1")
+public class CookieController {
+
+    // Read cookie
+    @GetMapping("/preferences")
+    public Mono<UserPreferences> getPreferences(
+            @CookieValue(value = "user-prefs", required = false) String prefsJson) {
+
+        if (prefsJson == null) {
+            return Mono.just(UserPreferences.defaults());
+        }
+        return Mono.just(objectMapper.readValue(prefsJson, UserPreferences.class));
+    }
+
+    // Set cookie in response
+    @PostMapping("/preferences")
+    public Mono<ResponseEntity<Void>> savePreferences(
+            @RequestBody UserPreferences preferences) {
+
+        String prefsJson = objectMapper.writeValueAsString(preferences);
+
+        ResponseCookie cookie = ResponseCookie.from("user-prefs", prefsJson)
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(Duration.ofDays(30))
+            .sameSite("Strict")
+            .build();
+
+        return Mono.just(ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, cookie.toString())
+            .build());
+    }
+
+    // Session ID from cookie
+    @GetMapping("/session")
+    public Mono<SessionInfo> getSessionInfo(
+            @CookieValue("SESSIONID") String sessionId) {
+        return sessionService.getSession(sessionId);
+    }
+
+    // Multiple cookies
+    @GetMapping("/context")
+    public Mono<UserContext> getUserContext(
+            @CookieValue(value = "auth-token", required = false) String authToken,
+            @CookieValue(value = "refresh-token", required = false) String refreshToken,
+            @CookieValue(value = "theme", defaultValue = "light") String theme) {
+
+        return userContextService.build(authToken, refreshToken, theme);
+    }
+}
+```
+
+### Response Handling và Status Codes
+
+```java
+@RestController
+@RequestMapping("/api/v1/resources")
+public class ResponseController {
+
+    // ResponseEntity với custom status và headers
+    @PostMapping
+    public Mono<ResponseEntity<Resource>> createResource(
+            @RequestBody CreateResourceRequest request) {
+
+        return resourceService.create(request)
+            .map(resource -> ResponseEntity
+                .created(URI.create("/api/v1/resources/" + resource.getId()))
+                .header("X-Resource-Version", String.valueOf(resource.getVersion()))
+                .body(resource));
+    }
+
+    // Conditional response
+    @GetMapping("/{id}")
+    public Mono<ResponseEntity<Resource>> getResource(@PathVariable String id) {
+        return resourceService.findById(id)
+            .map(ResponseEntity::ok)
+            .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    // No content response
+    @DeleteMapping("/{id}")
+    public Mono<ResponseEntity<Void>> deleteResource(@PathVariable String id) {
+        return resourceService.deleteById(id)
+            .then(Mono.just(ResponseEntity.noContent().<Void>build()))
+            .onErrorReturn(NotFoundException.class,
+                ResponseEntity.notFound().build());
+    }
+
+    // Accepted (async processing)
+    @PostMapping("/async-process")
+    public Mono<ResponseEntity<ProcessingResponse>> asyncProcess(
+            @RequestBody ProcessRequest request) {
+
+        return processingService.submitForProcessing(request)
+            .map(jobId -> ResponseEntity
+                .accepted()
+                .header("Location", "/api/v1/jobs/" + jobId)
+                .body(new ProcessingResponse(jobId, "PENDING")));
+    }
+
+    // Response với ETag và caching headers
+    @GetMapping("/{id}/cacheable")
+    public Mono<ResponseEntity<Resource>> getCacheableResource(@PathVariable String id) {
+        return resourceService.findById(id)
+            .map(resource -> {
+                String etag = "\"" + resource.getVersion() + "\"";
+                return ResponseEntity.ok()
+                    .eTag(etag)
+                    .cacheControl(CacheControl.maxAge(Duration.ofHours(1)))
+                    .lastModified(resource.getUpdatedAt())
+                    .body(resource);
+            });
+    }
+
+    // Streaming response
+    @GetMapping(value = "/stream", produces = MediaType.APPLICATION_NDJSON_VALUE)
+    public Flux<Resource> streamResources() {
+        return resourceService.streamAll()
+            .delayElements(Duration.ofMillis(100));  // Simulate streaming
+    }
+
+    // Download file
+    @GetMapping("/{id}/download")
+    public Mono<ResponseEntity<Resource>> downloadResource(@PathVariable String id) {
+        return resourceService.getFileResource(id)
+            .map(file -> ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"" + file.getFilename() + "\"")
+                .body(file.getResource()));
+    }
+
+    // Error responses
+    @GetMapping("/{id}/strict")
+    public Mono<ResponseEntity<Resource>> getResourceStrict(@PathVariable String id) {
+        return resourceService.findById(id)
+            .map(ResponseEntity::ok)
+            .switchIfEmpty(Mono.just(ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .header("X-Error-Code", "RESOURCE_NOT_FOUND")
+                .build()));
+    }
+}
+```
+
+### Validation với Bean Validation
+
+```java
+@RestController
+@RequestMapping("/api/v1/users")
+@Validated
+public class ValidationController {
+
+    // Basic validation
+    @PostMapping
+    public Mono<User> createUser(@Valid @RequestBody CreateUserRequest request) {
+        return userService.create(request);
+    }
+
+    // Path variable validation
+    @GetMapping("/{id}")
+    public Mono<User> getUser(
+            @PathVariable @Pattern(regexp = "^[a-f0-9]{24}$") String id) {
+        return userService.findById(id);
+    }
+
+    // Query param validation
+    @GetMapping("/search")
+    public Flux<User> searchUsers(
+            @RequestParam @NotBlank @Size(min = 2, max = 100) String query,
+            @RequestParam @Min(0) @Max(1000) int limit) {
+        return userService.search(query, limit);
+    }
+
+    // Validation groups
+    @PostMapping("/register")
+    public Mono<User> register(
+            @Validated(OnRegistration.class) @RequestBody UserRegistrationRequest request) {
+        return userService.register(request);
+    }
+
+    @PutMapping("/{id}")
+    public Mono<User> updateUser(
+            @PathVariable String id,
+            @Validated(OnUpdate.class) @RequestBody UpdateUserRequest request) {
+        return userService.update(id, request);
+    }
+
+    // Custom constraint validation
+    @PostMapping("/with-custom")
+    public Mono<User> createWithCustomValidation(
+            @Valid @RequestBody @UniqueEmail CreateUserRequest request) {
+        return userService.create(request);
+    }
+}
+
+// Request DTOs với validation
+@Data
+public class CreateUserRequest {
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    private String email;
+
+    @NotBlank(message = "Username is required")
+    @Size(min = 3, max = 50, message = "Username must be 3-50 characters")
+    @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "Username can only contain letters, numbers, and underscores")
+    private String username;
+
+    @NotBlank(message = "Password is required", groups = OnRegistration.class)
+    @Size(min = 8, message = "Password must be at least 8 characters")
+    @Pattern(
+        regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$",
+        message = "Password must contain uppercase, lowercase, and digit"
+    )
+    private String password;
+
+    @NotNull(message = "Birth date is required")
+    @Past(message = "Birth date must be in the past")
+    private LocalDate birthDate;
+
+    @Valid  // Validate nested object
+    @NotNull
+    private AddressDto address;
+}
+
+@Data
+public class AddressDto {
+    @NotBlank
+    private String street;
+
+    @NotBlank
+    private String city;
+
+    @NotBlank
+    @Pattern(regexp = "^\\d{5}$")
+    private String zipCode;
+}
+
+// Validation groups
+public interface OnRegistration {}
+public interface OnUpdate {}
+
+// Custom validator
+@Target({ElementType.TYPE, ElementType.PARAMETER})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = UniqueEmailValidator.class)
+public @interface UniqueEmail {
+    String message() default "Email already exists";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+
+@Component
+@RequiredArgsConstructor
+public class UniqueEmailValidator implements ConstraintValidator<UniqueEmail, CreateUserRequest> {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public boolean isValid(CreateUserRequest request, ConstraintValidatorContext context) {
+        if (request == null || request.getEmail() == null) {
+            return true;
+        }
+        return !userRepository.existsByEmail(request.getEmail()).block();
+    }
+}
+```
+
+### Exception Handling với @ExceptionHandler
+
+```java
+@RestController
+@RequestMapping("/api/v1/orders")
+public class OrderController {
+
+    @PostMapping
+    public Mono<Order> createOrder(@Valid @RequestBody CreateOrderRequest request) {
+        return orderService.create(request);
+    }
+
+    // Local exception handler
+    @ExceptionHandler(InsufficientStockException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Mono<ErrorResponse> handleInsufficientStock(InsufficientStockException ex) {
+        return Mono.just(ErrorResponse.builder()
+            .code("INSUFFICIENT_STOCK")
+            .message(ex.getMessage())
+            .details(Map.of(
+                "productId", ex.getProductId(),
+                "requested", ex.getRequestedQuantity(),
+                "available", ex.getAvailableQuantity()
+            ))
+            .build());
+    }
+}
+
+// Global exception handler
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Mono<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = ex.getBindingResult().getFieldErrors().stream()
+            .collect(Collectors.toMap(
+                FieldError::getField,
+                error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : "Invalid value",
+                (a, b) -> a + "; " + b
+            ));
+
+        return Mono.just(ErrorResponse.builder()
+            .code("VALIDATION_ERROR")
+            .message("Validation failed")
+            .details(errors)
+            .timestamp(Instant.now())
+            .build());
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Mono<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
+        Map<String, String> errors = ex.getConstraintViolations().stream()
+            .collect(Collectors.toMap(
+                v -> v.getPropertyPath().toString(),
+                ConstraintViolation::getMessage,
+                (a, b) -> a + "; " + b
+            ));
+
+        return Mono.just(ErrorResponse.builder()
+            .code("CONSTRAINT_VIOLATION")
+            .message("Request validation failed")
+            .details(errors)
+            .build());
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Mono<ErrorResponse> handleNotFound(NotFoundException ex) {
+        return Mono.just(ErrorResponse.builder()
+            .code("NOT_FOUND")
+            .message(ex.getMessage())
+            .build());
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Mono<ErrorResponse> handleDuplicateKey(DuplicateKeyException ex) {
+        return Mono.just(ErrorResponse.builder()
+            .code("DUPLICATE_ENTRY")
+            .message("Resource already exists")
+            .build());
+    }
+
+    @ExceptionHandler(WebExchangeBindException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Mono<ErrorResponse> handleBindException(WebExchangeBindException ex) {
+        Map<String, String> errors = ex.getFieldErrors().stream()
+            .collect(Collectors.toMap(
+                FieldError::getField,
+                error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : "Invalid",
+                (a, b) -> a + "; " + b
+            ));
+
+        return Mono.just(ErrorResponse.builder()
+            .code("BINDING_ERROR")
+            .message("Failed to bind request")
+            .details(errors)
+            .build());
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public Mono<ResponseEntity<ErrorResponse>> handleResponseStatus(ResponseStatusException ex) {
+        return Mono.just(ResponseEntity
+            .status(ex.getStatusCode())
+            .body(ErrorResponse.builder()
+                .code("HTTP_ERROR")
+                .message(ex.getReason())
+                .build()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Mono<ErrorResponse> handleGenericException(Exception ex) {
+        log.error("Unexpected error", ex);
+        return Mono.just(ErrorResponse.builder()
+            .code("INTERNAL_ERROR")
+            .message("An unexpected error occurred")
+            .build());
+    }
+}
+
+@Data
+@Builder
+public class ErrorResponse {
+    private String code;
+    private String message;
+    private Object details;
+    @Builder.Default
+    private Instant timestamp = Instant.now();
+}
+```
+
+### Content Negotiation
+
+```java
+@RestController
+@RequestMapping("/api/v1/reports")
+public class ContentNegotiationController {
+
+    // Produce multiple formats based on Accept header
+    @GetMapping(
+        path = "/{id}",
+        produces = {
+            MediaType.APPLICATION_JSON_VALUE,
+            MediaType.APPLICATION_XML_VALUE,
+            "text/csv"
+        }
+    )
+    public Mono<Report> getReport(@PathVariable String id) {
+        return reportService.findById(id);
+    }
+
+    // Different methods for different content types
+    @GetMapping(path = "/summary", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<ReportSummary> getSummaryJson() {
+        return reportService.getSummary();
+    }
+
+    @GetMapping(path = "/summary", produces = "text/csv")
+    public Mono<String> getSummaryCsv() {
+        return reportService.getSummary()
+            .map(this::convertToCsv);
+    }
+
+    @GetMapping(path = "/summary", produces = MediaType.APPLICATION_PDF_VALUE)
+    public Mono<byte[]> getSummaryPdf() {
+        return reportService.getSummary()
+            .map(pdfGenerator::generate);
+    }
+
+    // Custom media type
+    @GetMapping(
+        path = "/custom",
+        produces = "application/vnd.myapp.report.v2+json"
+    )
+    public Mono<ReportV2> getCustomFormat() {
+        return reportService.getReportV2();
+    }
+
+    // ResponseEntity với dynamic content type
+    @GetMapping("/{id}/download")
+    public Mono<ResponseEntity<byte[]>> downloadReport(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "pdf") String format) {
+
+        return reportService.findById(id)
+            .flatMap(report -> generateReport(report, format))
+            .map(data -> {
+                MediaType mediaType = switch (format) {
+                    case "pdf" -> MediaType.APPLICATION_PDF;
+                    case "xlsx" -> MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                    case "csv" -> MediaType.parseMediaType("text/csv");
+                    default -> MediaType.APPLICATION_OCTET_STREAM;
+                };
+
+                return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"report." + format + "\"")
+                    .body(data);
+            });
+    }
+}
+```
+
+### Controller Advice và Model Attributes
+
+```java
+@ControllerAdvice
+public class GlobalControllerAdvice {
+
+    // Add common attributes to all controllers
+    @ModelAttribute
+    public void addCommonAttributes(Model model, ServerWebExchange exchange) {
+        model.addAttribute("requestId", exchange.getRequest().getId());
+        model.addAttribute("timestamp", Instant.now());
+    }
+
+    // Bind custom types
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.registerCustomEditor(LocalDate.class, new PropertyEditorSupport() {
+            @Override
+            public void setAsText(String text) {
+                setValue(LocalDate.parse(text, DateTimeFormatter.ISO_DATE));
+            }
+        });
+    }
+}
+
+// Scoped controller advice
+@RestControllerAdvice(
+    basePackages = "com.example.api.admin",
+    annotations = AdminController.class
+)
+public class AdminControllerAdvice {
+
+    @ExceptionHandler(AdminException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Mono<ErrorResponse> handleAdminException(AdminException ex) {
+        return Mono.just(ErrorResponse.builder()
+            .code("ADMIN_ERROR")
+            .message(ex.getMessage())
+            .build());
+    }
+}
+
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@RestController
+@RequestMapping("/api/admin")
+public @interface AdminController {
+}
+```
+
+### Cross-Origin Requests (@CrossOrigin)
+
+```java
+@RestController
+@RequestMapping("/api/v1/public")
+@CrossOrigin(
+    origins = {"https://example.com", "https://app.example.com"},
+    methods = {RequestMethod.GET, RequestMethod.POST},
+    allowedHeaders = {"Content-Type", "Authorization"},
+    exposedHeaders = {"X-Custom-Header"},
+    allowCredentials = "true",
+    maxAge = 3600
+)
+public class PublicApiController {
+
+    @GetMapping("/data")
+    public Flux<Data> getData() {
+        return dataService.findAll();
+    }
+
+    // Override class-level CORS for specific endpoint
+    @CrossOrigin(origins = "*", maxAge = 1800)
+    @GetMapping("/open-data")
+    public Flux<Data> getOpenData() {
+        return dataService.findPublic();
+    }
+
+    // Disable CORS for specific endpoint
+    @CrossOrigin(origins = {})
+    @GetMapping("/restricted")
+    public Mono<Data> getRestricted() {
+        return dataService.findRestricted();
+    }
+}
+```
+
+---
 
 ## Router Function Patterns
 
