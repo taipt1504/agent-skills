@@ -5,7 +5,7 @@
 - [Router Function Patterns](#router-function-patterns)
 - [Handler Patterns](#handler-patterns)
 - [WebClient Advanced Patterns](#webclient-advanced-patterns)
-- [SSE và WebSocket Patterns](#sse-và-websocket-patterns)
+- [SSE and WebSocket Patterns](#sse-and-websocket-patterns)
 - [Request/Response Processing](#requestresponse-processing)
 - [Error Handling Strategies](#error-handling-strategies)
 - [Filter Patterns](#filter-patterns)
@@ -14,7 +14,7 @@
 
 ## Annotated Controller Patterns
 
-### Basic Controller với @RestController
+### Basic Controller with @RestController
 
 ```java
 @RestController
@@ -25,14 +25,14 @@ public class UserController {
 
     private final UserService userService;
 
-    // GET - Lấy tất cả users
+    // GET - Get all users
     @GetMapping
     public Flux<UserDto> getAllUsers() {
         return userService.findAll()
             .map(UserMapper::toDto);
     }
 
-    // GET - Lấy user theo ID
+    // GET - Get user by ID
     @GetMapping("/{id}")
     public Mono<UserDto> getUserById(@PathVariable String id) {
         return userService.findById(id)
@@ -40,7 +40,7 @@ public class UserController {
             .switchIfEmpty(Mono.error(new NotFoundException("User not found: " + id)));
     }
 
-    // POST - Tạo user mới
+    // POST - Create new user
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<UserDto> createUser(@Valid @RequestBody CreateUserRequest request) {
@@ -48,7 +48,7 @@ public class UserController {
             .map(UserMapper::toDto);
     }
 
-    // PUT - Update toàn bộ user
+    // PUT - Update entire user
     @PutMapping("/{id}")
     public Mono<UserDto> updateUser(
             @PathVariable String id,
@@ -57,7 +57,7 @@ public class UserController {
             .map(UserMapper::toDto);
     }
 
-    // PATCH - Update một phần user
+    // PATCH - Update partial user
     @PatchMapping("/{id}")
     public Mono<UserDto> patchUser(
             @PathVariable String id,
@@ -66,7 +66,7 @@ public class UserController {
             .map(UserMapper::toDto);
     }
 
-    // DELETE - Xóa user
+    // DELETE - Delete user
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> deleteUser(@PathVariable String id) {
@@ -112,13 +112,13 @@ public class ProductController {
         return productService.importAll(products);
     }
 
-    // Request mapping với params condition
+    // Request mapping with params condition
     @GetMapping(params = "category")
     public Flux<Product> getByCategory(@RequestParam String category) {
         return productService.findByCategory(category);
     }
 
-    // Request mapping với headers condition
+    // Request mapping with headers condition
     @GetMapping(headers = "X-API-Version=2")
     public Flux<ProductV2Dto> getAllProductsV2() {
         return productService.findAllV2();
@@ -136,7 +136,7 @@ public class ProductController {
 }
 ```
 
-### Path Variables và Patterns
+### Path Variables and Patterns
 
 ```java
 @RestController
@@ -157,13 +157,13 @@ public class PathVariableController {
         return orderService.findByUserIdAndOrderId(userId, orderId);
     }
 
-    // Path variable với regex pattern
-    @GetMapping("/users/{id:\\d+}")  // Chỉ match số
+    // Path variable with regex pattern
+    @GetMapping("/users/{id:\\d+}")  // Only match numeric
     public Mono<User> getUserByNumericId(@PathVariable Long id) {
         return userService.findById(id);
     }
 
-    // Path variable với custom name
+    // Path variable with custom name
     @GetMapping("/products/{product-id}")
     public Mono<Product> getProduct(
             @PathVariable("product-id") String productId) {
@@ -209,7 +209,7 @@ public class QueryParamController {
         return productService.search(keyword);
     }
 
-    // Optional query param với default value
+    // Optional query param with default value
     @GetMapping
     public Flux<Product> getProducts(
             @RequestParam(defaultValue = "0") int page,
@@ -224,7 +224,7 @@ public class QueryParamController {
         return productService.findAll(PageRequest.of(page, size, sort));
     }
 
-    // Optional query param (có thể null)
+    // Optional query param (can be null)
     @GetMapping("/filter")
     public Flux<Product> filter(
             @RequestParam(required = false) String category,
@@ -252,7 +252,7 @@ public class QueryParamController {
         return productService.dynamicSearch(params);
     }
 
-    // Query param với custom name
+    // Query param with custom name
     @GetMapping("/by-category")
     public Flux<Product> getByCategory(
             @RequestParam("cat") String category,
@@ -260,7 +260,7 @@ public class QueryParamController {
         return productService.findByCategory(category, subCategory);
     }
 
-    // MultiValueMap cho duplicate keys
+    // MultiValueMap for duplicate keys
     @GetMapping("/multi-filter")
     public Flux<Product> multiFilter(
             @RequestParam MultiValueMap<String, String> params) {
@@ -284,7 +284,7 @@ public class HeaderController {
         return dataService.getProtected(authorization);
     }
 
-    // Optional header với default
+    // Optional header with default
     @GetMapping("/data")
     public Flux<Data> getData(
             @RequestHeader(value = "Accept-Language", defaultValue = "en") String language,
@@ -387,7 +387,7 @@ public class RequestBodyController {
         return binaryService.process(data);
     }
 
-    // Body với custom deserialization
+    // Body with custom deserialization
     @PostMapping("/custom")
     public Mono<Response> processCustom(
             @RequestBody Mono<CustomRequest> requestMono) {
@@ -407,7 +407,7 @@ public class RequestBodyController {
         return orderService.patch(id, updates);
     }
 
-    // Body validation với custom validator
+    // Body validation with custom validator
     @PostMapping("/validated")
     public Mono<Order> createValidatedOrder(
             @RequestBody @Validated(OnCreate.class) CreateOrderRequest request) {
@@ -416,7 +416,7 @@ public class RequestBodyController {
 }
 ```
 
-### Cookie và Session (@CookieValue)
+### Cookie and Session (@CookieValue)
 
 ```java
 @RestController
@@ -473,14 +473,14 @@ public class CookieController {
 }
 ```
 
-### Response Handling và Status Codes
+### Response Handling and Status Codes
 
 ```java
 @RestController
 @RequestMapping("/api/v1/resources")
 public class ResponseController {
 
-    // ResponseEntity với custom status và headers
+    // ResponseEntity with custom status and headers
     @PostMapping
     public Mono<ResponseEntity<Resource>> createResource(
             @RequestBody CreateResourceRequest request) {
@@ -521,7 +521,7 @@ public class ResponseController {
                 .body(new ProcessingResponse(jobId, "PENDING")));
     }
 
-    // Response với ETag và caching headers
+    // Response with ETag and caching headers
     @GetMapping("/{id}/cacheable")
     public Mono<ResponseEntity<Resource>> getCacheableResource(@PathVariable String id) {
         return resourceService.findById(id)
@@ -617,7 +617,7 @@ public class ValidationController {
     }
 }
 
-// Request DTOs với validation
+// Request DTOs with validation
 @Data
 public class CreateUserRequest {
 
@@ -872,7 +872,7 @@ public class ContentNegotiationController {
         return reportService.getReportV2();
     }
 
-    // ResponseEntity với dynamic content type
+    // ResponseEntity with dynamic content type
     @GetMapping("/{id}/download")
     public Mono<ResponseEntity<byte[]>> downloadReport(
             @PathVariable String id,
@@ -899,7 +899,7 @@ public class ContentNegotiationController {
 }
 ```
 
-### Controller Advice và Model Attributes
+### Controller Advice and Model Attributes
 
 ```java
 @ControllerAdvice
@@ -1498,7 +1498,7 @@ public class AggregationService {
 }
 ```
 
-## SSE và WebSocket Patterns
+## SSE and WebSocket Patterns
 
 ### Advanced SSE with Heartbeat and Reconnection
 
