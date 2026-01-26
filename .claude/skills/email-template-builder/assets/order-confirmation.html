@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            background-color: #27ae60;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 40px;
+        }
+        .order-number {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .order-number strong {
+            display: block;
+            color: #7f8c8d;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .order-number span {
+            font-size: 20px;
+            color: #27ae60;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th {
+            background-color: #ecf0f1;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #bdc3c7;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .item-name {
+            font-weight: 500;
+        }
+        .item-price {
+            text-align: right;
+        }
+        .summary {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .summary-row:last-child {
+            border-bottom: none;
+        }
+        .summary-total {
+            font-size: 18px;
+            font-weight: bold;
+            color: #27ae60;
+            padding-top: 12px;
+            border-top: 2px solid #bdc3c7 !important;
+        }
+        .shipping-info {
+            background-color: #f0f8ff;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .button:hover {
+            background-color: #2980b9;
+        }
+        .footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+        }
+        .footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Order Confirmed</h1>
+        </div>
+
+        <div class="content">
+            <p>Hi {{customerFirstName}},</p>
+
+            <p>Thank you for your order! We're excited to process it.</p>
+
+            <div class="order-number">
+                <strong>Order Number</strong>
+                <span>{{orderNumber}}</span>
+            </div>
+
+            <p><strong>Order Date:</strong> {{orderDate}}</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th class="item-price">Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="item-name">{{itemName}}</td>
+                        <td>{{itemQuantity}}</td>
+                        <td class="item-price">{{itemPrice}}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="summary">
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span>{{subtotal}}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Shipping:</span>
+                    <span>{{shippingCost}}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tax:</span>
+                    <span>{{taxAmount}}</span>
+                </div>
+                <div class="summary-row summary-total">
+                    <span>Total:</span>
+                    <span>{{totalAmount}}</span>
+                </div>
+            </div>
+
+            <div class="shipping-info">
+                <p><strong>📦 Shipping Address</strong></p>
+                <p>{{shippingAddress}}<br>
+                {{shippingCity}}, {{shippingState}} {{shippingZip}}<br>
+                {{shippingCountry}}</p>
+            </div>
+
+            <p><strong>Estimated Delivery:</strong> {{estimatedDelivery}}</p>
+
+            <p>Track your order:</p>
+            <a href="{{trackingLink}}" class="button">View Tracking</a>
+
+            <p>Questions about your order? <a href="{{supportEmail}}">Contact us</a></p>
+
+            <p>Best regards,<br>
+            {{appName}} Team</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2024 {{appName}}. All rights reserved.</p>
+            <p>
+                <a href="{{termsLink}}">Terms</a> |
+                <a href="{{privacyLink}}">Privacy</a> |
+                <a href="{{supportLink}}">Support</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
