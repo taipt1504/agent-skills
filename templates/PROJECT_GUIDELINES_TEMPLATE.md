@@ -25,7 +25,7 @@
 | Framework | Spring Boot | 3.x | WebFlux (reactive) |
 | Reactive | Project Reactor | 3.6+ | Mono/Flux — never `.block()` |
 | Database | PostgreSQL | 15+ | R2DBC (reactive driver) |
-| Migrations | Liquibase | 4.x | `[or Flyway — pick one]` |
+| Migrations | Flyway | 9.x+ | `db/migration/` — SQL-based versioned migrations |
 | Caching | Redis | 7+ | Lettuce (reactive client) |
 | Messaging | Apache Kafka | 3.x | Reactor Kafka |
 | RPC | gRPC | `[version]` | `[if used, otherwise remove]` |
@@ -142,11 +142,9 @@ Example (Hexagonal):
     ├── application-uat.yml
     ├── application-prod.yml
     └── db/
-        └── changelog/                   # Liquibase migrations
-            ├── db.changelog-master.yaml
-            └── changes/
-                ├── 001-create-[table].yaml
-                └── 002-add-[column].yaml
+        └── migration/                   # Flyway migrations
+            ├── V1__create_[table].sql
+            └── V2__add_[column].sql
 ```
 
 > **Customize**: Adjust package names and structure to match your project.
@@ -238,23 +236,30 @@ Response:
 | Index naming | `idx_{table}_{columns}` | `idx_orders_customer_id` |
 | Unique naming | `uq_{table}_{columns}` | `uq_users_email` |
 
-### Migration Rules (Liquibase)
+### Migration Rules (Flyway)
 
-```yaml
-# db/changelog/db.changelog-master.yaml
-databaseChangeLog:
-  - include:
-      file: db/changelog/changes/001-create-users.yaml
-  - include:
-      file: db/changelog/changes/002-create-orders.yaml
+```sql
+-- db/migration/V1__create_users.sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- db/migration/V2__create_orders.sql
+CREATE TABLE orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 ```
 
 **Rules:**
-1. **Sequential numbering**: `001-`, `002-`, etc.
+1. **Versioned naming**: `V{n}__{description}.sql` — e.g., `V3__add_email_index.sql`
 2. **One logical change per file** — don't mix table creation with data migration
-3. **Always include rollback** — every changeset must be reversible
-4. **Never modify existing changesets** — create new ones for alterations
-5. **Descriptive names**: `003-add-email-to-users.yaml`, not `003-update.yaml`
+3. **Never modify existing migrations** — create new versioned files for alterations
+4. **Descriptive names**: `V4__add_email_to_users.sql`, not `V4__update.sql`
+5. **Repeatable migrations** use `R__{description}.sql` prefix (views, functions)
 6. **Test migrations locally** before committing
 
 ### Required Indexes
@@ -476,7 +481,7 @@ Push → Lint → Compile → Unit Tests → Integration Tests → Security Scan
 - [ ] Test coverage ≥ 80%
 - [ ] No critical security vulnerabilities
 - [ ] Docker image builds successfully
-- [ ] Liquibase migrations apply cleanly
+- [ ] Flyway migrations apply cleanly
 
 ---
 
@@ -527,7 +532,7 @@ Build:    ./gradlew clean build
 Test:     ./gradlew test
 Format:   ./gradlew spotlessApply
 Coverage: ./gradlew jacocoTestReport
-Migrate:  ./gradlew liquibaseUpdate
+Migrate:  ./gradlew flywayMigrate
 Security: ./gradlew dependencyCheckAnalyze
 Docker:   docker build -t [service-name]:latest .
 ```

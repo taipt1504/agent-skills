@@ -77,23 +77,30 @@ agent-skills/
 ├── CLAUDE.md                              # Global context auto-loaded by Claude Code
 ├── WORKING_WORKFLOW.md                    # 6-phase mandatory workflow reference
 ├── README.md
-├── agents/                                # 12 specialized sub-agents
+├── agents/                                # 16 specialized sub-agents
 │   ├── architect.md
 │   ├── blackbox-test-runner.md
 │   ├── build-error-resolver.md
 │   ├── code-reviewer.md
 │   ├── database-reviewer.md
 │   ├── e2e-runner.md
+│   ├── mysql-reviewer.md
+│   ├── performance-reviewer.md
 │   ├── planner.md
+│   ├── rabbitmq-reviewer.md
 │   ├── refactor-cleaner.md
 │   ├── security-reviewer.md
 │   ├── spring-boot-reviewer.md
+│   ├── spring-mvc-reviewer.md
 │   ├── spring-webflux-reviewer.md
 │   └── tdd-guide.md
-├── commands/                              # 15 slash commands
+├── commands/                              # 19 slash commands
+│   ├── adr.md
+│   ├── api-doc.md
 │   ├── build-fix.md
 │   ├── checkpoint.md
 │   ├── code-review.md
+│   ├── db-migrate.md
 │   ├── e2e.md
 │   ├── eval.md
 │   ├── evolve.md
@@ -103,6 +110,7 @@ agent-skills/
 │   ├── learn.md
 │   ├── orchestrate.md
 │   ├── plan.md
+│   ├── quality-gate.md
 │   ├── refactor-clean.md
 │   ├── skill-create.md
 │   └── verify.md
@@ -125,22 +133,25 @@ agent-skills/
 │       ├── session-end.sh
 │       ├── session-start.sh
 │       └── suggest-compact.sh
-├── skills/                                # 19 skill definitions
+├── skills/                                # 22 skill definitions
 │   ├── api-design/
 │   ├── backend-patterns/
 │   ├── blackbox-test/
 │   ├── coding-standards/
-│   ├── continuous-learning/
 │   ├── continuous-learning-v2/
 │   ├── grpc-patterns/
 │   ├── hexagonal-arch/
 │   ├── java-patterns/
 │   ├── kafka-patterns/
+│   ├── mysql-patterns/
+│   ├── observability-patterns/
 │   ├── postgres-patterns/
 │   ├── project-guidelines/
+│   ├── rabbitmq-patterns/
 │   ├── redis-patterns/
 │   ├── security-review/
 │   ├── solution-design/
+│   ├── spring-mvc-patterns/
 │   ├── spring-webflux-patterns/
 │   ├── strategic-compact/
 │   ├── tdd-workflow/
@@ -151,7 +162,7 @@ agent-skills/
 
 ---
 
-## Skills (19)
+## Skills (22)
 
 | Skill | Description |
 |---|---|
@@ -159,17 +170,20 @@ agent-skills/
 | [backend-patterns](./skills/backend-patterns/) | Backend architecture patterns, API design, DB optimization, messaging, and server-side best practices for Spring WebFlux/MVC |
 | [blackbox-test](./skills/blackbox-test/) | JSON-driven black box integration tests with JUnit 5, Testcontainers, WireMock, and Flyway using the F8A Summer Test framework |
 | [coding-standards](./skills/coding-standards/) | Universal Java Spring coding standards: KISS, DRY, SOLID, readability, and consistent formatting |
-| [continuous-learning](./skills/continuous-learning/) | v1: Stop hook that evaluates sessions and extracts reusable patterns as learned skills |
-| [continuous-learning-v2](./skills/continuous-learning-v2/) | v2: Instinct-based learning with confidence scoring, PreToolUse/PostToolUse observation, and `/evolve` clustering |
+| [continuous-learning-v2](./skills/continuous-learning-v2/) | Instinct-based learning with confidence scoring, PreToolUse/PostToolUse observation, and `/evolve` clustering |
 | [grpc-patterns](./skills/grpc-patterns/) | gRPC service patterns for Java Spring — protobuf definitions, server/client setup, streaming, error handling, and testing |
 | [hexagonal-arch](./skills/hexagonal-arch/) | Hexagonal Architecture (Ports & Adapters) for Spring WebFlux — package structure, dependency rules, domain modeling, CQRS integration |
 | [java-patterns](./skills/java-patterns/) | Java 17+ best practices: immutability, null safety, concurrency, streams, memory optimization, and modern language features |
 | [kafka-patterns](./skills/kafka-patterns/) | Apache Kafka patterns for Spring WebFlux — producer/consumer, exactly-once semantics, reactive Kafka, DLT, Schema Registry, testing |
+| [mysql-patterns](./skills/mysql-patterns/) | MySQL optimization, indexing strategies, JPA best practices, and connection pooling |
+| [observability-patterns](./skills/observability-patterns/) | Micrometer metrics, distributed tracing, structured logging, health checks, and alerting rules |
 | [postgres-patterns](./skills/postgres-patterns/) | PostgreSQL query optimization, indexing strategies, schema design, Row Level Security, and connection pooling |
 | [project-guidelines](./skills/project-guidelines/) | Pointer skill — reads `PROJECT_GUIDELINES.md` at project root for project-specific conventions |
+| [rabbitmq-patterns](./skills/rabbitmq-patterns/) | RabbitMQ exchanges, queues, DLQ, Spring AMQP patterns, and message reliability |
 | [redis-patterns](./skills/redis-patterns/) | Redis patterns for Spring WebFlux — reactive Lettuce, caching strategies, distributed locking, rate limiting, Pub/Sub, Streams |
 | [security-review](./skills/security-review/) | Security checklist: OWASP Top 10, secrets management, input validation, auth/authz, dependency CVEs |
 | [solution-design](./skills/solution-design/) | Architecture documentation: Solution Design (stakeholders) + Service Design (developers) with templates |
+| [spring-mvc-patterns](./skills/spring-mvc-patterns/) | Spring MVC patterns — controllers, servlet filters, exception handlers, validation, and interceptors |
 | [spring-webflux-patterns](./skills/spring-webflux-patterns/) | Spring WebFlux reactive patterns — Mono/Flux chains, error handling, backpressure, WebClient, SSE, WebSocket |
 | [strategic-compact](./skills/strategic-compact/) | Suggests `/compact` at strategic workflow boundaries to manage context efficiently instead of arbitrary auto-compaction |
 | [tdd-workflow](./skills/tdd-workflow/) | Enforces write-tests-first TDD with 80%+ coverage for Java Spring — unit, integration, and E2E tests |
@@ -177,7 +191,7 @@ agent-skills/
 
 ---
 
-## Agents (12)
+## Agents (16)
 
 Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 
@@ -187,24 +201,31 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 | `blackbox-test-runner` | Generates E2E API tests following the blackbox-test skill standard with JSON-driven test cases |
 | `build-error-resolver` | Fixes Java/Gradle build and compilation errors with minimal diffs — focuses on getting builds green fast |
 | `code-reviewer` | Expert code review for quality, security, readability, DRY, SOLID, and test quality |
-| `database-reviewer` | PostgreSQL specialist — query optimization, schema design, RLS, N+1 detection, Supabase best practices |
+| `database-reviewer` | PostgreSQL/MySQL specialist — query optimization, schema design, N+1 detection, JPA best practices |
 | `e2e-runner` | E2E API testing with Testcontainers and WebTestClient — manages containers, handles async scenarios |
+| `mysql-reviewer` | MySQL-specific review — indexes, JPA N+1, connection pool tuning, slow query analysis |
+| `performance-reviewer` | Performance bottlenecks, memory leaks, slow queries, and reactive pipeline analysis |
 | `planner` | Planning specialist for features, architecture decisions, and complex refactoring with risk assessment |
+| `rabbitmq-reviewer` | RabbitMQ config, message handling, DLQ setup, and Spring AMQP review |
 | `refactor-cleaner` | Dead code cleanup and consolidation — safely removes unused dependencies, classes, and methods |
 | `security-reviewer` | Security vulnerability detection — OWASP Top 10, secrets, injection, insecure crypto, reactive-specific issues |
 | `spring-boot-reviewer` | Spring Boot review — dependency injection, configuration, auto-configuration, Boot best practices |
+| `spring-mvc-reviewer` | Spring MVC patterns review — servlet filters, exception handlers, validation, interceptors |
 | `spring-webflux-reviewer` | Reactive programming review — backpressure handling, non-blocking patterns, Project Reactor best practices |
 | `tdd-guide` | TDD enforcement specialist — write-tests-first methodology with JUnit 5, Mockito, Testcontainers, 80%+ coverage |
 
 ---
 
-## Commands (15)
+## Commands (19)
 
 | Command | Description |
 |---|---|
+| `/adr` | Create Architecture Decision Record for significant technical decisions |
+| `/api-doc` | Generate or update OpenAPI spec from Spring controllers |
 | `/build-fix` | Incrementally fix Java/Gradle build and compilation errors |
 | `/checkpoint` | Create or verify a workflow checkpoint for progress tracking |
 | `/code-review` | Comprehensive security + quality review of uncommitted changes |
+| `/db-migrate` | Generate and validate Flyway migration files workflow |
 | `/e2e` | Generate and run E2E API tests with Testcontainers |
 | `/eval` | Manage eval-driven development workflow |
 | `/evolve` | Cluster related instincts into skills, commands, or agents |
@@ -214,6 +235,7 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 | `/learn` | Analyze current session and extract patterns worth saving as skills |
 | `/orchestrate` | Sequential multi-agent workflow for complex tasks |
 | `/plan` | Restate requirements, assess risks, create step-by-step implementation plan — WAIT for user confirm |
+| `/quality-gate` | Final quality check before PR — all reviewers + coverage enforcement |
 | `/refactor-clean` | Safely identify and remove dead code with test verification |
 | `/skill-create` | Analyze local git history to extract coding patterns and generate SKILL.md |
 | `/verify` | Run comprehensive verification: build → compile → tests → security → diff review |

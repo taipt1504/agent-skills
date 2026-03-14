@@ -16,7 +16,7 @@ cd "$PROJECT_ROOT" 2>/dev/null || true
 
 # Configuration (relative to project root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE=".claude/skills/continuous-learning/config.json"
+CONFIG_FILE="skills/continuous-learning-v2/config.json"
 LEARNED_DIR=".claude/learned-skills"
 MIN_SESSION_LENGTH=10
 

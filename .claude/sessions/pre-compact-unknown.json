@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-03-14T19:11:09Z",
+  "session": "unknown",
+  "project": "agent-skills",
+  "active_files": [
+    "CLAUDE.md",
+    "agents/planner.md",
+    "rules/agents.md",
+    "skills/api-design/SKILL.md",
+    "skills/backend-patterns/SKILL.md",
+    "skills/coding-standards/SKILL.md",
+    "skills/grpc-patterns/SKILL.md",
+    "skills/hexagonal-arch/SKILL.md",
+    "skills/kafka-patterns/SKILL.md",
+    "skills/project-guidelines/SKILL.md",
+    "skills/redis-patterns/SKILL.md",
+    "skills/security-review/SKILL.md",
+    "skills/spring-webflux-patterns/SKILL.md",
+    "skills/tdd-workflow/SKILL.md"
+  ],
+  "compaction_marker": true
+}

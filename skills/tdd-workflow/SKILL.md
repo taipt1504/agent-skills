@@ -1,734 +1,129 @@
 ---
 name: tdd-workflow
-description: Use this skill when writing new features, fixing bugs, or refactoring code. Enforces test-driven development with 80%+ coverage including unit, integration, and E2E tests for Java Spring projects.
+description: Test-Driven Development workflow for Java Spring Boot projects. Use when writing new features, fixing bugs, or refactoring code. Enforces write-tests-first, 80%+ coverage, and comprehensive unit/integration/E2E tests with JUnit 5, Mockito, Testcontainers, WireMock, and StepVerifier.
 ---
 
 # Test-Driven Development Workflow
 
-This skill ensures all Java Spring development follows TDD principles with comprehensive test coverage.
+TDD for Java Spring Boot 3.x (MVC + WebFlux). Tests first, always.
 
-## When to Activate
-
-- Writing new features or functionality
-- Fixing bugs or issues
-- Refactoring existing code
-- Adding API endpoints
-- Creating new services or components
-- Database schema changes
+**Test patterns reference**: See [references/test-patterns.md](references/test-patterns.md) for concrete examples of every test type.
 
 ## Core Principles
 
-### 1. Tests BEFORE Code
+1. **Tests BEFORE code** — write a failing test, then implement
+2. **Coverage minimum** — 80% line coverage (unit + integration + E2E)
+3. **Test types pyramid**: unit > integration > E2E
+4. **Independent tests** — `@BeforeEach` cleanup; no test depends on another
 
-ALWAYS write tests first, then implement code to make tests pass.
+## TDD Workflow (RED → GREEN → REFACTOR)
 
-### 2. Coverage Requirements
-
-- Minimum 80% coverage (unit + integration + E2E)
-- All edge cases covered
-- Error scenarios tested
-- Boundary conditions verified
-
-### 3. Test Types
-
-#### Unit Tests
-
-- Individual methods and utilities
-- Service logic
-- Pure functions
-- Mappers and validators
-
-#### Integration Tests
-
-- API endpoints (WebTestClient/TestRestTemplate)
-- Repository operations (R2DBC/JPA)
-- Service interactions
-- External API clients
-
-#### E2E Tests (Testcontainers)
-
-- Complete API flows
-- Database integration
-- Kafka/RabbitMQ messaging
-- Redis caching scenarios
-
-## TDD Workflow Steps
-
-### Step 1: Write User Journeys
-
-```
-As a [role], I want to [action], so that [benefit]
-
-Example:
-As a user, I want to search for markets semantically,
-so that I can find relevant markets even without exact keywords.
-```
-
-### Step 2: Generate Test Cases
-
-For each user journey, create comprehensive test cases:
+### Step 1: Write Failing Test
 
 ```java
-@ExtendWith(MockitoExtension.class)
-class MarketServiceTest {
-
-    @Mock
-    private MarketRepository marketRepository;
-
-    @Mock
-    private VectorSearchService vectorSearchService;
-
-    @InjectMocks
-    private MarketService marketService;
-
-    @Test
-    @DisplayName("Should return relevant markets for query")
-    void shouldReturnRelevantMarketsForQuery() {
-        // Test implementation
-    }
-
-    @Test
-    @DisplayName("Should return empty list when no markets match")
-    void shouldReturnEmptyListWhenNoMarketsMatch() {
-        // Test edge case
-    }
-
-    @Test
-    @DisplayName("Should fall back to substring search when Redis unavailable")
-    void shouldFallBackToSubstringSearchWhenRedisUnavailable() {
-        // Test fallback behavior
-    }
-
-    @Test
-    @DisplayName("Should sort results by similarity score")
-    void shouldSortResultsBySimilarityScore() {
-        // Test sorting logic
-    }
+@Test
+@DisplayName("Should create order and return PENDING status")
+void shouldCreateOrder() {
+    StepVerifier.create(orderService.create(validCommand))
+        .assertNext(o -> assertThat(o.getStatus()).isEqualTo(OrderStatus.PENDING))
+        .verifyComplete();
 }
 ```
-
-### Step 3: Run Tests (They Should Fail)
 
 ```bash
-./gradlew test
-# Tests should fail - we haven't implemented yet
+./gradlew test  # FAILS — RED phase
 ```
 
-### Step 4: Implement Code
+### Step 2: Implement Minimal Code
 
-Write minimal code to make tests pass:
-
-```java
-@Service
-@RequiredArgsConstructor
-public class MarketService {
-
-    private final MarketRepository marketRepository;
-    private final VectorSearchService vectorSearchService;
-
-    public Flux<Market> searchMarkets(String query, int limit) {
-        // Implementation here
-    }
-}
-```
-
-### Step 5: Run Tests Again
+Write the minimum code to make the test pass. Resist the urge to add more.
 
 ```bash
-./gradlew test
-# Tests should now pass
+./gradlew test  # PASSES — GREEN phase
 ```
 
-### Step 6: Refactor
+### Step 3: Refactor
 
-Improve code quality while keeping tests green:
-
-- Remove duplication
-- Improve naming
-- Optimize performance
-- Enhance readability
-
-### Step 7: Verify Coverage
+Clean up duplication, naming, and structure while keeping tests green.
 
 ```bash
-./gradlew test jacocoTestReport
-# Verify 80%+ coverage achieved
+./gradlew test jacocoTestReport  # Verify coverage stays ≥ 80%
 ```
 
-## Testing Patterns
+## Test Types — When to Write Each
 
-### Unit Test Pattern (JUnit 5 + Mockito)
+| Type | Annotation | Use For | Speed |
+|------|-----------|---------|-------|
+| Unit | `@ExtendWith(MockitoExtension.class)` | Service logic, domain objects | Fast |
+| Controller (WebFlux) | `@SpringBootTest + @AutoConfigureWebTestClient` | API contract | Medium |
+| Controller (MVC) | `@WebMvcTest` | API contract, auth | Medium |
+| Repository (R2DBC) | `@DataR2dbcTest` | DB queries | Medium |
+| Repository (JPA) | `@DataJpaTest` | JPA queries, MySQL | Medium |
+| Messaging | `@EmbeddedKafka` / `RabbitMQContainer` | Event publishing | Medium |
+| E2E | `@SpringBootTest + @Testcontainers` | Full stack flows | Slow |
 
-```java
-@ExtendWith(MockitoExtension.class)
-class MarketServiceTest {
+## Testcontainers Container Reuse
 
-    @Mock
-    private MarketRepository marketRepository;
-
-    @InjectMocks
-    private MarketService marketService;
-
-    @BeforeEach
-    void setUp() {
-        // Common setup
-    }
-
-    @Test
-    @DisplayName("Should create market successfully")
-    void shouldCreateMarket() {
-        // Arrange
-        var request = new CreateMarketRequest("Test Market", "Description");
-        var expected = Market.builder()
-            .id("market-123")
-            .name("Test Market")
-            .status(MarketStatus.PENDING)
-            .build();
-
-        when(marketRepository.save(any(Market.class)))
-            .thenReturn(Mono.just(expected));
-
-        // Act
-        var result = marketService.create(request);
-
-        // Assert
-        StepVerifier.create(result)
-            .assertNext(market -> {
-                assertThat(market.id()).isEqualTo("market-123");
-                assertThat(market.name()).isEqualTo("Test Market");
-                assertThat(market.status()).isEqualTo(MarketStatus.PENDING);
-            })
-            .verifyComplete();
-
-        verify(marketRepository).save(any(Market.class));
-    }
-
-    @Test
-    @DisplayName("Should throw exception when market not found")
-    void shouldThrowWhenMarketNotFound() {
-        // Arrange
-        when(marketRepository.findById("unknown"))
-            .thenReturn(Mono.empty());
-
-        // Act & Assert
-        StepVerifier.create(marketService.findById("unknown"))
-            .expectError(MarketNotFoundException.class)
-            .verify();
-    }
-}
-```
-
-### WebFlux Integration Test Pattern
+Always use `.withReuse(true)` for local development speed:
 
 ```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureWebTestClient
-@Testcontainers
-class MarketControllerIntegrationTest {
+@Container
+static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
+    .withDatabaseName("testdb").withUsername("test").withPassword("test")
+    .withReuse(true);  // ✅ Reuse across test classes
 
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
-        .withDatabaseName("testdb")
-        .withUsername("test")
-        .withPassword("test");
+@Container
+static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0")
+    .withReuse(true);
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.r2dbc.url", () -> 
-            "r2dbc:postgresql://" + postgres.getHost() + ":" + 
-            postgres.getFirstMappedPort() + "/testdb");
-        registry.add("spring.r2dbc.username", postgres::getUsername);
-        registry.add("spring.r2dbc.password", postgres::getPassword);
-    }
-
-    @Autowired
-    private WebTestClient webTestClient;
-
-    @Autowired
-    private MarketRepository marketRepository;
-
-    @BeforeEach
-    void setUp() {
-        marketRepository.deleteAll().block();
-    }
-
-    @Test
-    @DisplayName("GET /api/markets returns all markets")
-    void shouldReturnAllMarkets() {
-        // Arrange
-        var market = Market.builder()
-            .id(UUID.randomUUID().toString())
-            .name("Test Market")
-            .status(MarketStatus.ACTIVE)
-            .build();
-        marketRepository.save(market).block();
-
-        // Act & Assert
-        webTestClient.get()
-            .uri("/api/markets")
-            .exchange()
-            .expectStatus().isOk()
-            .expectBodyList(Market.class)
-            .hasSize(1)
-            .contains(market);
-    }
-
-    @Test
-    @DisplayName("POST /api/markets creates new market")
-    void shouldCreateMarket() {
-        var request = new CreateMarketRequest("New Market", "Description");
-
-        webTestClient.post()
-            .uri("/api/markets")
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody()
-            .jsonPath("$.id").isNotEmpty()
-            .jsonPath("$.name").isEqualTo("New Market")
-            .jsonPath("$.status").isEqualTo("PENDING");
-    }
-
-    @Test
-    @DisplayName("POST /api/markets validates input")
-    void shouldValidateInput() {
-        var invalidRequest = new CreateMarketRequest("", "");
-
-        webTestClient.post()
-            .uri("/api/markets")
-            .bodyValue(invalidRequest)
-            .exchange()
-            .expectStatus().isBadRequest()
-            .expectBody()
-            .jsonPath("$.code").isEqualTo("VALIDATION_ERROR");
-    }
-
-    @Test
-    @DisplayName("GET /api/markets/{id} returns 404 for unknown market")
-    void shouldReturn404ForUnknownMarket() {
-        webTestClient.get()
-            .uri("/api/markets/unknown-id")
-            .exchange()
-            .expectStatus().isNotFound();
-    }
-}
-```
-
-### Spring Boot MVC Integration Test Pattern
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class MarketControllerMvcIntegrationTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
-        .withDatabaseName("testdb")
-        .withUsername("test")
-        .withPassword("test");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-    }
-
-    @Autowired
-    private TestRestTemplate restTemplate;
-
-    @Autowired
-    private MarketRepository marketRepository;
-
-    @Test
-    @Order(1)
-    @DisplayName("GET /api/markets returns all markets")
-    void shouldReturnAllMarkets() {
-        // Arrange
-        var market = Market.builder()
-            .name("Test Market")
-            .status(MarketStatus.ACTIVE)
-            .build();
-        marketRepository.save(market);
-
-        // Act
-        ResponseEntity<List<Market>> response = restTemplate.exchange(
-            "/api/markets",
-            HttpMethod.GET,
-            null,
-            new ParameterizedTypeReference<List<Market>>() {}
-        );
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("POST /api/markets creates new market")
-    void shouldCreateMarket() {
-        var request = new CreateMarketRequest("New Market", "Description");
-
-        ResponseEntity<Market> response = restTemplate.postForEntity(
-            "/api/markets",
-            request,
-            Market.class
-        );
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody().getName()).isEqualTo("New Market");
-    }
-}
-```
-
-### Repository Test Pattern (R2DBC)
-
-```java
-@DataR2dbcTest
-@Testcontainers
-@Import(TestConfig.class)
-class MarketRepositoryTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
-        .withDatabaseName("testdb")
-        .withUsername("test")
-        .withPassword("test");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.r2dbc.url", () -> 
-            "r2dbc:postgresql://" + postgres.getHost() + ":" + 
-            postgres.getFirstMappedPort() + "/testdb");
-        registry.add("spring.r2dbc.username", postgres::getUsername);
-        registry.add("spring.r2dbc.password", postgres::getPassword);
-    }
-
-    @Autowired
-    private MarketRepository repository;
-
-    @Test
-    @DisplayName("Should save and retrieve market")
-    void shouldSaveAndRetrieve() {
-        var market = Market.builder()
-            .id(UUID.randomUUID().toString())
-            .name("Test")
-            .status(MarketStatus.ACTIVE)
-            .build();
-
-        StepVerifier.create(repository.save(market))
-            .expectNext(market)
-            .verifyComplete();
-
-        StepVerifier.create(repository.findById(market.id()))
-            .assertNext(found -> {
-                assertThat(found.name()).isEqualTo("Test");
-                assertThat(found.status()).isEqualTo(MarketStatus.ACTIVE);
-            })
-            .verifyComplete();
-    }
-
-    @Test
-    @DisplayName("Should find markets by status")
-    void shouldFindByStatus() {
-        var activeMarket = createMarket("Active", MarketStatus.ACTIVE);
-        var pendingMarket = createMarket("Pending", MarketStatus.PENDING);
-
-        repository.saveAll(List.of(activeMarket, pendingMarket)).blockLast();
-
-        StepVerifier.create(repository.findByStatus(MarketStatus.ACTIVE))
-            .assertNext(m -> assertThat(m.name()).isEqualTo("Active"))
-            .verifyComplete();
-    }
-}
-```
-
-### Kafka Integration Test Pattern
-
-```java
-@SpringBootTest
-@Testcontainers
-@EmbeddedKafka(partitions = 1, topics = {"market-events"})
-class MarketEventPublisherTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
-
-    @Autowired
-    private MarketEventPublisher eventPublisher;
-
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
-
-    @Autowired
-    @Qualifier("testConsumer")
-    private KafkaConsumer<String, String> consumer;
-
-    @Test
-    @DisplayName("Should publish market created event")
-    void shouldPublishMarketCreatedEvent() throws Exception {
-        // Arrange
-        var event = new MarketCreatedEvent("market-123", "Test Market");
-
-        // Act
-        eventPublisher.publish(event).block();
-
-        // Assert
-        ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(5));
-        assertThat(records.count()).isEqualTo(1);
-
-        var record = records.iterator().next();
-        assertThat(record.topic()).isEqualTo("market-events");
-        assertThat(record.value()).contains("market-123");
-    }
-}
+@Container
+static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.4.0"))
+    .withReuse(true);
 ```
 
 ## Test File Organization
 
 ```
-src/
-├── main/java/com/example/
-│   ├── domain/
-│   │   └── model/Market.java
-│   ├── application/
-│   │   └── service/MarketService.java
-│   ├── infrastructure/
-│   │   └── persistence/MarketRepositoryImpl.java
-│   └── adapter/
-│       └── web/MarketController.java
-│
-└── test/java/com/example/
-    ├── domain/
-    │   └── model/MarketTest.java              # Unit test
-    ├── application/
-    │   └── service/MarketServiceTest.java     # Unit test
-    ├── infrastructure/
-    │   └── persistence/MarketRepositoryTest.java  # Integration test
-    ├── adapter/
-    │   └── web/MarketControllerTest.java      # Integration test
-    ├── e2e/
-    │   └── MarketFlowE2ETest.java             # E2E test
-    └── fixtures/
-        └── TestDataFactory.java               # Test utilities
+src/test/java/com/example/
+├── unit/
+│   ├── service/OrderServiceTest.java         # @ExtendWith(MockitoExtension.class)
+│   └── domain/OrderTest.java
+├── integration/
+│   ├── web/OrderControllerTest.java          # @WebMvcTest or @SpringBootTest
+│   └── repository/OrderRepositoryTest.java   # @DataJpaTest / @DataR2dbcTest
+├── e2e/
+│   └── OrderFlowE2ETest.java                 # @SpringBootTest + @Testcontainers
+└── fixtures/
+    └── TestDataFactory.java                  # Shared test builders
 ```
 
-## Mocking Patterns
-
-### Repository Mock
-
-```java
-@Mock
-private MarketRepository marketRepository;
-
-@BeforeEach
-void setupMocks() {
-    when(marketRepository.findById(anyString()))
-        .thenReturn(Mono.just(Market.builder()
-            .id("market-123")
-            .name("Test")
-            .build()));
-
-    when(marketRepository.save(any(Market.class)))
-        .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-
-    when(marketRepository.findByStatus(MarketStatus.ACTIVE))
-        .thenReturn(Flux.just(
-            Market.builder().id("1").name("Market 1").build(),
-            Market.builder().id("2").name("Market 2").build()
-        ));
-}
-```
-
-### External Service Mock (WireMock)
-
-```java
-@WireMockTest(httpPort = 8089)
-class ExternalApiClientTest {
-
-    @Autowired
-    private ExternalApiClient apiClient;
-
-    @Test
-    @DisplayName("Should fetch data from external API")
-    void shouldFetchFromExternalApi(WireMockRuntimeInfo wmRuntimeInfo) {
-        // Arrange
-        stubFor(get("/api/data")
-            .willReturn(aResponse()
-                .withStatus(200)
-                .withHeader("Content-Type", "application/json")
-                .withBody("{\"value\": 123}")));
-
-        // Act & Assert
-        StepVerifier.create(apiClient.fetchData())
-            .assertNext(data -> assertThat(data.value()).isEqualTo(123))
-            .verifyComplete();
-    }
-
-    @Test
-    @DisplayName("Should handle external API error")
-    void shouldHandleApiError() {
-        stubFor(get("/api/data")
-            .willReturn(aResponse().withStatus(500)));
-
-        StepVerifier.create(apiClient.fetchData())
-            .expectError(ExternalApiException.class)
-            .verify();
-    }
-}
-```
-
-### Redis Mock
-
-```java
-@Mock
-private ReactiveRedisTemplate<String, Market> redisTemplate;
-
-@Mock
-private ReactiveValueOperations<String, Market> valueOps;
-
-@BeforeEach
-void setupRedisMock() {
-    when(redisTemplate.opsForValue()).thenReturn(valueOps);
-    when(valueOps.get(anyString())).thenReturn(Mono.empty());
-    when(valueOps.set(anyString(), any(), any(Duration.class)))
-        .thenReturn(Mono.just(true));
-}
-```
-
-## Test Coverage Configuration
-
-### Gradle (build.gradle.kts)
-
-```kotlin
-plugins {
-    id("jacoco")
-}
-
-tasks.test {
-    useJUnitPlatform()
-    finalizedBy(tasks.jacocoTestReport)
-}
-
-tasks.jacocoTestReport {
-    dependsOn(tasks.test)
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-    }
-}
-
-tasks.jacocoTestCoverageVerification {
-    violationRules {
-        rule {
-            limit {
-                minimum = "0.80".toBigDecimal()
-            }
-        }
-    }
-}
-```
-
-## Common Testing Mistakes to Avoid
-
-### WRONG: Testing Implementation Details
-
-```java
-// Don't test private methods directly
-assertThat(service.getInternalState()).isEqualTo(expected);
-```
-
-### CORRECT: Test Observable Behavior
-
-```java
-// Test public API and side effects
-StepVerifier.create(service.processOrder(request))
-    .assertNext(order -> assertThat(order.status()).isEqualTo(OrderStatus.COMPLETED))
-    .verifyComplete();
-
-verify(notificationService).sendOrderConfirmation(any());
-```
-
-### WRONG: No Test Isolation
-
-```java
-// Tests depend on each other
-@Test void test1_createUser() { /* creates user */ }
-@Test void test2_updateUser() { /* depends on test1 */ }
-```
-
-### CORRECT: Independent Tests
-
-```java
-@BeforeEach
-void setUp() {
-    // Reset state before each test
-    repository.deleteAll().block();
-}
-
-@Test void shouldCreateUser() { /* independent */ }
-@Test void shouldUpdateUser() { /* independent */ }
-```
-
-### WRONG: Sleeping Instead of Awaiting
-
-```java
-// Flaky and slow
-Thread.sleep(5000);
-assertThat(result).isNotNull();
-```
-
-### CORRECT: Use StepVerifier or Awaitility
-
-```java
-// Reactive testing
-StepVerifier.create(asyncOperation())
-    .expectNext(expected)
-    .verifyComplete();
-
-// Or with Awaitility
-await().atMost(5, SECONDS)
-    .untilAsserted(() -> assertThat(getResult()).isNotNull());
-```
-
-## Continuous Testing
-
-### Watch Mode During Development
+## Quick Test Commands
 
 ```bash
+# All tests
+./gradlew test
+
+# Single test class
+./gradlew test --tests "com.example.service.OrderServiceTest"
+
+# Watch mode (runs on file change)
 ./gradlew test --continuous
-# Tests run automatically on file changes
+
+# Coverage report
+./gradlew test jacocoTestReport
+# Report: build/reports/jacoco/test/html/index.html
 ```
 
-### Pre-Commit Hook (CI Integration)
+## Detailed Examples
 
-```yaml
-# .github/workflows/test.yml
-- name: Run Tests
-  run: ./gradlew test
+For complete test examples including:
+- Unit tests (JUnit 5 + Mockito + StepVerifier)
+- WebFlux integration tests (WebTestClient)
+- Spring MVC tests (MockMvc)
+- Repository tests (R2DBC, JPA/MySQL)
+- Kafka integration tests
+- WireMock for external APIs
+- Redis mocking
+- JaCoCo coverage configuration (Gradle + Maven)
 
-- name: Check Coverage
-  run: ./gradlew jacocoTestCoverageVerification
-
-- name: Upload Coverage
-  uses: codecov/codecov-action@v3
-  with:
-    files: build/reports/jacoco/test/jacocoTestReport.xml
-```
-
-## Success Metrics
-
-- 80%+ code coverage achieved
-- All tests passing (green)
-- No skipped or disabled tests
-- Fast test execution (<30s for unit tests)
-- Integration tests with Testcontainers
-- E2E tests cover critical user flows
-- Tests catch bugs before production
-
----
-
-**Remember**: Tests are not optional. They are the safety net that enables confident refactoring, rapid development, and
-production reliability.
+**→ Read [references/test-patterns.md](references/test-patterns.md)**

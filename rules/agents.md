@@ -11,9 +11,13 @@ Located in `.claude/agents/`:
 | **tdd-guide**               | Test-driven development (JUnit 5, StepVerifier) | New features, bug fixes                        |
 | **code-reviewer**           | General code review                             | After writing any code                         |
 | **spring-webflux-reviewer** | Reactive programming review                     | WebFlux controllers, services, reactive chains |
+| **spring-mvc-reviewer**     | Spring MVC (servlet) code review                | MVC controllers, filters, MockMvc tests        |
 | **spring-boot-reviewer**    | Spring Boot best practices                      | DI patterns, configuration, beans              |
-| **database-reviewer**       | Database & SQL review                           | R2DBC, Liquibase, queries                      |
+| **database-reviewer**       | PostgreSQL database & SQL review                | R2DBC, Liquibase, PostgreSQL queries           |
+| **mysql-reviewer**          | MySQL 8.x & JPA/Hibernate review                | MySQL queries, Flyway migrations, HikariCP     |
 | **security-reviewer**       | Security vulnerability analysis                 | Before commits, auth code                      |
+| **performance-reviewer**    | Application performance analysis                | Latency issues, high-throughput code review    |
+| **rabbitmq-reviewer**       | RabbitMQ & Spring AMQP review                   | Producers, consumers, DLQ config, AMQP code   |
 | **build-error-resolver**    | Fix Java/Gradle build errors                    | When build fails                               |
 | **e2e-runner**              | E2E testing (Testcontainers)                    | Critical API flows                             |
 | **refactor-cleaner**        | Dead code cleanup                               | Code maintenance, dependency cleanup           |
@@ -22,13 +26,17 @@ Located in `.claude/agents/`:
 
 ### 🔍 Code Review Agents
 
-| Agent                     | Focus Area                                          |
-|---------------------------|-----------------------------------------------------|
-| `code-reviewer`           | General quality, security basics                    |
-| `spring-webflux-reviewer` | Reactive patterns, blocking detection, backpressure |
-| `spring-boot-reviewer`    | DI, configuration, Spring conventions               |
-| `database-reviewer`       | SQL queries, R2DBC, migrations                      |
-| `security-reviewer`       | OWASP Top 10, secrets, vulnerabilities              |
+| Agent                     | Focus Area                                              |
+|---------------------------|---------------------------------------------------------|
+| `code-reviewer`           | General quality, security basics                        |
+| `spring-webflux-reviewer` | Reactive patterns, blocking detection, backpressure     |
+| `spring-mvc-reviewer`     | MVC controllers, validation, filters, MockMvc tests     |
+| `spring-boot-reviewer`    | DI, configuration, Spring conventions                   |
+| `database-reviewer`       | PostgreSQL, R2DBC, Liquibase, query optimization        |
+| `mysql-reviewer`          | MySQL 8.x, JPA/Hibernate, HikariCP, Flyway migrations   |
+| `rabbitmq-reviewer`       | RabbitMQ, Spring AMQP, DLQ, manual ack, retry patterns  |
+| `performance-reviewer`    | JVM tuning, N+1 queries, caching, async parallelism     |
+| `security-reviewer`       | OWASP Top 10, secrets, vulnerabilities                  |
 
 ### 🏗️ Design & Planning Agents
 
@@ -62,8 +70,12 @@ No user prompt needed - invoke automatically:
 | **API endpoint implemented/changed** | **blackbox-test-runner** (uses `blackbox-test` skill) |
 | Code just written/modified           | **code-reviewer**                                     |
 | WebFlux reactive code changed        | **spring-webflux-reviewer**                           |
+| Spring MVC controller/filter changed | **spring-mvc-reviewer**                               |
 | Spring configuration changed         | **spring-boot-reviewer**                              |
-| Database/SQL code changed            | **database-reviewer**                                 |
+| PostgreSQL / R2DBC code changed      | **database-reviewer**                                 |
+| MySQL / JPA / Flyway code changed    | **mysql-reviewer**                                    |
+| RabbitMQ producer/consumer changed   | **rabbitmq-reviewer**                                 |
+| Performance concerns or load review  | **performance-reviewer**                              |
 | Bug fix or new feature               | **tdd-guide**                                         |
 | Architectural decision needed        | **architect**                                         |
 | Build fails                          | **build-error-resolver**                              |
@@ -99,16 +111,20 @@ First agent 1, then agent 2, then agent 3
 
 ## Agent Selection by File Type
 
-| File Pattern              | Primary Agent           | Secondary Agents        |
-|---------------------------|-------------------------|-------------------------|
-| `*Controller.java`        | spring-webflux-reviewer | code-reviewer           |
-| `*Service.java`           | spring-boot-reviewer    | spring-webflux-reviewer |
-| `*Repository.java`        | database-reviewer       | spring-webflux-reviewer |
-| `*Config.java`            | spring-boot-reviewer    | security-reviewer       |
-| `*.yml`, `*.properties`   | spring-boot-reviewer    | security-reviewer       |
-| `*Test.java`              | tdd-guide               | -                       |
-| `*.sql`, `changelog*.xml` | database-reviewer       | -                       |
-| `build.gradle`            | build-error-resolver    | -                       |
+| File Pattern                       | Primary Agent           | Secondary Agents                      |
+|------------------------------------|-------------------------|---------------------------------------|
+| `*Controller.java` (WebFlux)       | spring-webflux-reviewer | code-reviewer                         |
+| `*Controller.java` (MVC)           | spring-mvc-reviewer     | code-reviewer                         |
+| `*Service.java`                    | spring-boot-reviewer    | spring-webflux-reviewer               |
+| `*Repository.java` (R2DBC/PG)      | database-reviewer       | spring-webflux-reviewer               |
+| `*Repository.java` (JPA/MySQL)     | mysql-reviewer          | spring-boot-reviewer                  |
+| `*Consumer.java`, `*Producer.java` | rabbitmq-reviewer       | performance-reviewer                  |
+| `*Config.java`                     | spring-boot-reviewer    | security-reviewer                     |
+| `*.yml`, `*.properties`            | spring-boot-reviewer    | security-reviewer                     |
+| `*Test.java`                       | tdd-guide               | -                                     |
+| `*.sql` (PostgreSQL/Liquibase)     | database-reviewer       | -                                     |
+| `V*.sql` (Flyway/MySQL)            | mysql-reviewer          | -                                     |
+| `build.gradle`, `pom.xml`          | build-error-resolver    | -                                     |
 
 ## Multi-Perspective Analysis
 

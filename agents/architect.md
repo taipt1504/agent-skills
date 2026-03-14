@@ -1,5 +1,5 @@
 ---
-name: backend-architect
+name: architect
 description: Backend software architecture specialist for scalable, reactive system design with Java Spring WebFlux, CQRS, DDD, and Event Sourcing. Use PROACTIVELY when planning new features, designing microservices, or making architectural decisions.
 tools: ["Read", "Grep", "Glob"]
 model: opus

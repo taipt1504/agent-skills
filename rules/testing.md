@@ -7,7 +7,7 @@ Test Types (ALL required):
 1. **Unit Tests** - Individual functions, utilities, components
 2. **Integration Tests** - API endpoints, database operations
 3. **Blackbox Tests** - End-to-end API tests for all implemented endpoints
-4. **E2E Tests** - Critical user flows (Playwright)
+4. **E2E Tests** - Critical API flows (WebTestClient + Testcontainers)
 
 ## Test-Driven Development
 
@@ -40,4 +40,4 @@ MANDATORY for all API endpoint tasks:
 
 - **tdd-guide** - Use PROACTIVELY for new features, enforces write-tests-first
 - **blackbox-test-runner** - Use PROACTIVELY after API implementation, uses `blackbox-test` skill
-- **e2e-runner** - Playwright E2E testing specialist
+- **e2e-runner** - E2E API testing specialist (WebTestClient + Testcontainers)

@@ -1,0 +1,75 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/session-start.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/suggest-compact.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/java-compile-check.sh",
+            "timeout": 90
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/java-format.sh",
+            "timeout": 60,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/pre-compact.sh",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/check-debug-statements.sh",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/session-end.sh",
+            "timeout": 60,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -49,46 +49,44 @@ Include specific examples of how to fix issues.
 
 ## Code Quality (HIGH)
 
-- Large functions (>50 lines)
-- Large files (>800 lines)
+- Large methods (>50 lines)
+- Large classes (>800 lines)
 - Deep nesting (>4 levels)
-- Missing error handling (try/catch)
-- console.log statements
-- Mutation patterns
+- Missing error handling
+- `.block()` calls in reactive chains
+- Mutation patterns (missing `@Value`, setters on domain objects)
 - Missing tests for new code
+- `@Autowired` field injection instead of constructor injection
 
 ## Performance (MEDIUM)
 
 - Inefficient algorithms (O(n²) when O(n log n) possible)
-- Unnecessary re-renders in React
-- Missing memoization
-- Large bundle sizes
-- Unoptimized images
-- Missing caching
-- N+1 queries
+- Missing caching for frequently-read data
+- N+1 queries (missing `@EntityGraph` or JOIN FETCH)
+- Unbounded queries without pagination
+- Blocking I/O on reactive threads (should use `boundedElastic` scheduler)
 
 ## Best Practices (MEDIUM)
 
-- Emoji usage in code/comments
 - TODO/FIXME without tickets
-- Missing JSDoc for public APIs
-- Accessibility issues (missing ARIA labels, poor contrast)
+- Missing Javadoc on public API interfaces
 - Poor variable naming (x, tmp, data)
 - Magic numbers without explanation
 - Inconsistent formatting
+- Domain entities exposed in API responses (missing DTO mapping)
 
 ## Review Output Format
 
 For each issue:
 
 ```
-[CRITICAL] Hardcoded API key
-File: src/api/client.ts:42
+[CRITICAL] Hardcoded credential
+File: src/main/java/com/example/config/ClientConfig.java:42
 Issue: API key exposed in source code
-Fix: Move to environment variable
+Fix: Move to environment variable / application.yml secret
 
-const apiKey = "sk-abc123";  // ❌ Bad
-const apiKey = process.env.API_KEY;  // ✓ Good
+String apiKey = "sk-abc123";  // ❌ Bad
+String apiKey = env.getProperty("external.api.key");  // ✓ Good
 ```
 
 ## Approval Criteria

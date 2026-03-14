@@ -14,8 +14,9 @@ No exceptions. No shortcuts.
 
 ## Tech Stack
 
-Java 17+ · Spring Boot 3.x · Spring WebFlux · R2DBC · PostgreSQL · Redis
-Kafka · RabbitMQ · gRPC · Docker · Gradle · JUnit 5 · Testcontainers
+Java 17+ · Spring Boot 3.x · Spring WebFlux (reactive) · Spring MVC (servlet)
+R2DBC · JPA/Hibernate · PostgreSQL · MySQL · Redis · Kafka · RabbitMQ · gRPC
+Lombok · Jackson · MapStruct · Resilience4j · Docker · Gradle · JUnit 5 · Testcontainers
 
 ## Architecture
 
@@ -77,19 +78,25 @@ com.example.{service}/
 ### Skills (`skills/`)
 | Skill | Purpose |
 |-------|---------|
+| `api-design` | RESTful and reactive API design — URL conventions, error handling, pagination |
 | `backend-patterns` | RESTful API, DB optimization, messaging patterns |
 | `blackbox-test` | JSON-driven black box integration tests |
 | `coding-standards` | KISS, DRY, SOLID, readability |
-| `continuous-learning` | Session pattern extraction (v1) |
 | `continuous-learning-v2` | Instinct-based learning with confidence scoring |
+| `grpc-patterns` | gRPC service patterns — protobuf, streaming, error handling |
 | `hexagonal-arch` | Hexagonal architecture patterns |
 | `java-patterns` | Java 17+ best practices |
-| `kafka-patterns` | Kafka messaging patterns |
-| `postgres-patterns` | PostgreSQL optimization & indexing |
+| `kafka-patterns` | Kafka producer/consumer, exactly-once, reactive Kafka, DLT |
+| `mysql-patterns` | MySQL optimization, indexing, JPA best practices, connection pooling |
+| `observability-patterns` | Micrometer, distributed tracing, structured logging, alerting |
+| `postgres-patterns` | PostgreSQL optimization, indexing, RLS |
 | `project-guidelines` | Reads project-root `PROJECT_GUIDELINES.md` |
-| `redis-patterns` | Redis caching patterns |
+| `rabbitmq-patterns` | RabbitMQ exchanges, queues, DLQ, Spring AMQP patterns |
+| `redis-patterns` | Redis caching, distributed locks, rate limiting |
 | `security-review` | OWASP Top 10, secrets, auth |
 | `solution-design` | Architecture documentation |
+| `spring-mvc-patterns` | Spring MVC patterns — controllers, exception handlers, validation |
+| `spring-webflux-patterns` | Spring WebFlux reactive patterns — Mono/Flux chains, backpressure, WebClient |
 | `strategic-compact` | Context-efficient `/compact` suggestions |
 | `tdd-workflow` | Write-tests-first TDD enforcement |
 | `verification-loop` | Multi-phase build/test/security verification |
@@ -101,12 +108,16 @@ com.example.{service}/
 | `blackbox-test-runner` | Generates E2E API tests |
 | `build-error-resolver` | Fixes Gradle/compile errors with minimal diffs |
 | `code-reviewer` | Quality + security code review |
-| `database-reviewer` | PostgreSQL schema, queries, RLS |
+| `database-reviewer` | PostgreSQL/MySQL schema, queries, JPA optimization |
 | `e2e-runner` | E2E testing with Testcontainers |
+| `mysql-reviewer` | MySQL-specific review — indexes, JPA N+1, connection pool |
+| `performance-reviewer` | Performance bottlenecks, memory leaks, slow queries |
 | `planner` | Feature/architecture/refactor planning |
+| `rabbitmq-reviewer` | RabbitMQ config, message handling, DLQ setup |
 | `refactor-cleaner` | Dead code removal |
 | `security-reviewer` | Security vulnerability detection |
 | `spring-boot-reviewer` | DI, config, auto-configuration review |
+| `spring-mvc-reviewer` | Spring MVC patterns, servlet filters, exception handlers |
 | `spring-webflux-reviewer` | Reactive patterns, backpressure review |
 | `tdd-guide` | TDD enforcement specialist |
 
@@ -115,9 +126,13 @@ com.example.{service}/
 |---------|---------|
 | `/plan` | Restate requirements → risk assessment → implementation plan |
 | `/verify` | Gradle build → compile → tests → security scan |
+| `/quality-gate` | Final quality check before PR — all reviewers + coverage |
 | `/code-review` | Comprehensive review of uncommitted changes |
 | `/build-fix` | Incrementally fix build errors |
 | `/checkpoint` | Create/verify workflow checkpoint |
+| `/adr` | Create Architecture Decision Record for key decisions |
+| `/db-migrate` | Generate and validate Flyway migration workflow |
+| `/api-doc` | Generate/update OpenAPI spec from controllers |
 | `/e2e` | Generate + run E2E tests |
 | `/eval` | Eval-driven development |
 | `/evolve` | Cluster instincts into skills/commands/agents |
@@ -128,6 +143,14 @@ com.example.{service}/
 | `/orchestrate` | Sequential multi-agent workflow |
 | `/refactor-clean` | Identify + remove dead code |
 | `/skill-create` | Generate SKILL.md from git history |
+
+### Contexts (`contexts/`)
+Behavioral injection files — load with `/load contexts/<name>.md` to change Claude's operating mode:
+| Context | When to Use |
+|---------|-------------|
+| `dev.md` | Active coding — code-first, minimal explanation, TDD loop |
+| `review.md` | Code review — severity classification, thorough analysis |
+| `research.md` | Investigation — root cause analysis, architecture evaluation |
 
 ### Rules (`rules/`)
 `agents` · `coding-style` · `git-workflow` · `hooks` · `patterns` · `performance` · `security` · `testing`
