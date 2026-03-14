@@ -4,6 +4,10 @@
 # Captures tool use events for pattern analysis.
 # Claude Code passes hook data via stdin as JSON.
 #
+# Features:
+#   - Local JSONL logging (original behavior)
+#   - Optional claude-mem integration (fire-and-forget POST)
+#
 # Hook config (in ~/.claude/settings.json):
 # {
 #   "hooks": {
@@ -23,6 +27,10 @@ set -e
 CONFIG_DIR="${HOME}/.claude/homunculus"
 OBSERVATIONS_FILE="${CONFIG_DIR}/observations.jsonl"
 MAX_FILE_SIZE_MB=10
+
+# Skill config (for claude-mem settings)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_CONFIG="${SCRIPT_DIR}/../config.json"
 
 # Ensure directory exists
 mkdir -p "$CONFIG_DIR"
@@ -102,7 +110,7 @@ if [ -f "$OBSERVATIONS_FILE" ]; then
   fi
 fi
 
-# Build and write observation
+# Build and write observation to local JSONL
 timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 python3 << EOF
@@ -133,5 +141,85 @@ if [ -f "$OBSERVER_PID_FILE" ]; then
     kill -USR1 "$observer_pid" 2>/dev/null || true
   fi
 fi
+
+# ── claude-mem integration (fire-and-forget) ──────────────────────────
+# Send observation to claude-mem if enabled and reachable.
+# This block is fully optional — failure here never affects the hook.
+
+_send_to_claude_mem() {
+  # Need curl
+  command -v curl >/dev/null 2>&1 || return 0
+
+  # Need config file
+  [ -f "$SKILL_CONFIG" ] || return 0
+
+  # Parse claude-mem config + build payload in one python call
+  local payload
+  payload=$(python3 << EOF
+import json, os
+
+# Read skill config
+try:
+    with open('$SKILL_CONFIG') as f:
+        cfg = json.load(f).get('claude_mem', {})
+except:
+    cfg = {}
+
+# Check enabled
+if not cfg.get('enabled', False):
+    exit(1)
+
+# Check send_observations flag
+if not cfg.get('send_observations', True):
+    exit(1)
+
+host = cfg.get('host', 'localhost')
+port = cfg.get('port', 37777)
+timeout = cfg.get('timeout_seconds', 2)
+
+# Build payload from parsed observation
+parsed = json.loads('''$PARSED''')
+project = os.path.basename(os.getcwd())
+
+obs = {
+    'type': 'tool_use',
+    'tool': parsed['tool'],
+    'event': parsed['event'],
+    'input': (parsed.get('input') or '')[:2000],
+    'output': (parsed.get('output') or '')[:2000],
+    'session': parsed['session'],
+    'project': project,
+    'timestamp': '$timestamp'
+}
+
+# Print config line then payload line
+print(json.dumps({'host': host, 'port': port, 'timeout': timeout}))
+print(json.dumps(obs))
+EOF
+  ) || return 0
+
+  # Extract config and payload (two lines from python)
+  local cm_config cm_payload cm_host cm_port cm_timeout
+  cm_config=$(echo "$payload" | head -1)
+  cm_payload=$(echo "$payload" | tail -1)
+
+  cm_host=$(echo "$cm_config" | python3 -c "import json,sys; print(json.load(sys.stdin)['host'])")
+  cm_port=$(echo "$cm_config" | python3 -c "import json,sys; print(json.load(sys.stdin)['port'])")
+  cm_timeout=$(echo "$cm_config" | python3 -c "import json,sys; print(json.load(sys.stdin)['timeout'])")
+
+  local cm_url="http://${cm_host}:${cm_port}/api/observations"
+
+  # Fire-and-forget: background curl, discard all output, ignore errors
+  curl -s -o /dev/null --max-time "${cm_timeout}" \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d "$cm_payload" \
+    "$cm_url" &
+
+  echo "[observe] Sent observation to claude-mem (${cm_host}:${cm_port})" >&2
+}
+
+# Run claude-mem send — never let it fail the hook
+_send_to_claude_mem >/dev/null 2>&1 || true
 
 exit 0

@@ -46,5 +46,13 @@
   "integration": {
     "skill_creator_api": "https://skill-creator.app/api",
     "backward_compatible_v1": true
+  },
+  "claude_mem": {
+    "enabled": true,
+    "host": "localhost",
+    "port": 37777,
+    "timeout_seconds": 2,
+    "send_observations": true,
+    "send_compaction_events": true
   }
 }
