@@ -169,8 +169,8 @@ the [Skill Creator GitHub App](https://github.com/apps/skill-creator):
 
 ## Related Commands
 
-- `/instinct-import` - Import generated instincts
-- `/instinct-status` - View learned instincts
+- `/instinct import` - Import generated instincts
+- `/instinct status` - View learned instincts
 - `/evolve` - Cluster instincts into skills/agents
 
 ---

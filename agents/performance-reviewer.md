@@ -1,8 +1,12 @@
 ---
 name: performance-reviewer
-description: Application performance specialist for Java Spring Boot applications. Reviews JVM configuration, connection pool sizing, caching strategies, database query efficiency, async/reactive patterns, and memory usage. Use PROACTIVELY when suspecting performance bottlenecks, preparing for load testing, reviewing code that runs at high throughput, or when production latency/throughput metrics degrade.
+description: >
+  Application performance specialist for Java Spring Boot. Reviews JVM config, connection pools,
+  caching, query efficiency, async/reactive patterns, and memory usage.
+  Use PROACTIVELY when suspecting bottlenecks, preparing for load testing, or reviewing high-throughput code.
+  When NOT to use: for security issues (use security-reviewer), for correctness bugs (use code-reviewer).
 tools: ["Read", "Grep", "Glob", "Bash"]
-model: opus
+model: sonnet
 ---
 
 # Performance Reviewer

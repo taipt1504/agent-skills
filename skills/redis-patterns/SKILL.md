@@ -12,6 +12,24 @@ description: >
 
 Production-ready Redis patterns for Java 17+ / Spring Boot 3.x reactive applications.
 
+## When to Activate
+
+- Implementing caching with Redis (`@Cacheable`, `ReactiveRedisTemplate`)
+- Building distributed locks or rate limiters
+- Configuring Redis connection pools and TTL policies
+- Reviewing cache consistency and invalidation strategies
+
+## Cache Consistency Checklist
+
+- [ ] TTL set on all cache entries (no infinite caches)
+- [ ] Cache eviction on write/update/delete operations
+- [ ] Cache key includes version or tenant if multi-tenant
+- [ ] Null values handled (cache-aside with `unless = "#result == null"`)
+- [ ] Serializer configured explicitly (JSON or Protobuf, not Java serialization)
+- [ ] Connection pool sized appropriately (default Lettuce pool)
+- [ ] Redis Sentinel or Cluster for HA in production
+- [ ] Cache warming strategy for cold starts documented
+
 ## Dependencies
 
 ```xml

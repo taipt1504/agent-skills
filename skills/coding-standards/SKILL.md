@@ -1,13 +1,20 @@
 ---
-name: coding-standards
-description: Universal coding standards, best practices, and patterns for Java Spring WebFlux/MVC development. Use proactively when reviewing code, implementing features, writing tests, or setting up project structure. Covers naming, immutability, error handling, validation, reactive patterns, code smells, and CQRS project organization.
+name: java-standards
+description: Java 17+ coding standards — KISS/DRY/SOLID principles, records, sealed classes, pattern matching, naming conventions, immutability, error handling, reactive patterns, Optional/Stream best practices
 ---
 
-# Coding Standards & Best Practices
+# Java Standards & Best Practices
 
-Universal coding standards for Java Spring projects.
+## When to Activate
 
-## Core Principles
+- Writing or reviewing any Java code
+- Refactoring existing code for readability or maintainability
+- Code review sessions — apply as checklist
+- Designing exception hierarchies, domain models, or reactive chains
+
+---
+
+## 1. Core Principles
 
 | Principle | Rule |
 |-----------|------|
@@ -19,29 +26,88 @@ Universal coding standards for Java Spring projects.
 
 ---
 
-## Naming Conventions
+## 2. Java 17+ Features
+
+### Records
+Use for immutable data carriers: DTOs, value objects, events, query results. Not for JPA entities, Spring beans, or classes requiring inheritance.
 
 ```java
-// Variables — descriptive nouns
-String marketSearchQuery = "election";     // ✅
-boolean isUserAuthenticated = true;        // ✅
-String q = "election"; boolean flag = true;  // ❌
+// GOOD: DTO record
+public record OrderResponse(Long id, String customerId, BigDecimal totalAmount, OrderStatus status) {}
 
-// Methods — verb-noun
-Mono<MarketData> fetchMarketData(String id) { }  // ✅
-boolean isValidEmail(String email) { }           // ✅
-Mono<MarketData> market(String id) { }           // ❌
+// GOOD: Compact constructor validation
+public record Money(BigDecimal amount, Currency currency) {
+    public Money {
+        Objects.requireNonNull(amount, "amount must not be null");
+        if (amount.compareTo(BigDecimal.ZERO) < 0) throw new IllegalArgumentException("amount must be non-negative");
+    }
+}
 
-// Classes — clear roles
-public interface MarketRepository { }                  // ✅
-public record CreateMarketRequest(String name) { }     // ✅
-public class MarketNotFoundException extends RuntimeException { }  // ✅
-public interface Repo { }  public class Request { }    // ❌
+// BAD: @Value class when record suffices
+@Value public class OrderResponse { Long id; String customerId; }
+```
+
+### Sealed Classes
+Use for exhaustive type hierarchies — domain events, result types.
+
+```java
+public sealed interface DomainEvent permits OrderCreatedEvent, OrderShippedEvent, OrderCancelledEvent {
+    Instant occurredAt();
+    String aggregateId();
+}
+
+public record OrderCreatedEvent(String aggregateId, Instant occurredAt, String customerId, BigDecimal amount) implements DomainEvent {}
+public record OrderCancelledEvent(String aggregateId, Instant occurredAt, String reason) implements DomainEvent {}
+```
+
+### Pattern Matching instanceof
+
+```java
+// GOOD
+if (event instanceof OrderCreatedEvent created) {
+    processNewOrder(created.customerId(), created.amount());
+}
+
+// BAD
+if (event instanceof OrderCreatedEvent) {
+    OrderCreatedEvent created = (OrderCreatedEvent) event; // explicit cast
+}
+```
+
+### Text Blocks
+
+```java
+// GOOD
+String query = """
+    SELECT o.id, o.customer_id FROM orders o
+    WHERE o.status = :status AND o.created_at > :since
+    ORDER BY o.created_at DESC
+    """;
+
+// BAD: concatenated strings
+String query = "SELECT o.id " + "FROM orders o " + "WHERE o.status = :status";
 ```
 
 ---
 
-## Immutability (CRITICAL)
+## 3. Naming Conventions
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Class | PascalCase | `OrderService`, `PaymentGateway` |
+| Method | camelCase, verb-first | `createOrder()`, `findByEmail()` |
+| Variable | descriptive noun | `marketSearchQuery`, `isUserAuthenticated` |
+| Constant | UPPER_SNAKE_CASE | `MAX_RETRY_ATTEMPTS`, `DEFAULT_PAGE_SIZE` |
+| Package | lowercase | `com.example.order.domain` |
+| Test method | shouldDoXWhenY | `shouldReturnOrderWhenIdExists()` |
+| Boolean | is/has/can prefix | `isActive()`, `hasPermission()` |
+| Record | Noun, no "Dto" suffix for internal | `OrderResponse`, `Money` |
+| Enum value | UPPER_SNAKE_CASE | `OrderStatus.IN_PROGRESS` |
+| Exception | Descriptive + suffix | `MarketNotFoundException`, `InsufficientStockException` |
+
+---
+
+## 4. Immutability (Critical)
 
 ```java
 // ✅ Immutable record with @Builder + @With
@@ -50,10 +116,9 @@ public record Order(String id, String customerId, OrderStatus status, BigDecimal
 
 // Update = new instance
 Order shipped = order.withStatus(OrderStatus.SHIPPED);
-Order updated = order.toBuilder().status(OrderStatus.CONFIRMED).total(newTotal).build();
 
-// ❌ Mutable class / mutation inside reactive chain
-market.setStatus(MarketStatus.ACTIVE);  // WRONG in reactive
+// ❌ Mutation inside reactive chain
+market.setStatus(MarketStatus.ACTIVE); // WRONG
 
 // ✅ Transform, don't mutate
 return marketRepository.findById(id)
@@ -63,15 +128,80 @@ return marketRepository.findById(id)
 
 ---
 
-## Error Handling
+## 5. Optional Usage Rules
 
 ```java
-// Domain exceptions — meaningful messages
-public class MarketNotFoundException extends RuntimeException {
-    public MarketNotFoundException(String id) { super("Market not found: " + id); }
+// DO: Return Optional from methods; chain operations
+public Optional<Order> findByTrackingNumber(String trackingNumber) { ... }
+
+public String getCustomerEmail(Long orderId) {
+    return orderRepository.findById(orderId)
+        .map(Order::getCustomerId)
+        .flatMap(customerRepository::findById)
+        .map(Customer::getEmail)
+        .orElseThrow(() -> new OrderNotFoundException(orderId));
 }
 
-// Reactive error handling
+// DON'T: Optional as parameter, field, or collection element
+public void createOrder(Optional<String> couponCode) { }  // BAD — use @Nullable or overload
+private Optional<Address> shippingAddress;                // BAD — use nullable field + accessor
+List<Optional<Order>> orders;                             // BAD — filter nulls instead
+```
+
+---
+
+## 6. Stream Best Practices
+
+```java
+// GOOD: Readable chain; immutable result
+var activeOrderTotals = orders.stream()
+    .filter(order -> order.getStatus() == OrderStatus.ACTIVE)
+    .map(Order::getTotalAmount)
+    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+var names = users.stream()
+    .map(User::getFullName)
+    .collect(Collectors.toUnmodifiableList());
+
+// BAD: Side effects in streams
+orders.stream().forEach(order -> {
+    order.setStatus(CANCELLED); // mutation — wrong
+    orderRepository.save(order);
+});
+
+// BAD: Overly complex stream — prefer a for-loop when readability suffers
+```
+
+---
+
+## 7. Error Handling & Exception Hierarchy
+
+```java
+// Base domain exception with error code
+public abstract class DomainException extends RuntimeException {
+    private final String errorCode;
+    protected DomainException(String errorCode, String message) { super(message); this.errorCode = errorCode; }
+    public String getErrorCode() { return errorCode; }
+}
+
+// Specific domain exceptions
+public class OrderNotFoundException extends DomainException {
+    public OrderNotFoundException(Long id) { super("ORDER_NOT_FOUND", "Order not found: " + id); }
+}
+
+public class InsufficientStockException extends DomainException {
+    public InsufficientStockException(String productId, int requested, int available) {
+        super("INSUFFICIENT_STOCK", "Product %s: requested %d, available %d".formatted(productId, requested, available));
+    }
+}
+
+// BAD: Generic exceptions — no error code, not catchable specifically
+throw new RuntimeException("Order not found");
+```
+
+### Reactive Error Handling
+
+```java
 public Mono<Market> getMarket(String id) {
     return marketRepository.findById(id)
         .switchIfEmpty(Mono.error(new MarketNotFoundException(id)))
@@ -86,76 +216,22 @@ public Mono<Market> getMarket(String id) {
 })
 ```
 
-```java
-// Global handler — RFC 7807 ProblemDetail
-@RestControllerAdvice @Slf4j
-public class GlobalExceptionHandler {
-    @ExceptionHandler(MarketNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ProblemDetail handleNotFound(MarketNotFoundException ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-    }
+### Reactive Parallel Execution
 
-    @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ProblemDetail handleAll(Exception ex) {
-        log.error("Unexpected error", ex);
-        return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
-            "An unexpected error occurred");  // ← never expose internals
-    }
-}
+```java
+// ✅ Use Mono.zip for independent calls
+return Mono.zip(
+    userService.findById(userId),
+    marketService.findByUser(userId).collectList(),
+    statsService.getForUser(userId)
+).map(t -> new DashboardData(t.getT1(), t.getT2(), t.getT3()));
+
+// ❌ Unnecessary sequential nesting when calls are independent
 ```
 
 ---
 
-## Input Validation
-
-```java
-// Request DTO with Bean Validation
-public record CreateMarketRequest(
-    @NotBlank @Size(min = 3, max = 200) String name,
-    @NotBlank @Size(max = 2000) String description,
-    @NotNull @Future Instant endDate,
-    @NotEmpty List<@NotBlank String> categories
-) {}
-
-// Controller — @Validated on class, @Valid on @RequestBody
-@RestController @Validated
-public class MarketController {
-    @PostMapping
-    public Mono<ResponseEntity<Market>> create(@Valid @RequestBody CreateMarketRequest req) { ... }
-
-    @GetMapping
-    public Flux<Market> list(
-        @RequestParam(defaultValue = "0") @Min(0) int offset,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) { ... }
-}
-```
-
----
-
-## Reactive Best Practices
-
-```java
-// ✅ Parallel execution with Mono.zip
-public Mono<DashboardData> getDashboard(String userId) {
-    return Mono.zip(
-        userService.findById(userId),
-        marketService.findByUser(userId).collectList(),
-        statsService.getForUser(userId)
-    ).map(t -> new DashboardData(t.getT1(), t.getT2(), t.getT3()));
-}
-
-// ❌ Unnecessary sequential nesting
-return userService.findById(userId)
-    .flatMap(user -> marketService.findByUser(userId).collectList()
-        .flatMap(markets -> statsService.getForUser(userId)
-            .map(stats -> new DashboardData(user, markets, stats))));
-```
-
----
-
-## Code Smells (Fix These)
+## 8. Code Smells (Fix These)
 
 | Smell | Rule | Fix |
 |-------|------|-----|
@@ -169,44 +245,22 @@ return userService.findById(userId)
 // Guard clauses > deep nesting
 if (user == null) return Mono.error(new UnauthorizedException());
 if (!user.isAdmin()) return Mono.error(new ForbiddenException());
-if (market == null) return Mono.error(new NotFoundException());
 // Do the work
 ```
 
 ---
 
-## Comments — When and How
+## 9. Verification Checklist
 
-```java
-// ✅ Explain WHY, not WHAT
-// Use exponential backoff to avoid overwhelming the API during outages
-long delay = Math.min(1000 * (long) Math.pow(2, retryCount), 30000);
-
-// ❌ Stating the obvious
-// Increment counter by 1
-count++;
-```
-
----
-
-## Code Quality Checklist
-
-Before any commit:
-
-- [ ] All methods < 30 lines, classes < 400 lines
-- [ ] Nesting depth < 4 levels
-- [ ] No hardcoded values (use constants/config)
-- [ ] No mutable state in reactive chains
+- [ ] Methods < 30 lines, classes < 400 lines, nesting depth < 4
+- [ ] Records used for DTOs and value objects (not Lombok `@Value`)
+- [ ] Sealed interfaces for exhaustive type hierarchies
+- [ ] Pattern matching `instanceof` (no explicit casts after instanceof)
+- [ ] Text blocks for multi-line strings
+- [ ] Optional only as return type — never as field or parameter
+- [ ] No mutable state or side effects in reactive chains / streams
+- [ ] Domain exceptions with error codes (not generic `RuntimeException`)
+- [ ] No hardcoded magic values — use constants or config
 - [ ] `@Valid` on all `@RequestBody` parameters
-- [ ] Domain exceptions with meaningful messages
-- [ ] No empty catch blocks
-- [ ] No sensitive data in logs
-- [ ] Tests written for new code
-
----
-
-## References
-
-Load as needed:
-
-- **[references/project-structure.md](references/project-structure.md)** — CQRS + Hexagonal package structure, full directory tree, package naming conventions, JavaDoc examples, database projection patterns
+- [ ] No empty catch blocks; no sensitive data in logs
+- [ ] Tests written for all new code

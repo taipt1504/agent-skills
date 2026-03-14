@@ -10,6 +10,9 @@
 # - UserPromptSubmit runs every message (heavy, adds latency)
 #
 
+# Profile gate
+source "$(dirname "$0")/run-with-flags.sh" "evaluate-session" || exit 0
+
 # Resolve project root (works in worktrees too)
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 cd "$PROJECT_ROOT" 2>/dev/null || true

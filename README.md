@@ -75,7 +75,7 @@ Claude Code will automatically load the workflow. Start with `/plan` for any non
 ```
 agent-skills/
 ├── CLAUDE.md                              # Global context auto-loaded by Claude Code
-├── WORKING_WORKFLOW.md                    # 6-phase mandatory workflow reference
+├── WORKING_WORKFLOW.md                    # 7-phase mandatory workflow reference
 ├── README.md
 ├── agents/                                # 16 specialized sub-agents
 │   ├── architect.md
@@ -114,15 +114,21 @@ agent-skills/
 │   ├── refactor-clean.md
 │   ├── skill-create.md
 │   └── verify.md
-├── rules/                                 # 8 global behavioral rules
-│   ├── agents.md
-│   ├── coding-style.md
-│   ├── git-workflow.md
-│   ├── hooks.md
-│   ├── patterns.md
-│   ├── performance.md
-│   ├── security.md
-│   └── testing.md
+├── rules/                                 # 12 behavioral rules (two-layer)
+│   ├── common/                            # Language-agnostic workflow rules
+│   │   ├── agents.md
+│   │   ├── development-workflow.md
+│   │   ├── git-workflow.md
+│   │   ├── hooks.md
+│   │   ├── patterns.md
+│   │   └── performance.md
+│   └── java/                              # Java/Spring-specific rules
+│       ├── api-design.md
+│       ├── coding-style.md
+│       ├── observability.md
+│       ├── reactive.md
+│       ├── security.md
+│       └── testing.md
 ├── scripts/
 │   └── hooks/                             # 8 lifecycle hook scripts
 │       ├── check-debug-statements.sh
@@ -235,6 +241,7 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 | `/learn` | Analyze current session and extract patterns worth saving as skills |
 | `/orchestrate` | Sequential multi-agent workflow for complex tasks |
 | `/plan` | Restate requirements, assess risks, create step-by-step implementation plan — WAIT for user confirm |
+| `/spec` | Define behavioral contracts (inputs, outputs, error cases, scenarios) from approved plan — gate between PLAN and BUILD |
 | `/quality-gate` | Final quality check before PR — all reviewers + coverage enforcement |
 | `/refactor-clean` | Safely identify and remove dead code with test verification |
 | `/skill-create` | Analyze local git history to extract coding patterns and generate SKILL.md |
@@ -242,20 +249,32 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 
 ---
 
-## Rules (8)
+## Rules (12)
 
-Global behavioral rules applied to all Claude Code sessions.
+Behavioral rules organized in two layers: `common/` (language-agnostic) and `java/` (Java/Spring-specific).
+
+### Common Rules (`rules/common/`)
 
 | Rule | Description |
 |---|---|
 | `agents.md` | Agent orchestration rules and available agent registry |
-| `coding-style.md` | Immutability-first code style, Java Spring patterns, no mutation |
+| `development-workflow.md` | Research-before-coding phases |
 | `git-workflow.md` | Commit message format conventions |
 | `hooks.md` | Hook system documentation — PreToolUse, PostToolUse, Stop, SessionStart/End |
-| `patterns.md` | Points to project-specific `PROJECT_GUIDELINES.md` |
+| `patterns.md` | Hexagonal, CQRS, DDD, Outbox, Saga patterns |
 | `performance.md` | Model selection strategy — Haiku for cost savings, Opus for complex tasks |
-| `security.md` | Mandatory security checks before any commit |
-| `testing.md` | Minimum 80% coverage, required test types (unit, integration, E2E) |
+| `spec-driven.md` | Spec-Driven Design mandate — behavioral contracts before implementation |
+
+### Java Rules (`rules/java/`)
+
+| Rule | Description |
+|---|---|
+| `api-design.md` | REST conventions, HTTP codes, pagination |
+| `coding-style.md` | Immutability-first code style, Java Spring patterns, no mutation |
+| `observability.md` | SLF4J, MDC, Micrometer, actuator |
+| `reactive.md` | WebFlux, Mono/Flux, backpressure, WebClient |
+| `security.md` | Spring Security, Bean Validation, OWASP |
+| `testing.md` | JUnit 5, StepVerifier, Testcontainers, 80%+ coverage |
 
 ---
 
@@ -278,20 +297,21 @@ Lifecycle scripts in `scripts/hooks/` that run automatically during Claude Code 
 
 ## Workflow
 
-Every session follows a **6-phase mandatory workflow**:
+Every session follows a **7-phase mandatory workflow**:
 
 ```
-① BOOT → ② PLAN → ③ BUILD (TDD) → ④ VERIFY → ⑤ REVIEW → ⑥ LEARN
+① BOOT → ② PLAN → ③ SPEC → ④ BUILD (TDD) → ⑤ VERIFY → ⑥ REVIEW → ⑦ LEARN
 ```
 
 | Phase | What Happens |
 |---|---|
 | **① BOOT** | Auto-detect project type, load guidelines, restore context from claude-mem |
 | **② PLAN** | `/plan` — decompose task, assess risk, wait for user confirmation |
-| **③ BUILD** | TDD cycle per step: RED (write test) → GREEN (implement) → REFACTOR |
-| **④ VERIFY** | `/verify` — build, compile, tests (≥80% coverage), reactive safety, security scan |
-| **⑤ REVIEW** | Multi-agent code review: code + security + conditional reviewers |
-| **⑥ LEARN** | Auto-extract patterns, save instincts to claude-mem with confidence scoring |
+| **③ SPEC** | `/spec` — define behavioral contracts (inputs, outputs, error cases, scenarios) |
+| **④ BUILD** | TDD cycle per step: RED (write test from spec) → GREEN (implement) → REFACTOR |
+| **⑤ VERIFY** | `/verify` — build, compile, tests (≥80% coverage), reactive safety, security scan |
+| **⑥ REVIEW** | Multi-agent code review: code + security + conditional reviewers |
+| **⑦ LEARN** | Auto-extract patterns, save instincts to claude-mem with confidence scoring |
 
 📖 **Full details:** [WORKING_WORKFLOW.md](./WORKING_WORKFLOW.md)
 
@@ -300,6 +320,7 @@ Every session follows a **6-phase mandatory workflow**:
 | Violation | Action |
 |---|---|
 | Writing code without `/plan` | **STOP** — run `/plan` first (exception: ≤5 line fixes) |
+| Writing code without approved spec | **STOP** — run `/spec` first (exception: ≤5 line fixes, no new behavior) |
 | Skipping tests | **BLOCK** — no code ships without tests |
 | `.block()` in reactive code | **CRITICAL** — must fix immediately |
 | Agent attempts git commit | **FORBIDDEN** — only user commits after final review |
@@ -340,7 +361,7 @@ This file overrides generic conventions with project-specific rules (architectur
 | File | Purpose |
 |---|---|
 | `CLAUDE.md` | Global context auto-loaded by Claude Code — tech stack, conventions, critical rules |
-| `WORKING_WORKFLOW.md` | Complete 6-phase workflow reference with examples and decision flowcharts |
+| `WORKING_WORKFLOW.md` | Complete 7-phase workflow reference with examples and decision flowcharts |
 | `PROJECT_GUIDELINES.md` | Per-project rules (created at each project root from template) |
 
 ---

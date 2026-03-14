@@ -12,6 +12,13 @@ description: >
 
 Ports and Adapters pattern for Java 17+ / Spring Boot 3.x.
 
+## When to Activate
+
+- Creating new modules, services, or bounded contexts
+- Reviewing package structure and dependency direction
+- Refactoring monolithic code into hexagonal layers
+- Planning domain model isolation from infrastructure
+
 ## Core Concept
 
 ```

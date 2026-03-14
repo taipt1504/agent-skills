@@ -12,6 +12,9 @@
 #   - Optional claude-mem integration (fire-and-forget POST)
 #
 
+# Profile gate
+source "$(dirname "$0")/run-with-flags.sh" "pre-compact" || exit 0
+
 # All output to stderr
 exec 1>&2
 

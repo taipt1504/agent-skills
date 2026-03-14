@@ -9,6 +9,9 @@
 # debug statements before committing.
 #
 
+# Profile gate
+source "$(dirname "$0")/run-with-flags.sh" "check-debug-statements" || exit 0
+
 # Read stdin (if any)
 DATA=$(cat)
 

@@ -1,8 +1,12 @@
 ---
 name: build-error-resolver
-description: Build and compilation error resolution specialist for Java/Gradle projects. Use PROACTIVELY when build fails or compilation errors occur. Fixes build/compilation errors only with minimal diffs, no architectural edits. Focuses on getting the build green quickly.
+description: >
+  Build and compilation error resolution specialist for Java/Gradle/Maven projects.
+  Use PROACTIVELY when build fails or compilation errors occur.
+  Fixes build/compilation errors only with minimal diffs, no architectural edits.
+  When NOT to use: for test failures (use tdd-guide), for architectural refactoring (use architect).
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: opus
+model: sonnet
 ---
 
 # Build Error Resolver

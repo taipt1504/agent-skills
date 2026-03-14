@@ -1,8 +1,11 @@
 ---
 name: refactor-cleaner
-description: Dead code cleanup and consolidation specialist for Java/Spring projects. Runs analysis tools to identify dead code and safely removes unused dependencies, classes, and methods.
+description: >
+  Dead code cleanup and consolidation specialist for Java/Spring projects.
+  Use PROACTIVELY during maintenance phases to identify and safely remove unused dependencies, classes, and methods.
+  When NOT to use: for feature changes (use planner + tdd-guide), for architectural redesign (use architect).
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: opus
+model: sonnet
 ---
 
 # Refactor & Dead Code Cleaner

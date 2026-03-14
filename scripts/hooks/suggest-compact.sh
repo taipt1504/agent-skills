@@ -12,6 +12,9 @@
 # - Compact after completing a milestone, before starting next
 #
 
+# Profile gate
+source "$(dirname "$0")/run-with-flags.sh" "suggest-compact" || exit 0
+
 # Resolve project root (works in worktrees too)
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 cd "$PROJECT_ROOT" 2>/dev/null || true

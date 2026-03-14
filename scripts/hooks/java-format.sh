@@ -4,6 +4,9 @@
 # Runs Spotless (or Google Java Format) after Java file edits
 #
 
+# Profile gate
+source "$(dirname "$0")/run-with-flags.sh" "java-format" || exit 0
+
 # Read stdin
 DATA=$(cat)
 

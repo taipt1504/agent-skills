@@ -19,6 +19,9 @@
 
 set -euo pipefail
 
+# Profile gate — exit if not enabled for current HOOK_PROFILE
+source "$(dirname "$0")/run-with-flags.sh" "session-end" || exit 0
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -73,6 +76,16 @@ SIGNALS_DIR=".claude/signals"
 mkdir -p "$SESSIONS_DIR" "$LEARNED_DIR" "$SIGNALS_DIR"
 
 SESSION_FILE="$SESSIONS_DIR/${TODAY}-${SHORT_ID}-session.md"
+
+# ---------------------------------------------------------------------------
+# Idempotency check — skip if session file already written for this session
+# ---------------------------------------------------------------------------
+
+MARKER_FILE="$SESSIONS_DIR/.written-${SHORT_ID}"
+if [ -f "$MARKER_FILE" ]; then
+    log "Session file already written for ${SHORT_ID} — skipping (idempotent)"
+    exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Git context
@@ -261,6 +274,15 @@ SUMMARY_TEXT="Session on ${TODAY} (${BRANCH}): ${USER_MESSAGES} user messages, $
 } > "$SESSION_FILE"
 
 log "Session file saved: ${SESSION_FILE}"
+
+# Write idempotency marker
+echo "$CURRENT_EPOCH" > "$MARKER_FILE"
+
+# Invoke cost-tracker inline
+COST_TRACKER="$(dirname "$0")/cost-tracker.sh"
+if [ -x "$COST_TRACKER" ]; then
+    bash "$COST_TRACKER" </dev/null 2>&1 || true
+fi
 
 # Clean up any .tmp session file from session-start hook
 EXISTING_TMP="$(find "$SESSIONS_DIR" -name "${TODAY}-${SHORT_ID}-session.tmp" 2>/dev/null | head -1)"

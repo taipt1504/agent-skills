@@ -7,6 +7,24 @@ description: RabbitMQ messaging patterns for Java Spring Boot applications using
 
 Production-ready RabbitMQ patterns for Java 17+ / Spring Boot 3.x with Spring AMQP.
 
+## When to Activate
+
+- Implementing RabbitMQ producers or consumers with Spring AMQP
+- Configuring exchanges, queues, and bindings
+- Setting up dead letter queues (DLQ) and retry mechanisms
+- Reviewing message handling reliability and error recovery
+
+## DLQ Setup Checklist
+
+- [ ] Dead letter exchange (DLX) declared and bound to DLQ
+- [ ] `x-dead-letter-exchange` and `x-dead-letter-routing-key` set on main queue
+- [ ] Max retry count configured before DLQ routing
+- [ ] DLQ consumer or monitoring for failed messages
+- [ ] Message TTL set on retry queues (backoff pattern)
+- [ ] Manual acknowledgment mode (`AcknowledgeMode.MANUAL`)
+- [ ] `@RabbitListener` with error handler configured
+- [ ] Testcontainers test for message round-trip + DLQ routing
+
 ## Quick Reference
 
 | Category | Jump To |

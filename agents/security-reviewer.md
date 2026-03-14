@@ -1,8 +1,12 @@
 ---
 name: security-reviewer
-description: Security vulnerability detection and remediation specialist for Java Spring WebFlux. Flags secrets, injection, insecure crypto, OWASP Top 10, and reactive-specific security issues.
+description: >
+  Security vulnerability detection specialist for Java Spring WebFlux/MVC.
+  Use PROACTIVELY before commits and PRs. Flags secrets, injection, insecure crypto, OWASP Top 10,
+  and reactive-specific security issues.
+  When NOT to use: for general code quality (use code-reviewer), for performance issues (use performance-reviewer).
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: opus
+model: sonnet
 ---
 
 # Security Reviewer

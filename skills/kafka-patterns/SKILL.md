@@ -11,6 +11,24 @@ description: >
 
 Production-ready Kafka patterns for Java 17+ / Spring Boot 3.x.
 
+## When to Activate
+
+- Implementing Kafka producers or consumers
+- Configuring exactly-once semantics or idempotent producers
+- Setting up dead letter topics (DLT) and error handling
+- Reviewing Kafka integration code for reliability patterns
+
+## Pre-Deploy Verification Checklist
+
+- [ ] Producer uses idempotent mode (`enable.idempotence=true`)
+- [ ] Consumer group ID is meaningful and unique per service
+- [ ] Dead letter topic configured for failed messages
+- [ ] Error handler with retry + DLT fallback
+- [ ] Serializer/deserializer configured (not relying on defaults)
+- [ ] Consumer offset commit strategy explicit (manual or auto)
+- [ ] Topic partitioning strategy documented
+- [ ] Testcontainers test for producer/consumer round-trip
+
 ## Dependencies
 
 ```xml

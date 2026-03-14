@@ -118,74 +118,15 @@ public record ApiResponse<T>(
 
 ## Global Exception Handler
 
-```java
-@RestControllerAdvice
-@Slf4j
-public class GlobalExceptionHandler {
+Use `@RestControllerAdvice` with centralized exception handling. Must cover:
 
-    // ─── Domain Exceptions ─────────────────────────────────────────────────────
-    @ExceptionHandler(ResourceNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ApiResponse<Void> handleNotFound(ResourceNotFoundException ex) {
-        return ApiResponse.error(ex.getMessage());
-    }
+- Domain exceptions → 404/409/422
+- `MethodArgumentNotValidException` → 400 with field errors
+- `ConstraintViolationException` → 400 with field errors
+- `AccessDeniedException` → 403
+- Catch-all → 500 (log full stack, return generic message — never expose internals)
 
-    @ExceptionHandler(BusinessRuleViolationException.class)
-    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-    public ApiResponse<Void> handleBusinessRule(BusinessRuleViolationException ex) {
-        log.warn("Business rule violation: {}", ex.getMessage());
-        return ApiResponse.error(ex.getMessage());
-    }
-
-    @ExceptionHandler(ConflictException.class)
-    @ResponseStatus(HttpStatus.CONFLICT)
-    public ApiResponse<Void> handleConflict(ConflictException ex) {
-        return ApiResponse.error(ex.getMessage());
-    }
-
-    // ─── Validation Exceptions ─────────────────────────────────────────────────
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Void> handleValidationErrors(MethodArgumentNotValidException ex) {
-        List<FieldError> errors = ex.getBindingResult().getFieldErrors().stream()
-            .map(e -> new FieldError(e.getField(), e.getDefaultMessage()))
-            .toList();
-        return ApiResponse.validationError(errors);
-    }
-
-    @ExceptionHandler(ConstraintViolationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Void> handleConstraintViolation(ConstraintViolationException ex) {
-        List<FieldError> errors = ex.getConstraintViolations().stream()
-            .map(v -> new FieldError(v.getPropertyPath().toString(), v.getMessage()))
-            .toList();
-        return ApiResponse.validationError(errors);
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Void> handleBadRequest(HttpMessageNotReadableException ex) {
-        return ApiResponse.error("Invalid request body: " + ex.getMostSpecificCause().getMessage());
-    }
-
-    // ─── Auth Exceptions ───────────────────────────────────────────────────────
-    @ExceptionHandler(AccessDeniedException.class)
-    @ResponseStatus(HttpStatus.FORBIDDEN)
-    public ApiResponse<Void> handleAccessDenied(AccessDeniedException ex) {
-        return ApiResponse.error("Access denied");
-    }
-
-    // ─── Catch-All ─────────────────────────────────────────────────────────────
-    @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ApiResponse<Void> handleGeneral(Exception ex, HttpServletRequest request) {
-        log.error("Unhandled exception for {}: {}", request.getRequestURI(), ex.getMessage(), ex);
-        return ApiResponse.error("An unexpected error occurred");
-    }
-
-    public record FieldError(String field, String message) {}
-}
-```
+> See `api-design` skill for full GlobalExceptionHandler implementation with RFC 7807.
 
 ---
 

@@ -241,9 +241,16 @@ When designing a new system or feature:
 ### Functional Requirements
 
 - [ ] Use cases documented
-- [ ] API contracts defined (OpenAPI/AsyncAPI)
 - [ ] Domain models specified (Aggregates, Entities, Value Objects)
 - [ ] Event flows mapped
+
+### Spec Verification (MANDATORY)
+
+- [ ] Spec artifact produced via `/spec` for each behavioral component
+- [ ] All scenarios enumerated (≥1 happy path, ≥2 failure cases)
+- [ ] Spec approved by user (`/checkpoint "spec-approved"` exists)
+
+If spec missing: **DO NOT approve design.** Request `/spec` first.
 
 ### Non-Functional Requirements
 
@@ -274,6 +281,8 @@ When designing a new system or feature:
 
 Watch for these architectural anti-patterns:
 
+- **Missing Spec Before BUILD**: Writing implementation code without an approved behavioral spec
+- **API Doc Before Spec**: Generating OpenAPI docs before defining behavioral contracts via `/spec`
 - **Blocking in Reactive Pipeline**: Using block() in reactive chain
 - **Distributed Monolith**: Microservices with tight coupling
 - **God Aggregate**: One aggregate does everything

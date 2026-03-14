@@ -16,6 +16,9 @@
 
 set -euo pipefail
 
+# Profile gate — exit if not enabled for current HOOK_PROFILE
+source "$(dirname "$0")/run-with-flags.sh" "session-start" || exit 0
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -137,9 +140,8 @@ fi
 
 # --- Recent sessions (< 7 days) ---
 if [ -d "$SESSIONS_DIR" ]; then
-  # macOS find doesn't support -mtime with decimals uniformly;
-  # -mtime -7 means modified within the last 7 days on both platforms.
-  RECENT_SESSIONS="$(find "$SESSIONS_DIR" -maxdepth 1 -name "*.tmp" -mtime -7 2>/dev/null | sort -r)"
+  # Look for both .tmp (active) and .md (completed) session files
+  RECENT_SESSIONS="$(find "$SESSIONS_DIR" -maxdepth 1 \( -name "*-session.tmp" -o -name "*-session.md" \) -mtime -7 2>/dev/null | sort -r)"
   if [ -n "$RECENT_SESSIONS" ]; then
     SESSION_COUNT="$(echo "$RECENT_SESSIONS" | wc -l | tr -d ' ')"
     log "Recent sessions (< 7 days): $SESSION_COUNT"
@@ -147,6 +149,21 @@ if [ -d "$SESSIONS_DIR" ]; then
     echo "$RECENT_SESSIONS" | head -5 | while IFS= read -r session_file; do
       log "  → $(basename "$session_file")"
     done
+
+    # Load content from the most recent session file (for context continuity)
+    LATEST_SESSION="$(echo "$RECENT_SESSIONS" | head -1)"
+    if [ -n "$LATEST_SESSION" ] && [ -f "$LATEST_SESSION" ]; then
+      log "--- Previous session context ($(basename "$LATEST_SESSION")) ---"
+      # Limit to 80 lines to avoid flooding context
+      head -80 "$LATEST_SESSION" | while IFS= read -r line; do
+        echo "$line" >&2
+      done
+      TOTAL_LINES="$(wc -l < "$LATEST_SESSION" | tr -d ' ')"
+      if [ "$TOTAL_LINES" -gt 80 ]; then
+        log "... (truncated, $TOTAL_LINES total lines)"
+      fi
+      log "--- End previous session context ---"
+    fi
   fi
 fi
 

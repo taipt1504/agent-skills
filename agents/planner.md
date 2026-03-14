@@ -92,6 +92,14 @@ Create detailed steps with:
 ## Success Criteria
 - [ ] Criterion 1
 - [ ] Criterion 2
+
+## Spec Handoff
+- **Task Type**: REST Endpoint | Domain Logic | Messaging | Migration | Job | Mixed
+- **Components for Spec**: [List of components that need behavioral specs]
+- **Constraints**: [Validation rules, NFRs, consistency requirements]
+- **Integration Points**: [External services, events, databases]
+
+> After plan approval, run `/spec` to define behavioral contracts before BUILD.
 ```
 
 ## Best Practices
@@ -103,6 +111,7 @@ Create detailed steps with:
 5. **Enable Testing**: Structure changes to be easily testable
 6. **Think Incrementally**: Each step should be verifiable
 7. **Document Decisions**: Explain why, not just what
+8. **Output Spec Handoff**: Every plan must include a Spec Handoff section identifying task type and inputs for `/spec`
 
 ## When Planning Refactors
 

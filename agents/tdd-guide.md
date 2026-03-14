@@ -1,8 +1,12 @@
 ---
 name: tdd-guide
-description: Test-Driven Development specialist for Java Spring WebFlux enforcing write-tests-first methodology with JUnit 5, Mockito, Testcontainers. Ensures 80%+ test coverage.
+description: >
+  Test-Driven Development specialist for Java Spring WebFlux/MVC.
+  Use PROACTIVELY when implementing new features or fixing bugs — enforces write-tests-first methodology.
+  JUnit 5, Mockito, StepVerifier, Testcontainers. Ensures 80%+ coverage.
+  When NOT to use: for E2E/integration tests (use e2e-runner), for blackbox API tests (use blackbox-test-runner).
 tools: ["Read", "Write", "Edit", "Bash", "Grep"]
-model: opus
+model: sonnet
 ---
 
 # TDD Guide

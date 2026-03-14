@@ -7,7 +7,7 @@
 
 ## ⚠️ MANDATORY: Read WORKING_WORKFLOW.md FIRST
 
-Every session MUST follow the **6-phase workflow** defined in `WORKING_WORKFLOW.md`.
+Every session MUST follow the **7-phase workflow** defined in `WORKING_WORKFLOW.md`.
 No exceptions. No shortcuts.
 
 ---
@@ -36,6 +36,7 @@ These rules are NON-NEGOTIABLE:
 | Violation | Action |
 |-----------|--------|
 | Writing code without `/plan` | **STOP** → run `/plan` first (exception: <5 line fixes) |
+| Writing code without approved spec | **STOP** → run `/spec` first (exception: ≤5 line fixes, no new behavior) |
 | Skipping tests | **BLOCK** — no code ships without tests |
 | `.block()` in reactive code | **CRITICAL** — must fix immediately |
 | Agent attempts git commit | **FORBIDDEN** — only user commits after final review |
@@ -79,13 +80,14 @@ com.example.{service}/
 | Skill | Purpose |
 |-------|---------|
 | `api-design` | RESTful and reactive API design — URL conventions, error handling, pagination |
-| `backend-patterns` | RESTful API, DB optimization, messaging patterns |
 | `blackbox-test` | JSON-driven black box integration tests |
-| `coding-standards` | KISS, DRY, SOLID, readability |
 | `continuous-learning-v2` | Instinct-based learning with confidence scoring |
+| `database-migrations` | Zero-downtime migrations — Flyway, expand-contract, Testcontainers validation |
 | `grpc-patterns` | gRPC service patterns — protobuf, streaming, error handling |
 | `hexagonal-arch` | Hexagonal architecture patterns |
 | `java-patterns` | Java 17+ best practices |
+| `java-standards` | Java 17+ coding standards — KISS/DRY/SOLID, records, sealed classes, naming, Optional, Streams |
+| `jpa-patterns` | JPA/Hibernate — entity design, N+1 prevention, HikariCP, pagination |
 | `kafka-patterns` | Kafka producer/consumer, exactly-once, reactive Kafka, DLT |
 | `mysql-patterns` | MySQL optimization, indexing, JPA best practices, connection pooling |
 | `observability-patterns` | Micrometer, distributed tracing, structured logging, alerting |
@@ -97,9 +99,11 @@ com.example.{service}/
 | `solution-design` | Architecture documentation |
 | `spring-mvc-patterns` | Spring MVC patterns — controllers, exception handlers, validation |
 | `spring-webflux-patterns` | Spring WebFlux reactive patterns — Mono/Flux chains, backpressure, WebClient |
+| `springboot-patterns` | REST controllers, pagination, caching, async, rate limiting, production defaults |
+| `springboot-security` | JWT filter, SecurityFilterChain, CORS, secrets management, OWASP scanning |
 | `strategic-compact` | Context-efficient `/compact` suggestions |
 | `tdd-workflow` | Write-tests-first TDD enforcement |
-| `verification-loop` | Multi-phase build/test/security verification |
+| `verification` | Verification pipeline — compile, test, coverage, security, static analysis, diff review |
 
 ### Agents (`agents/`)
 | Agent | Purpose |
@@ -107,17 +111,15 @@ com.example.{service}/
 | `architect` | Backend architecture — WebFlux, CQRS, DDD |
 | `blackbox-test-runner` | Generates E2E API tests |
 | `build-error-resolver` | Fixes Gradle/compile errors with minimal diffs |
-| `code-reviewer` | Quality + security code review |
-| `database-reviewer` | PostgreSQL/MySQL schema, queries, JPA optimization |
+| `code-reviewer` | Language-level code review — readability, naming, complexity, algorithms |
+| `database-reviewer` | PostgreSQL + MySQL — schema, queries, JPA, indexing, connection pooling |
 | `e2e-runner` | E2E testing with Testcontainers |
-| `mysql-reviewer` | MySQL-specific review — indexes, JPA N+1, connection pool |
 | `performance-reviewer` | Performance bottlenecks, memory leaks, slow queries |
 | `planner` | Feature/architecture/refactor planning |
 | `rabbitmq-reviewer` | RabbitMQ config, message handling, DLQ setup |
 | `refactor-cleaner` | Dead code removal |
 | `security-reviewer` | Security vulnerability detection |
-| `spring-boot-reviewer` | DI, config, auto-configuration review |
-| `spring-mvc-reviewer` | Spring MVC patterns, servlet filters, exception handlers |
+| `spring-reviewer` | Spring Boot + MVC — DI, controllers, validation, security, config, testing |
 | `spring-webflux-reviewer` | Reactive patterns, backpressure review |
 | `tdd-guide` | TDD enforcement specialist |
 
@@ -125,8 +127,8 @@ com.example.{service}/
 | Command | Purpose |
 |---------|---------|
 | `/plan` | Restate requirements → risk assessment → implementation plan |
-| `/verify` | Gradle build → compile → tests → security scan |
-| `/quality-gate` | Final quality check before PR — all reviewers + coverage |
+| `/spec` | Define behavioral contracts (inputs, outputs, error cases) from approved plan |
+| `/verify` | Build + compile + tests + security scan (modes: quick/full/gate) |
 | `/code-review` | Comprehensive review of uncommitted changes |
 | `/build-fix` | Incrementally fix build errors |
 | `/checkpoint` | Create/verify workflow checkpoint |
@@ -136,12 +138,12 @@ com.example.{service}/
 | `/e2e` | Generate + run E2E tests |
 | `/eval` | Eval-driven development |
 | `/evolve` | Cluster instincts into skills/commands/agents |
-| `/instinct-status` | Show learned instincts with confidence |
-| `/instinct-export` | Export instincts for team sharing |
-| `/instinct-import` | Import instincts from teammates |
+| `/instinct` | Manage instincts — status, export, import (subcommands) |
 | `/learn` | Extract patterns from current session |
-| `/orchestrate` | Sequential multi-agent workflow |
+| `/orchestrate` | Sequential/parallel multi-agent workflow |
 | `/refactor-clean` | Identify + remove dead code |
+| `/resume-session` | Load context from a previous session file |
+| `/save-session` | Manually persist current session context |
 | `/skill-create` | Generate SKILL.md from git history |
 
 ### Contexts (`contexts/`)
@@ -153,10 +155,13 @@ Behavioral injection files — load with `/load contexts/<name>.md` to change Cl
 | `research.md` | Investigation — root cause analysis, architecture evaluation |
 
 ### Rules (`rules/`)
-`agents` · `coding-style` · `git-workflow` · `hooks` · `patterns` · `performance` · `security` · `testing`
+**`common/`** (language-agnostic): `agents` · `development-workflow` · `git-workflow` · `hooks` · `patterns` · `performance` · `spec-driven`
+**`java/`** (Java/Spring-specific): `api-design` · `coding-style` · `observability` · `reactive` · `security` · `testing`
 
 ### Hooks (`scripts/hooks/`)
-`session-start` · `session-end` · `pre-compact` · `suggest-compact` · `evaluate-session` · `java-compile-check` · `java-format` · `check-debug-statements`
+`session-start` · `session-end` · `pre-compact` · `suggest-compact` · `evaluate-session` · `java-compile-check` · `java-format` · `check-debug-statements` · `cost-tracker` · `run-with-flags`
+
+Hook profiles: `minimal` | `standard` (default) | `strict` — set via `HOOK_PROFILE` env var.
 
 ---
 
@@ -165,7 +170,7 @@ Behavioral injection files — load with `/load contexts/<name>.md` to change Cl
 If `claude-mem` is available, it provides cross-session memory:
 - Learned patterns persist between sessions
 - Instincts (via `continuous-learning-v2`) accumulate with confidence scores
-- Use `/instinct-status` to see what's been learned
+- Use `/instinct status` to see what's been learned
 - Use `/evolve` to promote high-confidence instincts to skills
 
 ---
@@ -174,12 +179,20 @@ If `claude-mem` is available, it provides cross-session memory:
 
 ```
 /plan              → Start here. Always. Plan before code.
-/verify            → Run after implementation. Build + test + security.
+/spec              → After /plan. Define contracts before code.
+/verify            → Run after implementation (quick/full/gate modes).
 /code-review       → Before asking user to commit.
 /build-fix         → When Gradle/compile fails.
 /checkpoint        → Mark workflow phase completion.
 /e2e               → Generate E2E integration tests.
 /orchestrate       → Complex tasks needing multiple agents.
+/save-session      → Persist current context for next session.
+/resume-session    → Load context from a previous session.
+```
+
+### CI Validation
+```bash
+bash scripts/ci/run-all.sh     # Validate all plugin structure
 ```
 
 ### Common Build Commands
@@ -214,6 +227,7 @@ See `templates/PROJECT_GUIDELINES_TEMPLATE.md` for the standard template.
 8. Deploy without migrations
 9. Write code without `/plan`
 10. Commit on behalf of user
+11. Write implementation code without approved spec
 
 ### 🟢 ALWAYS
 1. Constructor injection (`@RequiredArgsConstructor`)
@@ -221,8 +235,9 @@ See `templates/PROJECT_GUIDELINES_TEMPLATE.md` for the standard template.
 3. Records for immutable DTOs
 4. `StepVerifier` for reactive tests
 5. 80%+ test coverage
-6. Follow the 6-phase workflow
+6. Follow the 7-phase workflow
 7. Domain exceptions (not generic `RuntimeException`)
 8. Parameterized queries
 9. Indexes for frequently queried columns
 10. Structured logging with context
+11. Run `/spec` after `/plan` for all non-trivial tasks

@@ -1,38 +1,50 @@
 {
   "$schema": "../schemas/hooks.schema.json",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.sh\"",
+            "timeout": 30
+          }
+        ],
+        "description": "Load previous session context, detect project structure (Maven/Gradle), and restore continuity"
+      }
+    ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Edit|Write|MultiEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/java-compile-check.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/suggest-compact.sh\"",
+            "timeout": 5,
+            "async": true
           }
         ],
-        "description": "Check Java compilation before running bash commands — catches compile errors early before they cascade"
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-debug-statements.sh\""
-          }
-        ],
-        "description": "Block commits containing debug statements (System.out.println, e.printStackTrace, @SuppressWarnings) in staged Java files"
+        "description": "Monitor context window usage and suggest /compact at logical boundaries"
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/java-format.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/java-compile-check.sh\"",
+            "timeout": 90
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/java-format.sh\"",
+            "timeout": 60,
+            "async": true
           }
         ],
-        "description": "Run Java format check after writing or editing Java files — ensures consistent code style"
+        "description": "Validate Java compilation and auto-format after file edits"
       }
     ],
     "PreCompact": [
@@ -41,22 +53,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.sh\"",
+            "timeout": 30,
+            "async": true
           }
         ],
         "description": "Save architectural decisions, current task state, and learnings before context compaction"
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.sh\""
-          }
-        ],
-        "description": "Load previous session context, detect project structure (Maven/Gradle), and restore architectural decisions"
       }
     ],
     "Stop": [
@@ -65,12 +67,23 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-debug-statements.sh\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/cost-tracker.sh\"",
+            "timeout": 10,
+            "async": true
+          },
+          {
+            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-end.sh\"",
-            "async": true,
-            "timeout": 10
+            "timeout": 60,
+            "async": true
           }
         ],
-        "description": "Persist session state, save learnings, and update context files after each response"
+        "description": "Check debug statements, track costs, and persist session state"
       }
     ]
   }

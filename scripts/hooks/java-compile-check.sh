@@ -4,6 +4,9 @@
 # Runs compilation check after Java file edits
 #
 
+# Profile gate
+source "$(dirname "$0")/run-with-flags.sh" "java-compile-check" || exit 0
+
 # Read stdin
 DATA=$(cat)
 

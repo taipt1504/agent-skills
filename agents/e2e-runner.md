@@ -1,8 +1,11 @@
 ---
 name: e2e-runner
-description: End-to-end API testing specialist for Java Spring WebFlux using Testcontainers and WebTestClient. Manages test containers, handles async scenarios, ensures critical API flows work.
+description: >
+  End-to-end API testing specialist using Testcontainers and WebTestClient.
+  Use PROACTIVELY when testing critical API flows end-to-end with real infrastructure (DB, Redis, Kafka).
+  When NOT to use: for unit tests (use tdd-guide), for blackbox API tests without containers (use blackbox-test-runner).
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: opus
+model: sonnet
 ---
 
 # E2E Test Runner

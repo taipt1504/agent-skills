@@ -40,6 +40,17 @@ Security-focused review:
 security-reviewer -> code-reviewer -> architect
 ```
 
+### review
+
+Parallel multi-reviewer workflow (all reviewers run simultaneously):
+
+```
+[parallel: code-reviewer, spring-reviewer, security-reviewer, database-reviewer]
+-> merge results -> final report
+```
+
+Use for comprehensive pre-PR review when changes span multiple layers.
+
 ## Execution Pattern
 
 For each agent in the workflow:
@@ -49,9 +60,9 @@ For each agent in the workflow:
 3. **Pass to next agent** in chain
 4. **Aggregate results** into final report
 
-## Handoff Document Format
+## Handoff Document Format (v2)
 
-Between agents, create handoff document:
+Between agents, create structured handoff:
 
 ```markdown
 ## HANDOFF: [previous-agent] -> [next-agent]
@@ -60,7 +71,10 @@ Between agents, create handoff document:
 [Summary of what was done]
 
 ### Findings
-[Key discoveries or decisions]
+| # | Severity | Finding | File | Line |
+|---|----------|---------|------|------|
+| 1 | CRITICAL | .block() in reactive chain | OrderService.java | 45 |
+| 2 | WARN | Missing @Valid annotation | OrderController.java | 23 |
 
 ### Files Modified
 [List of files touched]
@@ -70,6 +84,23 @@ Between agents, create handoff document:
 
 ### Recommendations
 [Suggested next steps]
+```
+
+### Parallel Results Table (for review workflow)
+
+When merging results from parallel agents:
+
+```markdown
+## PARALLEL RESULTS
+
+| Agent | Status | Critical | Warnings | Summary |
+|-------|--------|----------|----------|---------|
+| code-reviewer | PASS | 0 | 2 | Naming, complexity |
+| security-reviewer | WARN | 1 | 0 | Hardcoded timeout |
+| database-reviewer | PASS | 0 | 1 | Missing index |
+
+### Merged Findings (deduplicated, sorted by severity)
+[Combined findings from all agents]
 ```
 
 ## Example: Feature Workflow
@@ -164,6 +195,7 @@ $ARGUMENTS:
 - `bugfix <description>` - Bug fix workflow
 - `refactor <description>` - Refactoring workflow
 - `security <description>` - Security review workflow
+- `review <description>` - Parallel multi-reviewer workflow
 - `custom <agents> <description>` - Custom agent sequence
 
 ## Custom Workflow Example

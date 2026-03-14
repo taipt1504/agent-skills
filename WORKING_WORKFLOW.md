@@ -2,29 +2,29 @@
 
 **The mandatory workflow for every Claude Code session in Java Spring projects.**
 
-Every session follows six phases. No exceptions. No shortcuts. This document is the single source of truth for how work gets done.
+Every session follows seven phases. No exceptions. No shortcuts. This document is the single source of truth for how work gets done.
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        SESSION LIFECYCLE                            │
-│                                                                     │
-│  ┌──────┐   ┌──────┐   ┌───────┐   ┌────────┐   ┌────────┐       │
-│  │ BOOT │──▶│ PLAN │──▶│ BUILD │──▶│ VERIFY │──▶│ REVIEW │       │
-│  │  ①   │   │  ②   │   │  ③    │   │   ④    │   │   ⑤    │       │
-│  └──────┘   └──┬───┘   └───┬───┘   └───┬────┘   └───┬────┘       │
-│     ▲          │           │            │            │              │
-│     │          │     ┌─────┘            │            ▼              │
-│     │          │     │ TDD cycle        │     ┌──────────┐         │
-│     │          │     │ per step         │     │ DELIVER  │         │
-│     │          │     ▼                  │     │ to user  │         │
-│     │          │   RED → GREEN          │     └──────────┘         │
-│     │          │     → REFACTOR         │            │              │
-│     │          │                        │            ▼              │
-│  ┌──────┐     │                        │     ┌──────────┐         │
-│  │LEARN │◀────┴────────────────────────┴─────│  END     │         │
-│  │  ⑥   │          SessionEnd hook           └──────────┘         │
-│  └──────┘                                                          │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          SESSION LIFECYCLE                                │
+│                                                                          │
+│  ┌──────┐  ┌──────┐  ┌──────┐  ┌───────┐  ┌────────┐  ┌────────┐      │
+│  │ BOOT │─▶│ PLAN │─▶│ SPEC │─▶│ BUILD │─▶│ VERIFY │─▶│ REVIEW │      │
+│  │  ①   │  │  ②   │  │  ③   │  │  ④    │  │   ⑤    │  │   ⑥    │      │
+│  └──────┘  └──┬───┘  └──┬───┘  └───┬───┘  └───┬────┘  └───┬────┘      │
+│     ▲         │         │          │           │            │             │
+│     │         │         │    ┌─────┘           │            ▼             │
+│     │         │         │    │ TDD cycle       │     ┌──────────┐        │
+│     │         │         │    │ per step        │     │ DELIVER  │        │
+│     │         │         │    ▼                 │     │ to user  │        │
+│     │         │         │  RED → GREEN         │     └──────────┘        │
+│     │         │         │    → REFACTOR        │            │             │
+│     │         │         │                      │            ▼             │
+│  ┌──────┐    │         │                      │     ┌──────────┐        │
+│  │LEARN │◀───┴─────────┴──────────────────────┴─────│  END     │        │
+│  │  ⑦   │             SessionEnd hook               └──────────┘        │
+│  └──────┘                                                                │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -33,10 +33,11 @@ Every session follows six phases. No exceptions. No shortcuts. This document is 
 
 - [Phase 1: BOOT](#phase-1-boot)
 - [Phase 2: PLAN](#phase-2-plan)
-- [Phase 3: BUILD](#phase-3-build)
-- [Phase 4: VERIFY](#phase-4-verify)
-- [Phase 5: REVIEW](#phase-5-review)
-- [Phase 6: LEARN](#phase-6-learn)
+- [Phase 3: SPEC](#phase-3-spec)
+- [Phase 4: BUILD](#phase-4-build)
+- [Phase 5: VERIFY](#phase-5-verify)
+- [Phase 6: REVIEW](#phase-6-review)
+- [Phase 7: LEARN](#phase-7-learn)
 - [Enforcement Rules](#enforcement-rules)
 - [Memory Flow](#memory-flow)
 - [Quick Reference](#quick-reference)
@@ -211,39 +212,124 @@ When in doubt, plan.
 
 ---
 
-## Phase 3: BUILD
+## Phase 3: SPEC
 
-**Trigger:** User confirms plan (or skip conditions met for trivial changes)
+**Trigger:** `/spec` command after plan approval (or automatically after `/plan` confirm)
+**Purpose:** Define observable behavioral contracts before writing any code.
+**Command:** `/spec` (see `commands/spec.md`)
+**Rule:** `rules/common/spec-driven.md`
+
+### What Happens
+
+```
+Plan Approved
+    │
+    ├── Is this a trivial change?
+    │     ├── Bug fix < 5 lines         → Skip to BUILD
+    │     ├── Typo fix                   → Skip to BUILD
+    │     └── Config change only         → Skip to BUILD
+    │
+    └── Non-trivial change
+          │
+          ├── 1. Detect task type from plan signals
+          │       ├── REST Endpoint (Controller, Handler, API)
+          │       ├── Domain Logic (UseCase, Service, Command)
+          │       ├── Messaging (Kafka, RabbitMQ, Event)
+          │       ├── Database Migration (DDL, Flyway, schema)
+          │       └── Background Job (Scheduler, cron, batch)
+          │
+          ├── 2. Generate spec using type-specific template
+          │       ├── Inputs — what goes in
+          │       ├── Outputs / Side Effects — what comes out
+          │       ├── Contracts / Invariants — what must always hold
+          │       └── Error Cases — what can go wrong
+          │
+          ├── 3. Map scenarios to test cases
+          │       └── Each scenario → one or more test methods
+          │
+          ├── 4. ⏸️  WAIT FOR USER APPROVAL
+          │       ├── Approve → /checkpoint create "spec-approved"
+          │       ├── Revise  → Update spec based on feedback
+          │       └── Reject  → Return to /plan
+          │
+          └── 5. Hand off to BUILD phase
+                  └── Spec scenarios become TDD test specification
+```
+
+### Spec Output Format
+
+Every spec includes at minimum:
+
+| Section | Description |
+|---------|-------------|
+| **Inputs** | What goes in — request body, command fields, event payload |
+| **Outputs / Side Effects** | What comes out — response, state changes, events published |
+| **Contracts / Invariants** | What must always hold — validation, ordering, consistency |
+| **Error Cases** | What can go wrong — with trigger condition and expected behavior |
+| **Scenarios** | ≥1 happy path + ≥2 failure/edge cases — concrete and testable |
+
+### Spec → TDD Mapping
+
+Each spec scenario maps directly to test cases for the BUILD phase:
+
+```
+Spec Scenario                          → Test Method
+─────────────────────────────────────────────────────
+Happy path: valid order created        → shouldCreateOrderWhenValidInput()
+Validation: blank customer ID          → shouldReturn400WhenCustomerIdBlank()
+Conflict: duplicate order              → shouldReturn409WhenOrderExists()
+Auth: missing token                    → shouldReturn401WhenNoAuthToken()
+```
+
+### Skip Conditions
+
+Same as Phase 2 (PLAN) — skip only when **all** of these are true:
+
+| Condition | Example |
+|-----------|---------|
+| Change is ≤ 5 lines of code | Fix null check, update constant |
+| Single file affected | One config file, one typo |
+| No new observable behavior | Rename, reformat, comment fix |
+| No architectural impact | No new dependencies, no schema change |
+
+When in doubt, spec.
+
+---
+
+## Phase 4: BUILD
+
+**Trigger:** User approves spec (or skip conditions met for trivial changes)
 **Purpose:** Implement using strict TDD — Red → Green → Refactor.
 **Agent:** `tdd-guide` (see `agents/tdd-guide.md`)
 
 ### TDD Cycle Per Step
 
 ```
-For each step in the approved plan:
+For each step in the approved plan (using approved spec as test specification):
     │
-    ├── 3a. Write Test FIRST (RED)
+    ├── 4a. Write Test FIRST (RED)
+    │       ├── Test cases derived from approved spec scenarios
     │       ├── Unit test with JUnit 5 + Mockito
     │       ├── Integration test with @SpringBootTest + Testcontainers
     │       └── Reactive test with StepVerifier
     │
-    ├── 3b. Run Test → Confirm FAILS
+    ├── 4b. Run Test → Confirm FAILS
     │       └── ./gradlew test --tests "ClassName.methodName"
     │       └── Expected: FAIL (method not implemented yet)
     │
-    ├── 3c. Write Implementation (GREEN)
+    ├── 4c. Write Implementation (GREEN)
     │       ├── Minimal code to make the test pass
     │       ├── Follow hexagonal architecture
     │       ├── No .block() — reactive all the way
     │       ├── No mutation — immutable objects
     │       └── No side effects in pure functions
     │
-    ├── 3d. Run Test → Confirm PASSES
+    ├── 4d. Run Test → Confirm PASSES
     │       └── ./gradlew test --tests "ClassName.methodName"
     │       └── Expected: PASS
     │       └── If FAIL → /build-fix (invoke build-error-resolver agent)
     │
-    ├── 3e. Refactor (IMPROVE)
+    ├── 4e. Refactor (IMPROVE)
     │       ├── Extract methods for clarity
     │       ├── Remove duplication
     │       ├── Improve naming
@@ -340,7 +426,7 @@ Tool calls > 50     →  Reminder every 25 calls
 
 ---
 
-## Phase 4: VERIFY
+## Phase 5: VERIFY
 
 **Trigger:** All build steps complete, or manually via `/verify`
 **Purpose:** Multi-phase validation before review.
@@ -426,7 +512,7 @@ Issues to Address:
 
 ---
 
-## Phase 5: REVIEW
+## Phase 6: REVIEW
 
 **Trigger:** Verification passes
 **Purpose:** Multi-agent code review, then deliver results to user.
@@ -542,7 +628,7 @@ Review Complete
 
 ---
 
-## Phase 6: LEARN
+## Phase 7: LEARN
 
 **Trigger:** Automatic — `SessionEnd` hook (`scripts/hooks/session-end.sh`, `evaluate-session.sh`)
 **Purpose:** Extract patterns and learnings for future sessions.
@@ -635,6 +721,7 @@ These rules are non-negotiable. They prevent the most common workflow violations
 | Violation | Action | Exception |
 |-----------|--------|-----------|
 | Writing code without `/plan` | **STOP** — run `/plan` first | Bug fix ≤ 5 lines, typo, config-only change |
+| Writing code without approved spec | **STOP** — run `/spec` first | Bug fix ≤ 5 lines, no new behavior |
 | Committing without `/verify` | **BLOCK** — run `/verify` first | None |
 | Skipping tests for new code | **BLOCK** — write tests first | None |
 | `.block()` in reactive production code | **CRITICAL** — must fix immediately | Test code only (still discouraged) |
@@ -647,6 +734,10 @@ Code change detected
     │
     ├── Was /plan run? ─── NO ──▶ STOP. "Run /plan first."
     │       │                      (unless trivial fix)
+    │      YES
+    │       │
+    ├── Was /spec run and approved? ── NO ──▶ STOP. "Run /spec first."
+    │       │                          (unless trivial fix)
     │      YES
     │       │
     ├── Were tests written first? ── NO ──▶ BLOCK. "Write tests first."
@@ -732,6 +823,7 @@ The `claude-mem` integration provides cross-session continuity. Sessions within 
 |-------|-----------|------|
 | BOOT | **Read** | Last 5 sessions, active instincts, unresolved issues |
 | PLAN | **Read** | Similar past plans, architecture decisions |
+| SPEC | **Read** | Past specs for similar task types, reusable patterns |
 | BUILD | **Observe** | Hooks capture compile results, tool count |
 | VERIFY | **Observe** | Test results, coverage metrics |
 | REVIEW | **Observe** | Review verdicts, common issues |
@@ -759,16 +851,17 @@ Session 1 (order-service)          Session 2 (order-service)
 | Command | Phase | Purpose |
 |---------|-------|---------|
 | `/plan` | ② PLAN | Create implementation plan and wait for confirmation |
-| `/build-fix` | ③ BUILD | Fix build/compilation errors (invokes `build-error-resolver`) |
-| `/checkpoint create "name"` | ②③ | Save progress at milestones |
+| `/spec` | ③ SPEC | Define behavioral contracts from approved plan |
+| `/build-fix` | ④ BUILD | Fix build/compilation errors (invokes `build-error-resolver`) |
+| `/checkpoint create "name"` | ②③④ | Save progress at milestones |
 | `/checkpoint verify "name"` | Any | Compare current state to a checkpoint |
-| `/verify` | ④ VERIFY | Run full verification pipeline |
-| `/verify quick` | ④ VERIFY | Build + Compile only |
-| `/verify pre-commit` | ④ VERIFY | Build + Tests + Debug audit |
-| `/verify pre-pr` | ④ VERIFY | Full checks + Security scan |
-| `/code-review` | ⑤ REVIEW | Trigger multi-agent code review |
-| `/learn` | ⑥ LEARN | Manually extract patterns from current session |
-| `/instinct-status` | Any | Show all learned instincts with confidence |
+| `/verify` | ⑤ VERIFY | Run full verification pipeline |
+| `/verify quick` | ⑤ VERIFY | Build + Compile only |
+| `/verify pre-commit` | ⑤ VERIFY | Build + Tests + Debug audit |
+| `/verify pre-pr` | ⑤ VERIFY | Full checks + Security scan |
+| `/code-review` | ⑥ REVIEW | Trigger multi-agent code review |
+| `/learn` | ⑦ LEARN | Manually extract patterns from current session |
+| `/instinct status` | Any | Show all learned instincts with confidence |
 | `/evolve` | Any | Cluster related instincts into skills |
 | `/compact` | Any | Compact context (use at phase boundaries) |
 
@@ -778,10 +871,10 @@ Session 1 (order-service)          Session 2 (order-service)
 User sends a message
     │
     ├── "Fix this typo" / "Change this constant"
-    │     └── Skip PLAN → BUILD (trivial) → VERIFY quick → Done
+    │     └── Skip PLAN/SPEC → BUILD (trivial) → VERIFY quick → Done
     │
     ├── "Add feature X" / "Refactor Y"
-    │     └── PLAN → wait confirm → BUILD (TDD) → VERIFY full → REVIEW → Deliver
+    │     └── PLAN → confirm → SPEC → approve → BUILD (TDD) → VERIFY → REVIEW → Deliver
     │
     ├── "Build is broken"
     │     └── /build-fix → VERIFY quick → Done
@@ -802,7 +895,7 @@ User sends a message
 | Build failure | `build-error-resolver` |
 | Code review | `code-reviewer` + `security-reviewer` |
 | WebFlux code changed | + `spring-webflux-reviewer` |
-| Spring config changed | + `spring-boot-reviewer` |
+| Spring config changed | + `spring-reviewer` |
 | Database code changed | + `database-reviewer` |
 | Architecture decision | `architect` |
 | Dead code cleanup | `refactor-cleaner` |
@@ -814,7 +907,8 @@ User sends a message
 |------|---------|
 | `agents/*.md` | Agent definitions (12 specialized agents) |
 | `commands/*.md` | Slash command definitions (15 commands) |
-| `rules/*.md` | Global behavioral rules (8 rule files) |
+| `rules/common/*.md` | Language-agnostic workflow rules (6 files) |
+| `rules/java/*.md` | Java/Spring-specific rules (6 files) |
 | `scripts/hooks/*.sh` | Lifecycle hook scripts (8 scripts) |
 | `skills/*/SKILL.md` | Skill definitions (13+ skills) |
 | `PROJECT_GUIDELINES.md` | Per-project rules (in each project root) |
@@ -858,7 +952,20 @@ User sends a message
                                  │
                                  ▼
                     ┌─────────────────────────────────┐
-                    │  ③ BUILD (TDD per step)         │
+                    │  ③ SPEC                         │
+                    │  - Detect task type from plan    │
+                    │  - Generate behavioral spec      │
+                    │  - Map scenarios to test cases    │
+                    │  - ⏸️  WAIT for user approve     │
+                    └────────────┬────────────────────┘
+                                 │
+                          User approves spec
+                                 │
+                    └────────────┬───────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────────────┐
+                    │  ④ BUILD (TDD per step)         │
                     │  ┌───────────────────────────┐  │
                     │  │ RED: Write test            │  │
                     │  │ Run → confirm FAILS        │  │
@@ -872,7 +979,7 @@ User sends a message
                                  │
                                  ▼
                     ┌─────────────────────────────────┐
-                    │  ④ VERIFY                       │
+                    │  ⑤ VERIFY                       │
                     │  - Build check                   │
                     │  - Compile check                 │
                     │  - Test suite (≥80% coverage)    │
@@ -889,7 +996,7 @@ User sends a message
                      and re-run  │
                                  ▼
                     ┌─────────────────────────────────┐
-                    │  ⑤ REVIEW                       │
+                    │  ⑥ REVIEW                       │
                     │  - Code Reviewer                 │
                     │  - Security Reviewer             │
                     │  - Conditional reviewers          │
@@ -911,7 +1018,7 @@ User sends a message
                                        │
                                        ▼
                     ┌─────────────────────────────────┐
-                    │  ⑥ LEARN (automatic)            │
+                    │  ⑦ LEARN (automatic)            │
                     │  - Extract patterns              │
                     │  - Save instincts to claude-mem  │
                     │  - Update confidence scores      │
@@ -924,13 +1031,13 @@ User sends a message
 | Hook | Script | Phase | Fires When |
 |------|--------|-------|------------|
 | `SessionStart` | `session-start.sh` | ① BOOT | New session begins |
-| `PreToolUse` | `suggest-compact.sh` | ③ BUILD | Before each tool call (monitors count) |
-| `PostToolUse` | `java-compile-check.sh` | ③ BUILD | After Java file edits |
-| `PostToolUse` | `java-format.sh` | ③ BUILD | After Java file edits |
-| `Stop` | `check-debug-statements.sh` | ④ VERIFY | Session stopping — final audit |
-| `Stop` | `evaluate-session.sh` | ⑥ LEARN | Session stopping — extract patterns |
+| `PreToolUse` | `suggest-compact.sh` | ④ BUILD | Before each tool call (monitors count) |
+| `PostToolUse` | `java-compile-check.sh` | ④ BUILD | After Java file edits |
+| `PostToolUse` | `java-format.sh` | ④ BUILD | After Java file edits |
+| `Stop` | `check-debug-statements.sh` | ⑤ VERIFY | Session stopping — final audit |
+| `Stop` | `evaluate-session.sh` | ⑦ LEARN | Session stopping — extract patterns |
 | `PreCompact` | `pre-compact.sh` | Any | Before context compaction |
-| `SessionEnd` | `session-end.sh` | ⑥ LEARN | Session ending — persist state |
+| `SessionEnd` | `session-end.sh` | ⑦ LEARN | Session ending — persist state |
 
 ## Appendix C: Error Recovery
 

@@ -33,7 +33,7 @@ Tech stack: Java 17+, Spring Boot/MVC/WebFlux, MySQL, PostgreSQL, Redis, Kafka, 
 - `commands/quality-gate.md` — Comprehensive pre-merge quality checks
 
 **Phase 5: Optimizations**
-- `rules/agents.md` — Updated with 4 new agents and expanded trigger table
+- `rules/common/agents.md` — Updated with 4 new agents and expanded trigger table
 - `agents/planner.md` — Added `maxTurns: 15` frontmatter
 - `skills/tdd-workflow/SKILL.md` — Reduced from 734 to 129 lines
 - `skills/tdd-workflow/references/test-patterns.md` — Detailed test patterns reference
@@ -46,10 +46,10 @@ Tech stack: Java 17+, Spring Boot/MVC/WebFlux, MySQL, PostgreSQL, Redis, Kafka, 
 - `scripts/hooks/evaluate-session.sh` — fixed config path to `skills/continuous-learning-v2/config.json`
 
 **Wrong content rewritten:**
-- `rules/hooks.md` — replaced JS/tmux/Prettier content with actual 8 Java hook scripts documentation
-- `rules/patterns.md` — replaced broken link stub with Java hexagonal/CQRS/DDD architecture guidance
-- `rules/testing.md` — replaced Playwright with WebTestClient + Testcontainers
-- `rules/performance.md` — updated model IDs to `claude-haiku-4-5`, `claude-sonnet-4-6`, `claude-opus-4-6`
+- `rules/common/hooks.md` — replaced JS/tmux/Prettier content with actual 8 Java hook scripts documentation
+- `rules/common/patterns.md` — replaced broken link stub with Java hexagonal/CQRS/DDD architecture guidance
+- `rules/java/testing.md` — replaced Playwright with WebTestClient + Testcontainers
+- `rules/common/performance.md` — updated model IDs to `claude-haiku-4-5`, `claude-sonnet-4-6`, `claude-opus-4-6`
 - `agents/code-reviewer.md` — removed JS-specific checks (console.log, React re-renders, bundle sizes, ARIA), made Java-only
 - `templates/PROJECT_GUIDELINES_TEMPLATE.md` — replaced Liquibase with Flyway throughout
 
@@ -65,10 +65,10 @@ Tech stack: Java 17+, Spring Boot/MVC/WebFlux, MySQL, PostgreSQL, Redis, Kafka, 
 
 - Agents: YAML frontmatter with `model: opus` for reviewers, `model: sonnet` for executors
 - Skills: SKILL.md < 500 lines; detailed content in `references/`
-- Rules: flat `rules/` directory (8 files)
+- Rules: two-layer `rules/common/` (6 files) + `rules/java/` (6 files)
 - Commands: markdown prompt files in `commands/`
 - Hooks: scripts in `scripts/hooks/`, wired in `.claude/settings.json`
-- `rules/agents.md` — auto-delegation triggers and file-pattern routing table
+- `rules/common/agents.md` — auto-delegation triggers and file-pattern routing table
 
 ## File Pattern → Agent Routing
 

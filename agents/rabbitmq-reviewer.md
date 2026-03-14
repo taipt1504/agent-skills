@@ -1,8 +1,11 @@
 ---
 name: rabbitmq-reviewer
-description: RabbitMQ and Spring AMQP specialist for reviewing exchange/queue topology, producer reliability, consumer error handling, dead-letter queue configuration, and reactor-rabbitmq reactive patterns. Use PROACTIVELY when implementing RabbitMQ producers/consumers, configuring exchange bindings, handling message retries, or reviewing AMQP integration code.
+description: >
+  RabbitMQ and Spring AMQP specialist for exchange/queue topology, producer reliability, consumer error handling,
+  DLQ configuration, and reactor-rabbitmq patterns. Use PROACTIVELY when implementing RabbitMQ integration.
+  When NOT to use: for Kafka messaging (use kafka-patterns skill), for general async patterns (use performance-reviewer).
 tools: ["Read", "Grep", "Glob", "Bash"]
-model: opus
+model: sonnet
 ---
 
 # RabbitMQ Reviewer
