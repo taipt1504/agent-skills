@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+#
+# Java Compile Check Hook
+# Runs compilation check after Java file edits
+#
+
+# Read stdin
+DATA=$(cat)
+
+# Get file path from JSON input
+FILE_PATH=$(echo "$DATA" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"//' | sed 's/"$//')
+
+if [ -z "$FILE_PATH" ] || [ ! -f "$FILE_PATH" ]; then
+    echo "$DATA"
+    exit 0
+fi
+
+# Check if it's a Java file
+if [[ ! "$FILE_PATH" =~ \.java$ ]]; then
+    echo "$DATA"
+    exit 0
+fi
+
+# Find project root (where build.gradle is)
+PROJECT_ROOT="$PWD"
+CURRENT_DIR="$PWD"
+while [ "$CURRENT_DIR" != "/" ]; do
+    if [ -f "$CURRENT_DIR/build.gradle" ] || [ -f "$CURRENT_DIR/build.gradle.kts" ]; then
+        PROJECT_ROOT="$CURRENT_DIR"
+        break
+    fi
+    CURRENT_DIR="$(dirname "$CURRENT_DIR")"
+done
+
+cd "$PROJECT_ROOT"
+
+# Run compile check with Gradle
+if [ -f "gradlew" ]; then
+    RESULT=$(./gradlew compileJava --console=plain 2>&1) || true
+elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+    RESULT=$(gradle compileJava --console=plain 2>&1) || true
+else
+    echo "$DATA"
+    exit 0
+fi
+
+# Extract errors related to the edited file
+FILENAME=$(basename "$FILE_PATH")
+ERRORS=$(echo "$RESULT" | grep -i "error:" | grep -i "$FILENAME" | head -5)
+
+if [ -n "$ERRORS" ]; then
+    echo "[Hook] Compilation errors in $FILE_PATH:" >&2
+    echo "$ERRORS" >&2
+fi
+
+echo "$DATA"
