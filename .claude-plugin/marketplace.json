@@ -1,0 +1,60 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "agent-skills",
+  "description": "Battle-tested Claude Code plugin for Java/Spring WebFlux stack — agents, skills, hooks, commands, and rules for reactive microservices development",
+  "owner": {
+    "name": "TaiPT",
+    "email": "taipt1504@gmail.com"
+  },
+  "metadata": {
+    "description": "Production-ready Claude Code plugin tailored for Java/Spring Boot/WebFlux reactive microservices — hexagonal architecture, TDD, gRPC, Kafka, Redis, PostgreSQL"
+  },
+  "plugins": [
+    {
+      "name": "agent-skills",
+      "source": "./",
+      "description": "Complete Claude Code plugin for Java/Spring WebFlux stack — specialized agents, skills, hooks, commands, and rules for building reactive microservices with hexagonal architecture, TDD-first development, and production-grade patterns",
+      "version": "1.0.0",
+      "author": {
+        "name": "TaiPT",
+        "email": "taipt1504@gmail.com"
+      },
+      "homepage": "https://github.com/taipt1504/agent-skills",
+      "repository": "https://github.com/taipt1504/agent-skills",
+      "license": "MIT",
+      "keywords": [
+        "claude-code",
+        "java",
+        "spring-boot",
+        "spring-webflux",
+        "reactive",
+        "microservices",
+        "tdd",
+        "hexagonal-architecture",
+        "grpc",
+        "kafka",
+        "redis",
+        "postgresql"
+      ],
+      "category": "workflow",
+      "tags": [
+        "java",
+        "spring-boot",
+        "spring-webflux",
+        "reactive",
+        "microservices",
+        "tdd",
+        "hexagonal-architecture",
+        "grpc",
+        "kafka",
+        "redis",
+        "postgresql",
+        "agents",
+        "skills",
+        "hooks",
+        "commands"
+      ],
+      "strict": false
+    }
+  ]
+}

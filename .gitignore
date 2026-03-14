@@ -1,0 +1,39 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Python
+__pycache__/
+*.pyc
+
+# Private workspace
+tasks/
+personal/
+private/
+.dmux/
+
+# Java
+*.class
+*.jar
+target/
+build/
+.gradle/

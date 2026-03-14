@@ -1,0 +1,77 @@
+{
+  "$schema": "../schemas/hooks.schema.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/java-compile-check.sh\""
+          }
+        ],
+        "description": "Check Java compilation before running bash commands — catches compile errors early before they cascade"
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-debug-statements.sh\""
+          }
+        ],
+        "description": "Block commits containing debug statements (System.out.println, e.printStackTrace, @SuppressWarnings) in staged Java files"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/java-format.sh\""
+          }
+        ],
+        "description": "Run Java format check after writing or editing Java files — ensures consistent code style"
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.sh\""
+          }
+        ],
+        "description": "Save architectural decisions, current task state, and learnings before context compaction"
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.sh\""
+          }
+        ],
+        "description": "Load previous session context, detect project structure (Maven/Gradle), and restore architectural decisions"
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-end.sh\"",
+            "async": true,
+            "timeout": 10
+          }
+        ],
+        "description": "Persist session state, save learnings, and update context files after each response"
+      }
+    ]
+  }
+}

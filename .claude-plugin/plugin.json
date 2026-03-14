@@ -1,0 +1,26 @@
+{
+  "name": "agent-skills",
+  "version": "1.0.0",
+  "description": "Battle-tested Claude Code plugin for Java/Spring WebFlux stack — agents, skills, hooks, commands, and rules for reactive microservices development",
+  "author": {
+    "name": "TaiPT",
+    "url": "https://github.com/taipt1504"
+  },
+  "homepage": "https://github.com/taipt1504/agent-skills",
+  "repository": "https://github.com/taipt1504/agent-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "java",
+    "spring-boot",
+    "spring-webflux",
+    "reactive",
+    "microservices",
+    "tdd",
+    "hexagonal-architecture",
+    "grpc",
+    "kafka",
+    "redis",
+    "postgresql"
+  ]
+}

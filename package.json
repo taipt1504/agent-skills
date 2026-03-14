@@ -1,0 +1,56 @@
+{
+  "name": "agent-skills",
+  "version": "1.0.0",
+  "description": "Battle-tested Claude Code plugin for Java/Spring WebFlux stack — agents, skills, hooks, commands, and rules for reactive microservices development",
+  "keywords": [
+    "claude-code",
+    "java",
+    "spring-boot",
+    "spring-webflux",
+    "reactive",
+    "microservices",
+    "tdd",
+    "hexagonal-architecture",
+    "grpc",
+    "kafka",
+    "redis",
+    "postgresql"
+  ],
+  "license": "MIT",
+  "author": "TaiPT",
+  "bin": {
+    "agent-skills-install": "install.sh"
+  },
+  "files": [
+    "agents/",
+    "commands/",
+    "contexts/",
+    "examples/",
+    "hooks/",
+    "rules/",
+    "schemas/",
+    "scripts/",
+    "skills/",
+    "templates/",
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".claude-plugin/",
+    "install.sh"
+  ],
+  "scripts": {
+    "test": "node -e \"console.log('Validating plugin structure...')\" && node -e \"JSON.parse(require('fs').readFileSync('.claude-plugin/plugin.json','utf8')); console.log('✓ plugin.json valid')\" && node -e \"JSON.parse(require('fs').readFileSync('.claude-plugin/marketplace.json','utf8')); console.log('✓ marketplace.json valid')\" && node -e \"JSON.parse(require('fs').readFileSync('hooks/hooks.json','utf8')); console.log('✓ hooks.json valid')\" && echo 'All validations passed ✓'",
+    "postinstall": "echo '' && echo '🚀 agent-skills installed!' && echo '' && echo 'Claude Code plugin for Java/Spring WebFlux reactive microservices.' && echo 'Run: claude plugin install ./node_modules/agent-skills' && echo ''",
+    "lint": "markdownlint '**/*.md' --ignore node_modules"
+  },
+  "devDependencies": {
+    "markdownlint-cli": "^0.48.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taipt1504/agent-skills.git"
+  },
+  "homepage": "https://github.com/taipt1504/agent-skills#readme",
+  "bugs": {
+    "url": "https://github.com/taipt1504/agent-skills/issues"
+  }
+}
