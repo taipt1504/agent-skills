@@ -1,5 +1,5 @@
 {
-  "name": "@devco/agent-skills",
+  "name": "agent-skills",
   "version": "1.0.0",
   "description": "Battle-tested Claude Code plugin for Java/Spring WebFlux stack — agents, skills, hooks, commands, and rules for reactive microservices development",
   "author": {
