@@ -2,32 +2,39 @@
 
 A curated collection of skills, agents, commands, rules, and hooks for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — optimized for **Java 17+ Spring WebFlux** backend development.
 
-Provides a complete development workflow: planning → TDD → verification → multi-agent code review → continuous learning. All enforced automatically through hooks and rules.
+Provides a complete development workflow: planning → spec → TDD → verification → multi-agent code review → continuous learning. All enforced automatically through hooks and rules.
 
 ## Quick Start
 
 ### 1. Install
 
-Clone into your Claude Code configuration directory:
+#### Method 1: GitHub Marketplace (Recommended)
 
 ```bash
-# Clone the repo
-git clone https://github.com/your-org/agent-skills.git
+# Register the marketplace source (one-time)
+/plugin marketplace add taipt1504/agent-skills
 
-# Copy contents into your project's .claude/ directory
-cp -r agent-skills/skills/ .claude/skills/
-cp -r agent-skills/agents/ .claude/agents/
-cp -r agent-skills/commands/ .claude/commands/
-cp -r agent-skills/rules/ .claude/rules/
-cp -r agent-skills/scripts/ .claude/scripts/
+# Install the plugin
+/plugin install agent-skills
+```
 
-# Or symlink for easy updates
-ln -s /path/to/agent-skills/skills .claude/skills
+#### Method 2: npm
+
+```bash
+npm install -g @devco/agent-skills
+claude plugin install ./node_modules/@devco/agent-skills
+```
+
+#### Method 3: Manual Clone (Fallback)
+
+```bash
+git clone https://github.com/taipt1504/agent-skills.git ~/.claude/plugins/agent-skills
+claude plugin install ~/.claude/plugins/agent-skills
 ```
 
 ### 2. Configure Hooks
 
-Add hook registrations to `~/.claude/settings.json`:
+Hooks are registered automatically when installed via marketplace or npm. To configure manually, add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -61,12 +68,44 @@ Add hook registrations to `~/.claude/settings.json`:
 Copy the template to your project root and customize:
 
 ```bash
-cp agent-skills/templates/PROJECT_GUIDELINES_TEMPLATE.md ./PROJECT_GUIDELINES.md
+cp templates/PROJECT_GUIDELINES_TEMPLATE.md ./PROJECT_GUIDELINES.md
 ```
 
 ### 4. Start a Session
 
 Claude Code will automatically load the workflow. Start with `/plan` for any non-trivial task.
+
+---
+
+## Team Onboarding
+
+### Per Developer (One-Time)
+
+```bash
+# Register the marketplace source
+/plugin marketplace add taipt1504/agent-skills
+
+# Install the plugin
+/plugin install agent-skills
+```
+
+### Per Machine
+
+Enable hooks in `~/.claude/settings.json` (see [Configure Hooks](#2-configure-hooks) above). Hook profiles (`minimal`, `standard`, `strict`) are controlled via the `HOOK_PROFILE` env var.
+
+### Per Project Repo
+
+Create `PROJECT_GUIDELINES.md` at the project root:
+
+```bash
+cp templates/PROJECT_GUIDELINES_TEMPLATE.md /path/to/your/project/PROJECT_GUIDELINES.md
+```
+
+This file overrides generic conventions with project-specific rules (architecture decisions, naming conventions, dependency choices, etc.).
+
+### Shared Settings (Optional)
+
+Commit a `.claude/settings.json` at the project root to share hook configuration and plugin settings across the team. This ensures every developer gets the same hooks without manual setup.
 
 ---
 
@@ -77,21 +116,19 @@ agent-skills/
 ├── CLAUDE.md                              # Global context auto-loaded by Claude Code
 ├── WORKING_WORKFLOW.md                    # 7-phase mandatory workflow reference
 ├── README.md
-├── agents/                                # 16 specialized sub-agents
+├── agents/                                # 14 specialized sub-agents
 │   ├── architect.md
 │   ├── blackbox-test-runner.md
 │   ├── build-error-resolver.md
 │   ├── code-reviewer.md
 │   ├── database-reviewer.md
 │   ├── e2e-runner.md
-│   ├── mysql-reviewer.md
 │   ├── performance-reviewer.md
 │   ├── planner.md
 │   ├── rabbitmq-reviewer.md
 │   ├── refactor-cleaner.md
 │   ├── security-reviewer.md
-│   ├── spring-boot-reviewer.md
-│   ├── spring-mvc-reviewer.md
+│   ├── spring-reviewer.md
 │   ├── spring-webflux-reviewer.md
 │   └── tdd-guide.md
 ├── commands/                              # 19 slash commands
@@ -104,24 +141,27 @@ agent-skills/
 │   ├── e2e.md
 │   ├── eval.md
 │   ├── evolve.md
-│   ├── instinct-export.md
-│   ├── instinct-import.md
-│   ├── instinct-status.md
+│   ├── instinct.md
 │   ├── learn.md
 │   ├── orchestrate.md
 │   ├── plan.md
-│   ├── quality-gate.md
 │   ├── refactor-clean.md
+│   ├── resume-session.md
+│   ├── save-session.md
 │   ├── skill-create.md
+│   ├── spec.md
 │   └── verify.md
-├── rules/                                 # 12 behavioral rules (two-layer)
+├── rules/                                 # 15 behavioral rules (two-layer)
 │   ├── common/                            # Language-agnostic workflow rules
 │   │   ├── agents.md
+│   │   ├── coding-style.md
 │   │   ├── development-workflow.md
 │   │   ├── git-workflow.md
 │   │   ├── hooks.md
 │   │   ├── patterns.md
-│   │   └── performance.md
+│   │   ├── performance.md
+│   │   ├── security.md
+│   │   └── spec-driven.md
 │   └── java/                              # Java/Spring-specific rules
 │       ├── api-design.md
 │       ├── coding-style.md
@@ -130,74 +170,80 @@ agent-skills/
 │       ├── security.md
 │       └── testing.md
 ├── scripts/
-│   └── hooks/                             # 8 lifecycle hook scripts
+│   └── hooks/                             # 10 lifecycle hook scripts
 │       ├── check-debug-statements.sh
+│       ├── cost-tracker.sh
 │       ├── evaluate-session.sh
 │       ├── java-compile-check.sh
 │       ├── java-format.sh
 │       ├── pre-compact.sh
+│       ├── run-with-flags.sh
 │       ├── session-end.sh
 │       ├── session-start.sh
 │       └── suggest-compact.sh
-├── skills/                                # 22 skill definitions
+├── skills/                                # 24 skill definitions
 │   ├── api-design/
-│   ├── backend-patterns/
 │   ├── blackbox-test/
 │   ├── coding-standards/
 │   ├── continuous-learning-v2/
+│   ├── database-migrations/
 │   ├── grpc-patterns/
 │   ├── hexagonal-arch/
 │   ├── java-patterns/
+│   ├── jpa-patterns/
 │   ├── kafka-patterns/
 │   ├── mysql-patterns/
 │   ├── observability-patterns/
 │   ├── postgres-patterns/
-│   ├── project-guidelines/
 │   ├── rabbitmq-patterns/
 │   ├── redis-patterns/
 │   ├── security-review/
 │   ├── solution-design/
 │   ├── spring-mvc-patterns/
 │   ├── spring-webflux-patterns/
+│   ├── springboot-patterns/
+│   ├── springboot-security/
 │   ├── strategic-compact/
 │   ├── tdd-workflow/
-│   └── verification-loop/
+│   └── verification/
 └── templates/
     └── PROJECT_GUIDELINES_TEMPLATE.md     # Project-level config template
 ```
 
 ---
 
-## Skills (22)
+## Skills (24)
 
 | Skill | Description |
 |---|---|
 | [api-design](./skills/api-design/) | RESTful and reactive API design standards — URL conventions, request/response patterns, error handling, pagination, versioning |
-| [backend-patterns](./skills/backend-patterns/) | Backend architecture patterns, API design, DB optimization, messaging, and server-side best practices for Spring WebFlux/MVC |
-| [blackbox-test](./skills/blackbox-test/) | JSON-driven black box integration tests with JUnit 5, Testcontainers, WireMock, and Flyway using the F8A Summer Test framework |
+| [blackbox-test](./skills/blackbox-test/) | JSON-driven black box integration tests with JUnit 5, Testcontainers, WireMock, and Flyway |
 | [coding-standards](./skills/coding-standards/) | Universal Java Spring coding standards: KISS, DRY, SOLID, readability, and consistent formatting |
 | [continuous-learning-v2](./skills/continuous-learning-v2/) | Instinct-based learning with confidence scoring, PreToolUse/PostToolUse observation, and `/evolve` clustering |
+| [database-migrations](./skills/database-migrations/) | Zero-downtime database migration patterns — Flyway conventions, expand-contract, safety checklists, Testcontainers validation |
 | [grpc-patterns](./skills/grpc-patterns/) | gRPC service patterns for Java Spring — protobuf definitions, server/client setup, streaming, error handling, and testing |
 | [hexagonal-arch](./skills/hexagonal-arch/) | Hexagonal Architecture (Ports & Adapters) for Spring WebFlux — package structure, dependency rules, domain modeling, CQRS integration |
 | [java-patterns](./skills/java-patterns/) | Java 17+ best practices: immutability, null safety, concurrency, streams, memory optimization, and modern language features |
+| [jpa-patterns](./skills/jpa-patterns/) | JPA/Hibernate patterns for Spring Data — entity design, N+1 prevention, HikariCP configuration, and pagination |
 | [kafka-patterns](./skills/kafka-patterns/) | Apache Kafka patterns for Spring WebFlux — producer/consumer, exactly-once semantics, reactive Kafka, DLT, Schema Registry, testing |
 | [mysql-patterns](./skills/mysql-patterns/) | MySQL optimization, indexing strategies, JPA best practices, and connection pooling |
 | [observability-patterns](./skills/observability-patterns/) | Micrometer metrics, distributed tracing, structured logging, health checks, and alerting rules |
 | [postgres-patterns](./skills/postgres-patterns/) | PostgreSQL query optimization, indexing strategies, schema design, Row Level Security, and connection pooling |
-| [project-guidelines](./skills/project-guidelines/) | Pointer skill — reads `PROJECT_GUIDELINES.md` at project root for project-specific conventions |
 | [rabbitmq-patterns](./skills/rabbitmq-patterns/) | RabbitMQ exchanges, queues, DLQ, Spring AMQP patterns, and message reliability |
 | [redis-patterns](./skills/redis-patterns/) | Redis patterns for Spring WebFlux — reactive Lettuce, caching strategies, distributed locking, rate limiting, Pub/Sub, Streams |
 | [security-review](./skills/security-review/) | Security checklist: OWASP Top 10, secrets management, input validation, auth/authz, dependency CVEs |
 | [solution-design](./skills/solution-design/) | Architecture documentation: Solution Design (stakeholders) + Service Design (developers) with templates |
 | [spring-mvc-patterns](./skills/spring-mvc-patterns/) | Spring MVC patterns — controllers, servlet filters, exception handlers, validation, and interceptors |
 | [spring-webflux-patterns](./skills/spring-webflux-patterns/) | Spring WebFlux reactive patterns — Mono/Flux chains, error handling, backpressure, WebClient, SSE, WebSocket |
+| [springboot-patterns](./skills/springboot-patterns/) | Spring Boot patterns — REST controllers, pagination, caching, async processing, rate limiting, production defaults |
+| [springboot-security](./skills/springboot-security/) | Spring Security patterns — JWT filter, SecurityFilterChain, method security, CORS, secrets management, OWASP scanning |
 | [strategic-compact](./skills/strategic-compact/) | Suggests `/compact` at strategic workflow boundaries to manage context efficiently instead of arbitrary auto-compaction |
 | [tdd-workflow](./skills/tdd-workflow/) | Enforces write-tests-first TDD with 80%+ coverage for Java Spring — unit, integration, and E2E tests |
-| [verification-loop](./skills/verification-loop/) | Multi-phase verification: Gradle build → compile check → tests → reactive safety scan → security scan → diff review |
+| [verification](./skills/verification/) | Comprehensive verification pipeline — compile, test, coverage, security, static analysis, and diff review |
 
 ---
 
-## Agents (16)
+## Agents (14)
 
 Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 
@@ -209,14 +255,12 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 | `code-reviewer` | Expert code review for quality, security, readability, DRY, SOLID, and test quality |
 | `database-reviewer` | PostgreSQL/MySQL specialist — query optimization, schema design, N+1 detection, JPA best practices |
 | `e2e-runner` | E2E API testing with Testcontainers and WebTestClient — manages containers, handles async scenarios |
-| `mysql-reviewer` | MySQL-specific review — indexes, JPA N+1, connection pool tuning, slow query analysis |
 | `performance-reviewer` | Performance bottlenecks, memory leaks, slow queries, and reactive pipeline analysis |
 | `planner` | Planning specialist for features, architecture decisions, and complex refactoring with risk assessment |
 | `rabbitmq-reviewer` | RabbitMQ config, message handling, DLQ setup, and Spring AMQP review |
 | `refactor-cleaner` | Dead code cleanup and consolidation — safely removes unused dependencies, classes, and methods |
 | `security-reviewer` | Security vulnerability detection — OWASP Top 10, secrets, injection, insecure crypto, reactive-specific issues |
-| `spring-boot-reviewer` | Spring Boot review — dependency injection, configuration, auto-configuration, Boot best practices |
-| `spring-mvc-reviewer` | Spring MVC patterns review — servlet filters, exception handlers, validation, interceptors |
+| `spring-reviewer` | Spring Boot + MVC review — dependency injection, controllers, validation, security, configuration, testing |
 | `spring-webflux-reviewer` | Reactive programming review — backpressure handling, non-blocking patterns, Project Reactor best practices |
 | `tdd-guide` | TDD enforcement specialist — write-tests-first methodology with JUnit 5, Mockito, Testcontainers, 80%+ coverage |
 
@@ -235,21 +279,20 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 | `/e2e` | Generate and run E2E API tests with Testcontainers |
 | `/eval` | Manage eval-driven development workflow |
 | `/evolve` | Cluster related instincts into skills, commands, or agents |
-| `/instinct-export` | Export instincts for sharing with teammates or other projects |
-| `/instinct-import` | Import instincts from teammates or other sources |
-| `/instinct-status` | Show all learned instincts with confidence levels |
+| `/instinct` | Manage instincts — status, export, import (subcommands) |
 | `/learn` | Analyze current session and extract patterns worth saving as skills |
 | `/orchestrate` | Sequential multi-agent workflow for complex tasks |
 | `/plan` | Restate requirements, assess risks, create step-by-step implementation plan — WAIT for user confirm |
-| `/spec` | Define behavioral contracts (inputs, outputs, error cases, scenarios) from approved plan — gate between PLAN and BUILD |
-| `/quality-gate` | Final quality check before PR — all reviewers + coverage enforcement |
 | `/refactor-clean` | Safely identify and remove dead code with test verification |
+| `/resume-session` | Load context from a previous session file |
+| `/save-session` | Manually persist current session context |
 | `/skill-create` | Analyze local git history to extract coding patterns and generate SKILL.md |
+| `/spec` | Define behavioral contracts (inputs, outputs, error cases, scenarios) from approved plan — gate between PLAN and BUILD |
 | `/verify` | Run comprehensive verification: build → compile → tests → security → diff review |
 
 ---
 
-## Rules (12)
+## Rules (15)
 
 Behavioral rules organized in two layers: `common/` (language-agnostic) and `java/` (Java/Spring-specific).
 
@@ -258,11 +301,13 @@ Behavioral rules organized in two layers: `common/` (language-agnostic) and `jav
 | Rule | Description |
 |---|---|
 | `agents.md` | Agent orchestration rules and available agent registry |
+| `coding-style.md` | Language-agnostic coding style — clarity, simplicity, consistency |
 | `development-workflow.md` | Research-before-coding phases |
 | `git-workflow.md` | Commit message format conventions |
 | `hooks.md` | Hook system documentation — PreToolUse, PostToolUse, Stop, SessionStart/End |
 | `patterns.md` | Hexagonal, CQRS, DDD, Outbox, Saga patterns |
 | `performance.md` | Model selection strategy — Haiku for cost savings, Opus for complex tasks |
+| `security.md` | Security rules — secrets, access control, dependency scanning |
 | `spec-driven.md` | Spec-Driven Design mandate — behavioral contracts before implementation |
 
 ### Java Rules (`rules/java/`)
@@ -278,7 +323,7 @@ Behavioral rules organized in two layers: `common/` (language-agnostic) and `jav
 
 ---
 
-## Hooks (8)
+## Hooks (10)
 
 Lifecycle scripts in `scripts/hooks/` that run automatically during Claude Code sessions.
 
@@ -292,6 +337,8 @@ Lifecycle scripts in `scripts/hooks/` that run automatically during Claude Code 
 | `java-format.sh` | PostToolUse | Runs Spotless/Google Java Format after Java file edits |
 | `check-debug-statements.sh` | Stop | Checks modified Java files for debug statements (System.out, printStackTrace) |
 | `evaluate-session.sh` | Stop | Evaluates session for extractable reusable patterns |
+| `cost-tracker.sh` | Various | Tracks token usage and cost across the session |
+| `run-with-flags.sh` | Various | Runs commands with configurable feature flags |
 
 ---
 
@@ -313,7 +360,7 @@ Every session follows a **7-phase mandatory workflow**:
 | **⑥ REVIEW** | Multi-agent code review: code + security + conditional reviewers |
 | **⑦ LEARN** | Auto-extract patterns, save instincts to claude-mem with confidence scoring |
 
-📖 **Full details:** [WORKING_WORKFLOW.md](./WORKING_WORKFLOW.md)
+Full details: [WORKING_WORKFLOW.md](./WORKING_WORKFLOW.md)
 
 ### Enforcement Rules
 
@@ -334,9 +381,8 @@ Cross-session memory via `claude-mem` provides continuity between sessions:
 - **Session summaries** persist between sessions (last 5 loaded at boot)
 - **Instincts** accumulate with confidence scores (0.3–0.9)
 - **Unresolved issues** surface as blockers in new sessions
-- Use `/instinct-status` to see learned behaviors
+- Use `/instinct status` to see learned behaviors
 - Use `/evolve` to promote high-confidence instincts into skills/commands/agents
-- Use `/instinct-export` and `/instinct-import` for team sharing
 
 ---
 
@@ -344,7 +390,9 @@ Cross-session memory via `claude-mem` provides continuity between sessions:
 
 ### Hook Registration
 
-Register hooks in `~/.claude/settings.json` (see [Quick Start](#2-configure-hooks) above).
+Register hooks in `~/.claude/settings.json` (see [Configure Hooks](#2-configure-hooks) above).
+
+Hook profiles: `minimal` | `standard` (default) | `strict` — set via `HOOK_PROFILE` env var.
 
 ### Project-Level Guidelines
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "agent-skills",
+  "name": "@devco/agent-skills",
   "description": "Battle-tested Claude Code plugin for Java/Spring WebFlux stack — agents, skills, hooks, commands, and rules for reactive microservices development",
   "owner": {
     "name": "TaiPT",
@@ -13,6 +13,7 @@
     {
       "name": "agent-skills",
       "source": "./",
+      "npmPackage": "@devco/agent-skills",
       "description": "Complete Claude Code plugin for Java/Spring WebFlux stack — specialized agents, skills, hooks, commands, and rules for building reactive microservices with hexagonal architecture, TDD-first development, and production-grade patterns",
       "version": "1.0.0",
       "author": {
