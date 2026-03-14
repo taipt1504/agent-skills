@@ -15,7 +15,7 @@ Provides a complete development workflow: planning → spec → TDD → verifica
 /plugin marketplace add taipt1504/agent-skills
 
 # Install the plugin
-/plugin install agent-skills
+/plugin install devco-agent-skills
 ```
 
 #### Method 2: npm
@@ -86,7 +86,7 @@ Claude Code will automatically load the workflow. Start with `/plan` for any non
 /plugin marketplace add taipt1504/agent-skills
 
 # Install the plugin
-/plugin install agent-skills
+/plugin install devco-agent-skills
 ```
 
 ### Per Machine

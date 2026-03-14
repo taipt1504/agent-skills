@@ -19,7 +19,7 @@ A battle-tested Claude Code plugin purpose-built for **Java/Spring WebFlux** rea
 /plugin marketplace add taipt1504/agent-skills
 
 # Install the plugin
-/plugin install agent-skills
+/plugin install devco-agent-skills
 ```
 
 ### Method 2: npm
@@ -43,7 +43,7 @@ claude plugin install ~/.claude/plugins/agent-skills
 /plugin list
 ```
 
-You should see `agent-skills` in the output. Start any session and run `/plan` for a non-trivial task.
+You should see `devco-agent-skills` in the output. Start any session and run `/plan` for a non-trivial task.
 
 ## Key Features
 
