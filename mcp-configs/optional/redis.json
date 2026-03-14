@@ -1,0 +1,16 @@
+{
+  "_comment": "Redis MCP — cache inspection, key browsing, TTL analysis. Enable only when project uses Redis.",
+  "_install": "claude mcp add redis -s user -- npx -y mcp-redis --url $REDIS_URL",
+  "_env_required": ["REDIS_URL"],
+  "_env_example": {
+    "REDIS_URL": "redis://localhost:6379"
+  },
+  "_security": "Connect to LOCAL/DEV Redis only. Never point at production. Read operations are safe; write operations modify cache state.",
+  "_tools_added": 8,
+  "mcpServers": {
+    "redis": {
+      "command": "npx",
+      "args": ["-y", "mcp-redis", "--url", "${REDIS_URL}"]
+    }
+  }
+}

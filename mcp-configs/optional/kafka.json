@@ -1,0 +1,21 @@
+{
+  "_comment": "Kafka/Confluent MCP — topic management, consumer group inspection, schema registry. Enable only when project uses Kafka.",
+  "_install": "claude mcp add kafka -s user -e CONFLUENT_CLOUD_API_KEY -e CONFLUENT_CLOUD_API_SECRET -- npx -y @confluentinc/mcp-confluent",
+  "_env_required": ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"],
+  "_env_example": {
+    "CONFLUENT_CLOUD_API_KEY": "your-api-key",
+    "CONFLUENT_CLOUD_API_SECRET": "your-api-secret"
+  },
+  "_security": "Use dev/staging Confluent credentials only. Never use production API keys. Topic creation/deletion modifies cluster state.",
+  "_tools_added": 8,
+  "mcpServers": {
+    "kafka": {
+      "command": "npx",
+      "args": ["-y", "@confluentinc/mcp-confluent"],
+      "env": {
+        "CONFLUENT_CLOUD_API_KEY": "${CONFLUENT_CLOUD_API_KEY}",
+        "CONFLUENT_CLOUD_API_SECRET": "${CONFLUENT_CLOUD_API_SECRET}"
+      }
+    }
+  }
+}

@@ -5,6 +5,27 @@
 
 ---
 
+## First-Time Setup (After Plugin Install)
+
+After running `claude plugin add devco-agent-skills@devco-agent-skills`, run `/setup` **once**
+to make rules auto-load in every session across all projects:
+
+```
+/setup
+```
+
+Or from the terminal:
+```bash
+bash ~/.claude/plugins/cache/devco-agent-skills/scripts/setup.sh
+```
+
+For a new project, also install project-level rules:
+```bash
+bash ~/.claude/plugins/cache/devco-agent-skills/scripts/setup.sh --project
+```
+
+---
+
 ## ⚠️ MANDATORY: Read WORKING_WORKFLOW.md FIRST
 
 Every session MUST follow the **7-phase workflow** defined in `WORKING_WORKFLOW.md`.
@@ -140,6 +161,7 @@ com.example.{service}/
 | `/evolve` | Cluster instincts into skills/commands/agents |
 | `/instinct` | Manage instincts — status, export, import (subcommands) |
 | `/learn` | Extract patterns from current session |
+| `/mcp-setup` | Guided MCP server setup — audit, token budget, install core/optional |
 | `/orchestrate` | Sequential/parallel multi-agent workflow |
 | `/refactor-clean` | Identify + remove dead code |
 | `/resume-session` | Load context from a previous session file |
@@ -186,6 +208,7 @@ If `claude-mem` is available, it provides cross-session memory:
 /checkpoint        → Mark workflow phase completion.
 /e2e               → Generate E2E integration tests.
 /orchestrate       → Complex tasks needing multiple agents.
+/mcp-setup         → Configure MCP servers for the stack.
 /save-session      → Persist current context for next session.
 /resume-session    → Load context from a previous session.
 ```

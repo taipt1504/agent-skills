@@ -1,0 +1,19 @@
+{
+  "_comment": "Exa Web Search MCP — neural + keyword web search that returns FULL page content (not just snippets). Superior to basic web search for research tasks: finding solutions, reading documentation, investigating errors, exploring libraries.",
+  "_install": "claude mcp add exa-search -s user -e EXA_API_KEY -- npx -y exa-mcp-server",
+  "_env_required": ["EXA_API_KEY"],
+  "_env_example": {
+    "EXA_API_KEY": "your-exa-api-key-from-exa.ai"
+  },
+  "_security": "Uses Exa API for search. API key has usage-based billing. No local data is sent — only search queries. Safe for development use.",
+  "_tools_added": 3,
+  "mcpServers": {
+    "exa-search": {
+      "command": "npx",
+      "args": ["-y", "exa-mcp-server"],
+      "env": {
+        "EXA_API_KEY": "${EXA_API_KEY}"
+      }
+    }
+  }
+}

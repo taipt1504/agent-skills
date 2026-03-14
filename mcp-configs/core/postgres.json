@@ -1,0 +1,16 @@
+{
+  "_comment": "PostgreSQL MCP — schema inspection, read-only query execution, table/index metadata",
+  "_install": "claude mcp add postgres -s user -- npx -y @modelcontextprotocol/server-postgres $POSTGRES_CONNECTION_STRING",
+  "_env_required": ["POSTGRES_CONNECTION_STRING"],
+  "_env_example": {
+    "POSTGRES_CONNECTION_STRING": "postgresql://dev_user:dev_pass@localhost:5432/mydb"
+  },
+  "_security": "Use a READ-ONLY database user. Never point at production. Ideal for schema inspection during development.",
+  "_tools_added": 8,
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "${POSTGRES_CONNECTION_STRING}"]
+    }
+  }
+}

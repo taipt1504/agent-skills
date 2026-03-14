@@ -64,6 +64,12 @@
           },
           {
             "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/cost-tracker.sh",
+            "timeout": 10,
+            "async": true
+          },
+          {
+            "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/session-end.sh",
             "timeout": 60,
             "async": true

@@ -1,0 +1,19 @@
+{
+  "_comment": "Notion MCP — search and read Notion pages, databases, and workspace content. Useful for teams that keep architecture docs, ADRs, runbooks, or project specs in Notion.",
+  "_install": "claude mcp add notion -s user -e OPENAPI_MCP_HEADERS -- npx -y @notionhq/notion-mcp-server",
+  "_env_required": ["OPENAPI_MCP_HEADERS"],
+  "_env_example": {
+    "OPENAPI_MCP_HEADERS": "{\"Authorization\": \"Bearer ntn_xxxxxxxxxxxxxxxxxxxx\", \"Notion-Version\": \"2022-06-28\"}"
+  },
+  "_security": "Requires a Notion integration token. Grant read-only access in Notion settings. Only share specific pages/databases with the integration — not the entire workspace.",
+  "_tools_added": 8,
+  "mcpServers": {
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "OPENAPI_MCP_HEADERS": "${OPENAPI_MCP_HEADERS}"
+      }
+    }
+  }
+}

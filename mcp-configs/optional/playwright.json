@@ -1,0 +1,14 @@
+{
+  "_comment": "Playwright MCP — browser automation for E2E UI testing. Enable only when project has browser-facing tests.",
+  "_install": "claude mcp add playwright -s user -- npx -y @playwright/mcp@latest",
+  "_env_required": [],
+  "_env_example": {},
+  "_security": "Runs a local Chromium browser. No network access beyond localhost by default. Safe for local E2E testing.",
+  "_tools_added": 8,
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    }
+  }
+}

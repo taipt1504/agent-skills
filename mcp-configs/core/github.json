@@ -1,0 +1,19 @@
+{
+  "_comment": "GitHub MCP — PR/issue management, code search, repository operations directly from Claude.",
+  "_install": "claude mcp add github -s user -e GITHUB_PERSONAL_ACCESS_TOKEN -- npx -y @modelcontextprotocol/server-github",
+  "_env_required": ["GITHUB_PERSONAL_ACCESS_TOKEN"],
+  "_env_example": {
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  "_security": "Use a fine-grained PAT with minimal scopes: repo, read:org. Rotate tokens regularly. Never commit tokens.",
+  "_tools_added": 8,
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

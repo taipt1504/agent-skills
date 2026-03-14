@@ -1,0 +1,17 @@
+{
+  "_comment": "Filesystem MCP — secure read/write access to specified directories outside CWD. Useful when agents need to access shared config, reference projects, or multi-repo setups. Only exposes directories you explicitly allow.",
+  "_install": "claude mcp add filesystem -s user -- npx -y @modelcontextprotocol/server-filesystem /path/to/allowed/dir1 /path/to/allowed/dir2",
+  "_env_required": [],
+  "_env_example": {},
+  "_security": "ONLY exposes directories listed in args. Never add home directory root or system paths. Use the most restrictive paths possible. Example: allow ~/projects but NOT ~/.",
+  "_tools_added": 11,
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y", "@modelcontextprotocol/server-filesystem",
+        "${HOME}/projects"
+      ]
+    }
+  }
+}

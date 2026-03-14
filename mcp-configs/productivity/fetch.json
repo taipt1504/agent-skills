@@ -1,0 +1,14 @@
+{
+  "_comment": "Fetch MCP — lightweight URL fetch with HTML-to-Markdown conversion. No API key needed. Essential for reading documentation, Stack Overflow, blog posts, and any web page during research tasks.",
+  "_install": "claude mcp add fetch -s user -- npx -y @modelcontextprotocol/server-fetch",
+  "_env_required": [],
+  "_env_example": {},
+  "_security": "Read-only HTTP GET requests. No credentials sent. Respects robots.txt by default. Safe for general use.",
+  "_tools_added": 2,
+  "mcpServers": {
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"]
+    }
+  }
+}

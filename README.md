@@ -116,6 +116,22 @@ agent-skills/
 ├── CLAUDE.md                              # Global context auto-loaded by Claude Code
 ├── WORKING_WORKFLOW.md                    # 7-phase mandatory workflow reference
 ├── README.md
+├── mcp-configs/                           # 11 MCP server configs (4 productivity + 4 core + 3 optional)
+│   ├── README.md
+│   ├── productivity/
+│   │   ├── fetch.json
+│   │   ├── exa-search.json
+│   │   ├── filesystem.json
+│   │   └── notion.json
+│   ├── core/
+│   │   ├── postgres.json
+│   │   ├── docker.json
+│   │   ├── github.json
+│   │   └── gradle.json
+│   └── optional/
+│       ├── redis.json
+│       ├── kafka.json
+│       └── playwright.json
 ├── agents/                                # 14 specialized sub-agents
 │   ├── architect.md
 │   ├── blackbox-test-runner.md
@@ -131,7 +147,7 @@ agent-skills/
 │   ├── spring-reviewer.md
 │   ├── spring-webflux-reviewer.md
 │   └── tdd-guide.md
-├── commands/                              # 19 slash commands
+├── commands/                              # 21 slash commands
 │   ├── adr.md
 │   ├── api-doc.md
 │   ├── build-fix.md
@@ -143,11 +159,13 @@ agent-skills/
 │   ├── evolve.md
 │   ├── instinct.md
 │   ├── learn.md
+│   ├── mcp-setup.md
 │   ├── orchestrate.md
 │   ├── plan.md
 │   ├── refactor-clean.md
 │   ├── resume-session.md
 │   ├── save-session.md
+│   ├── setup.md
 │   ├── skill-create.md
 │   ├── spec.md
 │   └── verify.md
@@ -266,7 +284,7 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 
 ---
 
-## Commands (19)
+## Commands (21)
 
 | Command | Description |
 |---|---|
@@ -281,11 +299,13 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 | `/evolve` | Cluster related instincts into skills, commands, or agents |
 | `/instinct` | Manage instincts — status, export, import (subcommands) |
 | `/learn` | Analyze current session and extract patterns worth saving as skills |
+| `/mcp-setup` | Guided MCP server configuration — audit, token budget, install core/optional servers |
 | `/orchestrate` | Sequential multi-agent workflow for complex tasks |
 | `/plan` | Restate requirements, assess risks, create step-by-step implementation plan — WAIT for user confirm |
 | `/refactor-clean` | Safely identify and remove dead code with test verification |
 | `/resume-session` | Load context from a previous session file |
 | `/save-session` | Manually persist current session context |
+| `/setup` | One-time install — writes plugin rules into `~/.claude/CLAUDE.md` for global auto-loading |
 | `/skill-create` | Analyze local git history to extract coding patterns and generate SKILL.md |
 | `/spec` | Define behavioral contracts (inputs, outputs, error cases, scenarios) from approved plan — gate between PLAN and BUILD |
 | `/verify` | Run comprehensive verification: build → compile → tests → security → diff review |
@@ -339,6 +359,40 @@ Lifecycle scripts in `scripts/hooks/` that run automatically during Claude Code 
 | `evaluate-session.sh` | Stop | Evaluates session for extractable reusable patterns |
 | `cost-tracker.sh` | Various | Tracks token usage and cost across the session |
 | `run-with-flags.sh` | Various | Runs commands with configurable feature flags |
+
+---
+
+## MCP Server Configs
+
+Curated MCP server configurations in `mcp-configs/` for agent productivity and the Java/Spring stack. Run `/mcp-setup` for guided installation.
+
+### Productivity (agent research & knowledge)
+
+| Server | Description |
+|---|---|
+| `fetch` | URL fetch + HTML-to-Markdown — read docs, blogs, Stack Overflow (no API key) |
+| `exa-search` | Neural web search with full page content via `exa-mcp-server` |
+| `filesystem` | Secure read/write to directories outside CWD via `@modelcontextprotocol/server-filesystem` |
+| `notion` | Notion workspace/wiki access via `@notionhq/notion-mcp-server` |
+
+### Core Stack (Java/Spring dev)
+
+| Server | Description |
+|---|---|
+| `postgres` | Schema inspection, read-only queries via `@modelcontextprotocol/server-postgres` |
+| `docker` | Container lifecycle for Testcontainers via `docker/mcp` |
+| `github` | PR/issue management via `@modelcontextprotocol/server-github` |
+| `gradle` | Build task execution via `gradle-mcp-server` |
+
+### Optional Stack (per-project)
+
+| Server | Description |
+|---|---|
+| `redis` | Cache inspection via `mcp-redis` |
+| `kafka` | Topic management via `@confluentinc/mcp-confluent` |
+| `playwright` | Browser E2E tests via `@playwright/mcp` |
+
+**Token budget:** Keep total under 80 tools active. See [mcp-configs/README.md](./mcp-configs/README.md) for budget breakdown.
 
 ---
 

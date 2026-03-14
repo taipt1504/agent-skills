@@ -25,48 +25,48 @@ A concrete statement of observable behavior: inputs → outputs → error cases.
 
 ### REST Endpoint
 
-| Section | Required |
-|---------|----------|
-| Request schema (method, path, headers, body) | Yes |
-| Response schema (status codes, body shape) | Yes |
-| Scenarios (≥3: happy path, validation error, not found / conflict) | Yes |
-| Auth/authz requirements | If applicable |
+| Section                                                            | Required      |
+| ------------------------------------------------------------------ | ------------- |
+| Request schema (method, path, headers, body)                       | Yes           |
+| Response schema (status codes, body shape)                         | Yes           |
+| Scenarios (≥3: happy path, validation error, not found / conflict) | Yes           |
+| Auth/authz requirements                                            | If applicable |
 
 ### Domain Logic
 
-| Section | Required |
-|---------|----------|
-| Preconditions (valid input state) | Yes |
-| Postconditions (output state, side effects) | Yes |
-| Invariants (what must always hold) | Yes |
-| Failure exceptions (specific domain exceptions) | Yes |
+| Section                                         | Required |
+| ----------------------------------------------- | -------- |
+| Preconditions (valid input state)               | Yes      |
+| Postconditions (output state, side effects)     | Yes      |
+| Invariants (what must always hold)              | Yes      |
+| Failure exceptions (specific domain exceptions) | Yes      |
 
 ### Messaging (Kafka / RabbitMQ)
 
-| Section | Required |
-|---------|----------|
-| Event schema (topic/exchange, key, payload shape) | Yes |
-| Delivery guarantee (at-least-once, exactly-once) | Yes |
-| Idempotency strategy | Yes |
-| DLQ / DLT behavior on failure | Yes |
+| Section                                           | Required |
+| ------------------------------------------------- | -------- |
+| Event schema (topic/exchange, key, payload shape) | Yes      |
+| Delivery guarantee (at-least-once, exactly-once)  | Yes      |
+| Idempotency strategy                              | Yes      |
+| DLQ / DLT behavior on failure                     | Yes      |
 
 ### Database Migration
 
-| Section | Required |
-|---------|----------|
-| DDL changes (CREATE, ALTER, DROP) | Yes |
-| Zero-downtime strategy (expand-contract phases) | Yes |
-| Rollback DDL | Yes |
-| Data backfill (if any) | If applicable |
+| Section                                         | Required      |
+| ----------------------------------------------- | ------------- |
+| DDL changes (CREATE, ALTER, DROP)               | Yes           |
+| Zero-downtime strategy (expand-contract phases) | Yes           |
+| Rollback DDL                                    | Yes           |
+| Data backfill (if any)                          | If applicable |
 
 ### Background Job
 
-| Section | Required |
-|---------|----------|
-| Trigger (cron, event, manual) | Yes |
-| Inputs and outputs / side effects | Yes |
-| Idempotency strategy | Yes |
-| Failure behavior (retry, DLQ, alert) | Yes |
+| Section                              | Required |
+| ------------------------------------ | -------- |
+| Trigger (cron, event, manual)        | Yes      |
+| Inputs and outputs / side effects    | Yes      |
+| Idempotency strategy                 | Yes      |
+| Failure behavior (retry, DLQ, alert) | Yes      |
 
 ## Minimum Format (All Types)
 

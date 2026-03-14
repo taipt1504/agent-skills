@@ -1,0 +1,18 @@
+{
+  "_comment": "Docker MCP — container lifecycle, image management, log inspection. Essential for Testcontainers workflows.",
+  "_install": "claude mcp add docker -s user -- docker run -i --rm -v /var/run/docker.sock:/var/run/docker.sock docker/mcp:latest",
+  "_env_required": [],
+  "_env_example": {},
+  "_security": "Mounts the local Docker socket. Only use on development machines. Never expose to untrusted environments.",
+  "_tools_added": 8,
+  "mcpServers": {
+    "docker": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/var/run/docker.sock:/var/run/docker.sock",
+        "docker/mcp:latest"
+      ]
+    }
+  }
+}

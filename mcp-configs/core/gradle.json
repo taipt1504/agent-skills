@@ -1,0 +1,14 @@
+{
+  "_comment": "Gradle MCP — build task listing and execution, dependency inspection, project structure analysis.",
+  "_install": "claude mcp add gradle -s user -- npx -y gradle-mcp-server",
+  "_env_required": [],
+  "_env_example": {},
+  "_security": "Executes Gradle tasks in your project. Review task names before running. Safe for development use.",
+  "_tools_added": 7,
+  "mcpServers": {
+    "gradle": {
+      "command": "npx",
+      "args": ["-y", "gradle-mcp-server"]
+    }
+  }
+}

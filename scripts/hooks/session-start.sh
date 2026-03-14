@@ -269,9 +269,40 @@ if [ -f "BLOCKERS.md" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Workflow reminder
+# 6. Workflow reminder — stdout so Claude reads it as session context
 # ---------------------------------------------------------------------------
 
+# NOTE: stdout → injected into Claude's context window.
+#       stderr → terminal only (the `log` helper above uses stderr).
+# We send a compact context block to Claude so it is aware of:
+#   - mandatory workflow
+#   - stack (if detected)
+#   - global setup status
+
+{
+  echo "## Session Context (devco-agent-skills)"
+  echo ""
+  echo "**Mandatory workflow**: PLAN → BUILD (TDD) → VERIFY → REVIEW → DELIVER"
+  echo "Run \`/plan\` before writing any code. No exceptions."
+  echo ""
+
+  if [ -n "$SPRING_TYPE" ]; then
+    echo "**Stack**: Java ${JAVA_VERSION:-17+} · Spring Boot 3.x · $SPRING_TYPE"
+  fi
+
+  if [ -f "PROJECT_GUIDELINES.md" ]; then
+    echo "**Project guidelines**: \`PROJECT_GUIDELINES.md\` found — read it for project-specific rules."
+  fi
+
+  # Warn if global setup has not been run yet
+  if ! grep -q "devco-agent-skills:start" "$HOME/.claude/CLAUDE.md" 2>/dev/null; then
+    echo ""
+    echo "> ⚠️  **Plugin not fully set up**: Run \`/setup\` to install rules into \`~/.claude/CLAUDE.md\`"
+    echo "> so they auto-load in every session across all projects."
+  fi
+} # stdout → Claude context
+
+# Verbose diagnostics on stderr (terminal only)
 log "Workflow: PLAN → BUILD (TDD) → VERIFY → REVIEW → DELIVER"
 log "Run /plan before writing code"
 
