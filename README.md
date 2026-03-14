@@ -32,7 +32,49 @@ git clone https://github.com/taipt1504/agent-skills.git ~/.claude/plugins/agent-
 claude plugin install ~/.claude/plugins/agent-skills
 ```
 
-### 2. Configure Hooks
+### 2. Run Setup (Required — once per project)
+
+> **Why this step is necessary:** Claude Code plugins register skills, agents, and hooks automatically,
+> but they cannot inject `CLAUDE.md` or workflow files into your project.
+> The `/setup` command copies the plugin's context directly into your project root so Claude
+> loads them automatically every session.
+
+From your **project's root directory**, open Claude Code and run:
+
+```
+/setup
+```
+
+**What `/setup` installs into your project:**
+
+| File/Dir | Auto-loaded by Claude | Contains |
+|---|---|---|
+| `CLAUDE.md` | ✅ Every session for this project | Tech stack, 7-phase workflow, critical rules |
+| `WORKING_WORKFLOW.md` | When read from CLAUDE.md | Full 7-phase workflow reference (1055 lines) |
+| `.claude/rules/` | ✅ Every session for this project | Coding style, reactive, security, testing rules |
+
+**Commit and share with your team:**
+
+```bash
+git add CLAUDE.md WORKING_WORKFLOW.md .claude/rules/
+git commit -m "chore: add Claude Code project context"
+```
+
+Once committed, every teammate who clones the repo gets the full context — no manual setup needed.
+
+**Optional: also install globally** (loads rules in every project on this machine):
+
+```bash
+bash ~/.claude/plugins/cache/devco-agent-skills/scripts/setup.sh --global
+```
+
+**After a plugin update**, refresh the installed content:
+
+```bash
+bash ~/.claude/plugins/cache/devco-agent-skills/scripts/setup.sh --update
+```
+
+### 3. Configure Hooks (if not auto-registered)
 
 Hooks are registered automatically when installed via marketplace or npm. To configure manually, add to `~/.claude/settings.json`:
 
@@ -63,7 +105,7 @@ Hooks are registered automatically when installed via marketplace or npm. To con
 }
 ```
 
-### 3. Add Project Guidelines (Optional)
+### 4. Add Project Guidelines (Optional)
 
 Copy the template to your project root and customize:
 
@@ -71,7 +113,7 @@ Copy the template to your project root and customize:
 cp templates/PROJECT_GUIDELINES_TEMPLATE.md ./PROJECT_GUIDELINES.md
 ```
 
-### 4. Start a Session
+### 5. Start a Session
 
 Claude Code will automatically load the workflow. Start with `/plan` for any non-trivial task.
 
@@ -79,7 +121,9 @@ Claude Code will automatically load the workflow. Start with `/plan` for any non
 
 ## Team Onboarding
 
-### Per Developer (One-Time)
+Complete setup checklist for a new team member. Steps 1–2 run once per machine; steps 3–4 run once per project repo.
+
+### Step 1 — Install the plugin (per machine)
 
 ```bash
 # Register the marketplace source
@@ -89,23 +133,59 @@ Claude Code will automatically load the workflow. Start with `/plan` for any non
 /plugin install devco-agent-skills
 ```
 
-### Per Machine
+### Step 2 — Configure hooks (per machine)
 
-Enable hooks in `~/.claude/settings.json` (see [Configure Hooks](#2-configure-hooks) above). Hook profiles (`minimal`, `standard`, `strict`) are controlled via the `HOOK_PROFILE` env var.
+Hooks are registered automatically when installed via marketplace. If manual configuration is
+needed, see [Configure Hooks](#3-configure-hooks).
 
-### Per Project Repo
+Hook profiles (`minimal`, `standard`, `strict`) are controlled via the `HOOK_PROFILE` env var.
 
-Create `PROJECT_GUIDELINES.md` at the project root:
+### Step 3 — Run project setup (per project repo, required)
+
+From the **project root**, open Claude Code and run:
+
+```
+/setup
+```
+
+This copies `CLAUDE.md`, `WORKING_WORKFLOW.md`, and `.claude/rules/` into the project.
+**Commit these files** so every teammate gets the context on clone — no manual setup needed for them:
+
+```bash
+git add CLAUDE.md WORKING_WORKFLOW.md .claude/rules/
+git commit -m "chore: add Claude Code project context"
+```
+
+Verify it worked:
+```bash
+test -f CLAUDE.md           && echo "✅ CLAUDE.md"
+test -f WORKING_WORKFLOW.md && echo "✅ WORKING_WORKFLOW.md"
+ls .claude/rules/ 2>/dev/null | head -3 && echo "✅ Rules"
+```
+
+### Step 4 — Add Project Guidelines (per project repo, recommended)
 
 ```bash
 cp templates/PROJECT_GUIDELINES_TEMPLATE.md /path/to/your/project/PROJECT_GUIDELINES.md
 ```
 
-This file overrides generic conventions with project-specific rules (architecture decisions, naming conventions, dependency choices, etc.).
+Customize with project-specific rules: architecture decisions, naming conventions, dependency
+choices, etc. The `session-start` hook loads this file automatically at every session start.
+
+### What auto-loads and when
+
+| What | When loaded | Requires setup? |
+|---|---|---|
+| `~/.claude/CLAUDE.md` (plugin rules) | Every session, every project | ✅ Run `/setup` once |
+| `.claude/rules/` (project rules) | Every session in this project | ✅ Run `--project` setup or commit the dir |
+| `PROJECT_GUIDELINES.md` | Every session in this project | Create from template |
+| Session context (workflow reminder) | Every session start via hook stdout | Automatic |
+| Skills / agents / commands | On demand | Automatic (registered by plugin) |
 
 ### Shared Settings (Optional)
 
-Commit a `.claude/settings.json` at the project root to share hook configuration and plugin settings across the team. This ensures every developer gets the same hooks without manual setup.
+Commit a `.claude/settings.json` at the project root to share hook configuration and plugin
+settings across the team. This ensures every developer gets the same hooks without manual setup.
 
 ---
 
@@ -188,6 +268,7 @@ agent-skills/
 │       ├── security.md
 │       └── testing.md
 ├── scripts/
+│   ├── setup.sh                           # One-time setup: writes plugin rules to ~/.claude/CLAUDE.md
 │   └── hooks/                             # 10 lifecycle hook scripts
 │       ├── check-debug-statements.sh
 │       ├── cost-tracker.sh
@@ -349,7 +430,7 @@ Lifecycle scripts in `scripts/hooks/` that run automatically during Claude Code 
 
 | Script | Hook Type | Description |
 |---|---|---|
-| `session-start.sh` | SessionStart | Loads previous context, detects project type, queries claude-mem |
+| `session-start.sh` | SessionStart | Detects project type, injects workflow reminder into Claude's context (stdout), warns if `/setup` not run, queries claude-mem |
 | `session-end.sh` | SessionEnd | Persists session state and files modified list |
 | `pre-compact.sh` | PreCompact | Saves current state before context compaction |
 | `suggest-compact.sh` | PreToolUse | Suggests `/compact` at logical workflow boundaries (threshold: 50 tool calls) |

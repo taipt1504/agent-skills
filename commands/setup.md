@@ -1,23 +1,20 @@
 ---
 name: setup
 description: >
-  One-time install that writes devco-agent-skills rules and stack guidelines into
-  ~/.claude/CLAUDE.md so they auto-load in EVERY Claude Code session across ALL projects.
-  Optionally copies rules/ into the current project's .claude/rules/.
-  Re-run after plugin updates with --update flag.
+  Install devco-agent-skills into the current project — copies CLAUDE.md,
+  WORKING_WORKFLOW.md, and rules/ into the project root so they auto-load
+  every session. Run once per project after cloning or after plugin updates.
 ---
 
-# /setup — Install Plugin Rules Globally
+# /setup — Install Plugin into Current Project
 
-This command makes the plugin's coding standards, workflow, and Java/Spring rules
-**auto-load in every Claude Code session** — not just in this repo.
+Copies three things from the plugin into your project:
 
-## What happens
-
-| Action | Result |
-|--------|--------|
-| Writes to `~/.claude/CLAUDE.md` | Rules load globally in every session |
-| Copies to `.claude/rules/` (with `--project`) | Rules load for this specific project |
+| File/Dir | Where | Auto-loaded by Claude |
+|----------|-------|----------------------|
+| `CLAUDE.md` | Project root | ✅ Every session for this project |
+| `WORKING_WORKFLOW.md` | Project root | When Claude reads it from CLAUDE.md |
+| `.claude/rules/` | Project `.claude/rules/` | ✅ Every session for this project |
 
 ## Run setup now
 
@@ -30,54 +27,68 @@ PLUGIN_DIR="$(find "$HOME/.claude/plugins" -maxdepth 4 -name "setup.sh" \
 
 if [ -z "$PLUGIN_DIR" ]; then
   echo "❌ Plugin not found in ~/.claude/plugins"
-  echo "   Ensure it is installed: claude plugin add devco-agent-skills@devco-agent-skills"
+  echo "   Install it first: claude plugin add devco-agent-skills@devco-agent-skills"
   exit 1
 fi
 
 echo "Plugin found at: $PLUGIN_DIR"
 ```
 
-Then run the appropriate variant:
+Then run setup from the **target project's root directory**:
 
-**Global only** (rules load everywhere):
 ```bash
 bash "$PLUGIN_DIR/scripts/setup.sh"
 ```
 
-**Global + current project rules** (recommended for new projects):
+## Commit to version control
+
+Share the setup with your team by committing the generated files:
+
 ```bash
-bash "$PLUGIN_DIR/scripts/setup.sh" --project
+git add CLAUDE.md WORKING_WORKFLOW.md .claude/rules/
+git commit -m "chore: add Claude Code project context"
 ```
 
-**Refresh after plugin update**:
+Once committed, every teammate who clones the repo gets the rules automatically —
+no manual setup required.
+
+## Optional: also install globally
+
+To load plugin rules in **every** project on this machine (not just this one):
+
+```bash
+bash "$PLUGIN_DIR/scripts/setup.sh" --global
+```
+
+## Refresh after plugin update
+
+Re-run to pull in updated rules after a plugin upgrade — safe to run multiple times:
+
 ```bash
 bash "$PLUGIN_DIR/scripts/setup.sh" --update
 ```
 
 ## Verify it worked
 
-After running setup, confirm rules are installed:
 ```bash
-grep -c "devco-agent-skills" ~/.claude/CLAUDE.md && echo "✅ Global rules installed"
-ls .claude/rules/ 2>/dev/null && echo "✅ Project rules installed" || echo "ℹ️  No project rules (run with --project)"
+test -f CLAUDE.md           && echo "✅ CLAUDE.md present"
+test -f WORKING_WORKFLOW.md && echo "✅ WORKING_WORKFLOW.md present"
+ls .claude/rules/ 2>/dev/null && echo "✅ Rules installed" || echo "❌ Rules missing"
 ```
 
-## What gets loaded where
+## What gets loaded
 
 ```
-~/.claude/CLAUDE.md          ← loaded EVERY session, EVERY project (this machine)
-  └── Stack: Java 17+ / Spring Boot 3.x / WebFlux
-  └── Architecture: Hexagonal, CQRS, DDD
-  └── Critical rules: no .block(), constructor injection, 80% coverage...
-  └── Workflow: PLAN → BUILD (TDD) → VERIFY → REVIEW
-
-.claude/rules/               ← loaded only for THIS project
-  ├── common/coding-style.md
-  ├── common/security.md
-  ├── java/reactive.md
-  └── java/testing.md        (and 12 more...)
+PROJECT_ROOT/
+├── CLAUDE.md                ← loaded every session for this project
+├── WORKING_WORKFLOW.md      ← 7-phase workflow reference (read by CLAUDE.md)
+└── .claude/
+    └── rules/               ← loaded every session for this project
+        ├── common/
+        │   ├── coding-style.md
+        │   └── security.md
+        ├── java/
+        │   ├── reactive.md
+        │   └── testing.md
+        └── ...
 ```
-
-## Session context (hook stdout)
-
-The `session-start` hook also outputs a **workflow reminder to Claude's context** at every session start, so Claude is reminded of the mandatory workflow even without reading CLAUDE.md explicitly.

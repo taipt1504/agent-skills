@@ -274,33 +274,88 @@ fi
 
 # NOTE: stdout → injected into Claude's context window.
 #       stderr → terminal only (the `log` helper above uses stderr).
-# We send a compact context block to Claude so it is aware of:
-#   - mandatory workflow
-#   - stack (if detected)
-#   - global setup status
 
 {
-  echo "## Session Context (devco-agent-skills)"
-  echo ""
-  echo "**Mandatory workflow**: PLAN → BUILD (TDD) → VERIFY → REVIEW → DELIVER"
-  echo "Run \`/plan\` before writing any code. No exceptions."
+  echo "## Session Boot — devco-agent-skills"
   echo ""
 
+  # Stack context (when detected)
   if [ -n "$SPRING_TYPE" ]; then
     echo "**Stack**: Java ${JAVA_VERSION:-17+} · Spring Boot 3.x · $SPRING_TYPE"
+    echo ""
   fi
 
+  # Project guidelines reminder
   if [ -f "PROJECT_GUIDELINES.md" ]; then
-    echo "**Project guidelines**: \`PROJECT_GUIDELINES.md\` found — read it for project-specific rules."
+    echo "**Project guidelines**: \`PROJECT_GUIDELINES.md\` present — read it before starting work."
+    echo ""
+  fi
+
+  # Phase decision — most important thing Claude needs to decide what to do next
+  echo "### Workflow Phase Decision"
+  echo ""
+  echo "Before touching any code, answer: **Is this task trivial?**"
+  echo ""
+  echo "| Trivial (ALL must be true) | Non-trivial (ANY is true) |"
+  echo "|----------------------------|---------------------------|"
+  echo "| Change ≤ 5 lines | Change > 5 lines |"
+  echo "| Single file only | Multiple files |"
+  echo "| No new behavior | New behavior / feature |"
+  echo "| No architectural impact | Schema / dependency / arch change |"
+  echo ""
+  echo "**Trivial** → go straight to BUILD"
+  echo "**Non-trivial** → \`/plan\` → user confirms → \`/spec\` → user approves → BUILD"
+  echo ""
+
+  # Hard blocks reminder
+  echo "### Hard Blocks (non-negotiable)"
+  echo ""
+  echo "- No code without \`/plan\` approval (non-trivial)"
+  echo "- No code without \`/spec\` approval (non-trivial)"
+  echo "- Tests FIRST — always write test before implementation"
+  echo "- \`.block()\` in \`src/main/\` → CRITICAL, stop and fix immediately"
+  echo "- Never run \`git commit\` — user commits after final review"
+  echo ""
+
+  # TDD reminder
+  echo "### TDD Cycle (Phase ④)"
+  echo ""
+  echo "\`RED\` (write failing test) → \`GREEN\` (minimal impl) → \`REFACTOR\` (clean) → \`/checkpoint\`"
+  echo ""
+
+  # Command cheat sheet
+  echo "### Commands"
+  echo ""
+  echo "| Command | When |"
+  echo "|---------|------|"
+  echo "| \`/plan\` | Non-trivial task — plan before code |"
+  echo "| \`/spec\` | After plan confirmed — spec before code |"
+  echo "| \`/verify\` | After all steps done — gates before review |"
+  echo "| \`/code-review\` | After verify passes — multi-agent review |"
+  echo "| \`/build-fix\` | Build or compile fails |"
+  echo "| \`/checkpoint\` | After each build step completes |"
+  echo "| \`/compact\` | At phase boundaries when context is large |"
+  echo ""
+
+  # Recent session context (if available)
+  if [ -d ".claude/sessions" ]; then
+    LATEST="$(find ".claude/sessions" -maxdepth 1 -name "*-session.md" -mtime -7 2>/dev/null | sort -r | head -1)"
+    if [ -n "$LATEST" ] && [ -f "$LATEST" ]; then
+      echo "### Previous Session Context"
+      echo ""
+      # Output first 40 lines of the latest session (summary section)
+      head -40 "$LATEST"
+      echo ""
+    fi
   fi
 
   # Warn if global setup has not been run yet
   if ! grep -q "devco-agent-skills:start" "$HOME/.claude/CLAUDE.md" 2>/dev/null; then
     echo ""
-    echo "> ⚠️  **Plugin not fully set up**: Run \`/setup\` to install rules into \`~/.claude/CLAUDE.md\`"
-    echo "> so they auto-load in every session across all projects."
+    echo "> ⚠️  **Plugin rules not installed globally**: Run \`/setup\` to write rules into"
+    echo "> \`~/.claude/CLAUDE.md\` so they auto-load in every session across all projects."
   fi
-} # stdout → Claude context
+} # end stdout → Claude context
 
 # Verbose diagnostics on stderr (terminal only)
 log "Workflow: PLAN → BUILD (TDD) → VERIFY → REVIEW → DELIVER"

@@ -26,10 +26,78 @@ bash ~/.claude/plugins/cache/devco-agent-skills/scripts/setup.sh --project
 
 ---
 
-## ⚠️ MANDATORY: Read WORKING_WORKFLOW.md FIRST
+## Workflow — 7 Phases (NON-NEGOTIABLE)
 
-Every session MUST follow the **7-phase workflow** defined in `WORKING_WORKFLOW.md`.
-No exceptions. No shortcuts.
+Every session follows these phases without exception. Full reference: `WORKING_WORKFLOW.md`.
+
+### Phases
+
+| # | Phase | Trigger | Key Output |
+|---|-------|---------|------------|
+| ① | **BOOT** | Session start (automatic) | Project type detected, guidelines + memory loaded |
+| ② | **PLAN** | Non-trivial task → `/plan` | Implementation plan → ⏸️ **wait for user confirm** |
+| ③ | **SPEC** | Plan confirmed → `/spec` | Behavioral contracts + test scenarios → ⏸️ **wait for user approve** |
+| ④ | **BUILD** | Spec approved → TDD per step | Failing test → implementation → passing test → `/checkpoint` |
+| ⑤ | **VERIFY** | All steps done → `/verify` | Build + tests (≥80%) + reactive safety + security scan |
+| ⑥ | **REVIEW** | Verify passes → `/code-review` | Multi-agent review → APPROVE / WARN / BLOCK |
+| ⑦ | **LEARN** | Session end (automatic) | Patterns + instincts saved to claude-mem |
+
+### Phase Decision — Trivial vs Non-Trivial
+
+```
+New task received
+  ├── ALL true: ≤5 lines, 1 file, no new behavior, no arch impact → BUILD directly (skip PLAN+SPEC)
+  └── ANY false → /plan → confirm → /spec → approve → BUILD
+When in doubt → /plan first.
+```
+
+### Hard Blocks — Non-Negotiable
+
+| Violation | Response |
+|-----------|----------|
+| Writing code without `/plan` approval | **STOP** — run `/plan`, wait for user confirm |
+| Writing code without `/spec` approval | **STOP** — run `/spec`, wait for user approve |
+| Skipping tests | **BLOCK** — write the test first, always |
+| `.block()` anywhere in `src/main/` | **CRITICAL** — stop everything, fix now |
+| Agent runs `git commit` | **FORBIDDEN** — user is the only one who commits |
+
+### TDD Cycle (Phase ④, per step)
+
+```
+RED:      Write test from spec scenario → run → confirm FAILS
+GREEN:    Write minimal implementation → run → confirm PASSES
+REFACTOR: Clean up, rename, extract → run → still PASSES
+          → /checkpoint create "step-N-done"
+```
+
+### Reactive Safety Rules (`src/main/` only)
+
+| Forbidden | Fix |
+|-----------|-----|
+| `.block()` | Chain with `flatMap` / `then` / `zip` |
+| `Thread.sleep()` | `Mono.delay()` / `StepVerifier.withVirtualTime()` |
+| `.subscribe()` inside a chain | `flatMap` / `concatWith` / `then` |
+| `Mono.just(blockingCall())` | `Mono.fromCallable(() -> blockingCall()).subscribeOn(Schedulers.boundedElastic())` |
+
+### Verification Gates (`/verify`)
+
+```
+Build clean → Compile zero errors → Tests 100% pass + ≥80% coverage
+  → No .block()/.sleep() in src/main/ → No hardcoded secrets → No debug prints
+  → Diff review (only planned files changed)
+All gates must be GREEN before REVIEW phase begins.
+```
+
+### Review Chain (`/code-review`)
+
+Always: `code-reviewer` + `security-reviewer`
+Conditional:
+- WebFlux / reactive code changed → `spring-webflux-reviewer`
+- Config / Spring beans changed → `spring-reviewer`
+- Repository / SQL / migration changed → `database-reviewer`
+- New packages / DDD boundaries → `architect`
+
+Verdict: ✅ APPROVE → deliver · ⚠️ WARNING → deliver with notes · ❌ BLOCK → fix then re-verify + re-review
 
 ---
 
