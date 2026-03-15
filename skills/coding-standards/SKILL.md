@@ -240,6 +240,7 @@ return Mono.zip(
 | **Magic Numbers** | `if (count > 3)` | `private static final int MAX_RETRIES = 3` |
 | **God Class** | Service doing payments + notifications + reports | One class, one purpose |
 | **N+1 Queries** | `flatMap(m -> repo.findByMarketId(m.id()))` | Batch fetch with `findByMarketIdIn(ids)` |
+| **Fully-Qualified Names** | `java.util.List<java.math.BigDecimal>` inline | Use `import` — always |
 
 ```java
 // Guard clauses > deep nesting
@@ -264,3 +265,4 @@ if (!user.isAdmin()) return Mono.error(new ForbiddenException());
 - [ ] `@Valid` on all `@RequestBody` parameters
 - [ ] No empty catch blocks; no sensitive data in logs
 - [ ] Tests written for all new code
+- [ ] No fully-qualified class names inline — all types referenced via `import`

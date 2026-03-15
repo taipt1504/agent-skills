@@ -40,6 +40,26 @@
 - NEVER swallow errors silently (`onErrorReturn(null)`)
 - NEVER `throw` in `map` — use `flatMap` + `Mono.error()`
 
+## Imports
+
+- ALWAYS use `import` statements for all class references — NEVER inline fully-qualified names
+- Exception: unavoidable name conflicts (two classes with same simple name in one file)
+
+```java
+// ❌ NEVER
+private java.util.List<java.math.BigDecimal> prices;
+reactor.core.publisher.Mono<com.example.Order> order = repository.findById(id);
+
+// ✅ ALWAYS
+import java.util.List;
+import java.math.BigDecimal;
+import reactor.core.publisher.Mono;
+import com.example.Order;
+
+private List<BigDecimal> prices;
+Mono<Order> order = repository.findById(id);
+```
+
 ## Code Quality Checklist
 
 - [ ] Immutability patterns followed (no setters, builders/records)
@@ -52,6 +72,7 @@
 - [ ] No god classes — single responsibility per class
 - [ ] No anemic domain models — entities have behavior
 - [ ] Constructor injection only — no `@Autowired` on fields
+- [ ] No inline fully-qualified class names — use import statements
 
 ## Detailed Patterns
 

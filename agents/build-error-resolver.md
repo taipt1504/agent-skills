@@ -259,7 +259,27 @@ dependencies {
 // Don't modify existing migrations in production!
 ```
 
-**Pattern 10: R2DBC Mapping Error**
+**Pattern 10a: Fully-Qualified Name Instead of Import**
+
+When encountering `cannot find symbol` or when fixing any missing-class error, ALWAYS add an
+`import` statement — NEVER resolve it by inlining the fully-qualified name in code.
+
+```java
+// ❌ WRONG FIX: inline FQN
+private java.util.List<reactor.core.publisher.Mono<com.example.Order>> results;
+
+// ✅ CORRECT FIX: add imports
+import java.util.List;
+import reactor.core.publisher.Mono;
+import com.example.Order;
+
+private List<Mono<Order>> results;
+```
+
+This rule applies everywhere: field declarations, method return types, local variables,
+generic type parameters, and annotation attributes.
+
+**Pattern 10b: R2DBC Mapping Error**
 
 ```java
 // ❌ ERROR: Could not read property 'createdAt' from result set
@@ -346,6 +366,7 @@ testImplementation 'org.testcontainers:kafka'
 ✅ Add missing dependencies in build.gradle
 ✅ Fix reactive chain issues
 ✅ Add missing constructors
+✅ Resolve "cannot find symbol" with `import` — never with inline FQN
 
 ### DON'T:
 

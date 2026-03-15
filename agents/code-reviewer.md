@@ -43,6 +43,7 @@ When invoked:
 | Magic Numbers | `if (count > 3)` | `static final int MAX_RETRIES = 3` |
 | God Class | Service doing payments + notifications | Split by responsibility |
 | Duplicated Code | Same logic in 2+ places | Extract shared method |
+| Fully-Qualified Names | `java.util.List<com.example.Order>` inline | Add `import` — never use FQN in code body |
 
 ### Algorithms & Performance (MEDIUM)
 
