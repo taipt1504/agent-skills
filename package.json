@@ -1,6 +1,6 @@
 {
   "name": "@devco/agent-skills",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Battle-tested Claude Code plugin for Java/Spring WebFlux stack — agents, skills, hooks, commands, and rules for reactive microservices development",
   "keywords": [
     "claude-code",
@@ -34,7 +34,8 @@
     "templates/",
     "CLAUDE.md",
     "WORKING_WORKFLOW.md",
-    ".claude-plugin/"
+    ".claude-plugin/",
+    ".mcp.json"
   ],
   "scripts": {
     "test": "bash scripts/ci/run-all.sh",
