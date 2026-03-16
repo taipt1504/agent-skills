@@ -108,8 +108,9 @@ com.example.{service}/
 5. Commit secrets to git
 6. Skip input validation
 7. `SELECT *` in queries
-8. Write code without `/plan` + `/spec`
-9. Commit on behalf of user
+8. Inline fully-qualified class names — use `import` statements, never `java.util.List<com.example.Order>`
+9. Write code without `/plan` + `/spec`
+10. Commit on behalf of user
 
 ### ALWAYS
 1. Constructor injection (`@RequiredArgsConstructor`)
