@@ -19,6 +19,17 @@
 #   strict:   + java-format, evaluate-session, pre-compact
 # =============================================================================
 
+# ---------------------------------------------------------------------------
+# Self-heal CLAUDE_PLUGIN_ROOT (bug #27145: not set for SessionStart/SessionEnd)
+# Derive from this script's own location: scripts/hooks/run-with-flags.sh → plugin root
+# ---------------------------------------------------------------------------
+if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+  if [ -n "$_SELF_DIR" ]; then
+    export CLAUDE_PLUGIN_ROOT="$(cd "$_SELF_DIR/../.." 2>/dev/null && pwd)"
+  fi
+fi
+
 _HOOK_NAME="${1:-}"
 _HOOK_PROFILE="${HOOK_PROFILE:-standard}"
 
@@ -28,10 +39,10 @@ case "$_HOOK_PROFILE" in
     _ENABLED_HOOKS="session-start session-end cost-tracker"
     ;;
   standard)
-    _ENABLED_HOOKS="session-start session-end cost-tracker suggest-compact java-compile-check check-debug-statements"
+    _ENABLED_HOOKS="session-start session-end cost-tracker suggest-compact java-compile-check check-debug-statements observe"
     ;;
   strict)
-    _ENABLED_HOOKS="session-start session-end cost-tracker suggest-compact java-compile-check check-debug-statements java-format evaluate-session pre-compact"
+    _ENABLED_HOOKS="session-start session-end cost-tracker suggest-compact java-compile-check check-debug-statements observe java-format evaluate-session pre-compact"
     ;;
   *)
     # Unknown profile — default to standard

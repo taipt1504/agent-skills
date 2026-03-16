@@ -6,181 +6,136 @@ Provides a complete development workflow: planning → spec → TDD → verifica
 
 ## Quick Start
 
-### 1. Install
-
-#### Method 1: GitHub Marketplace (Recommended)
+### Step 1 — Install the plugin (one-time per machine)
 
 ```bash
-# Register the marketplace source (one-time)
 /plugin marketplace add taipt1504/agent-skills
-
-# Install the plugin
 /plugin install devco-agent-skills
 ```
 
-#### Method 2: npm
+After install, **all skills, agents, commands, and hooks are active immediately**. You can start using `/plan`, `/spec`, `/verify`, and all 27 skills right away.
+
+### Step 2 — Run project setup (one-time per project, lead dev only)
+
+From your **project root**, run:
+
+```
+/setup
+```
+
+This installs project context under `.claude/`:
+
+| Component | What | Auto-loaded |
+|-----------|------|-------------|
+| `.claude/CLAUDE.md` | Tech stack, 7-phase workflow, critical rules | ✅ Every session |
+| `.claude/WORKING_WORKFLOW.md` | Full workflow reference (1055 lines) | When referenced |
+| `.claude/rules/` | 15 coding rules (style, reactive, security, testing) | ✅ Every session |
+| `.claude/settings.json` | Hook wiring + team auto-install config | ✅ Every session |
+| `.claude/memory/` | Structured session & knowledge storage | ✅ Auto-initialized |
+
+### Step 3 — Commit and share (team gets it for free)
+
+```bash
+git add .claude/
+git commit -m "chore: add Claude Code project context"
+```
+
+After this commit, **every teammate who clones the repo**:
+- Gets all rules, workflow, and hooks automatically — zero setup needed
+- Is prompted to install the plugin on first `claude` run (via `extraKnownMarketplaces`)
+
+### Step 4 — Verify (optional)
+
+```
+/status
+```
+
+Shows what's installed, what's missing, and how to fix it.
+
+### Step 5 — Start coding
+
+Start with `/plan` for any non-trivial task. The 7-phase workflow is enforced automatically.
+
+### Alternative install methods
+
+<details>
+<summary>npm install</summary>
 
 ```bash
 npm install -g @devco/agent-skills
 claude plugin install ./node_modules/@devco/agent-skills
 ```
+</details>
 
-#### Method 3: Manual Clone (Fallback)
+<details>
+<summary>Manual clone</summary>
 
 ```bash
 git clone https://github.com/taipt1504/agent-skills.git ~/.claude/plugins/agent-skills
 claude plugin install ~/.claude/plugins/agent-skills
 ```
+</details>
 
-### 2. Run Setup (Required — once per project)
+<details>
+<summary>Refresh after plugin update</summary>
 
-> **Why this step is necessary:** Claude Code plugins register skills, agents, and hooks automatically,
-> but they cannot inject `CLAUDE.md` or workflow files into your project.
-> The `/setup` command copies the plugin's context directly into your project root so Claude
-> loads them automatically every session.
-
-From your **project's root directory**, open Claude Code and run:
-
-```
+```bash
 /setup
+# or: bash ~/.claude/plugins/cache/devco-agent-skills/scripts/setup.sh --update
 ```
-
-**What `/setup` installs into your project** (all under `.claude/`):
-
-| File/Dir | Auto-loaded by Claude | Contains |
-|---|---|---|
-| `.claude/CLAUDE.md` | ✅ Every session for this project | Tech stack, 7-phase workflow, critical rules |
-| `.claude/WORKING_WORKFLOW.md` | When referenced from CLAUDE.md | Full 7-phase workflow reference (1055 lines) |
-| `.claude/rules/` | ✅ Every session for this project | Coding style, reactive, security, testing rules |
-
-**Commit and share with your team:**
-
-```bash
-git add .claude/CLAUDE.md .claude/WORKING_WORKFLOW.md .claude/rules/
-git commit -m "chore: add Claude Code project context"
-```
-
-Once committed, every teammate who clones the repo gets the full context — no manual setup needed.
-
-**Optional: also install globally** (loads rules in every project on this machine):
-
-```bash
-bash ~/.claude/plugins/cache/devco-agent-skills/scripts/setup.sh --global
-```
-
-**After a plugin update**, refresh the installed content:
-
-```bash
-bash ~/.claude/plugins/cache/devco-agent-skills/scripts/setup.sh --update
-```
-
-### 3. Configure Hooks (if not auto-registered)
-
-Hooks are registered automatically when installed via marketplace or npm. To configure manually, add to `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      { "command": ".claude/scripts/hooks/session-start.sh" }
-    ],
-    "SessionEnd": [
-      { "command": ".claude/scripts/hooks/session-end.sh" }
-    ],
-    "PreToolUse": [
-      { "command": ".claude/scripts/hooks/suggest-compact.sh" }
-    ],
-    "PostToolUse": [
-      { "command": ".claude/scripts/hooks/java-compile-check.sh" },
-      { "command": ".claude/scripts/hooks/java-format.sh" }
-    ],
-    "PreCompact": [
-      { "command": ".claude/scripts/hooks/pre-compact.sh" }
-    ],
-    "Stop": [
-      { "command": ".claude/scripts/hooks/check-debug-statements.sh" },
-      { "command": ".claude/scripts/hooks/evaluate-session.sh" }
-    ]
-  }
-}
-```
-
-### 4. Add Project Guidelines (Optional)
-
-Copy the template to your project root and customize:
-
-```bash
-cp templates/PROJECT_GUIDELINES_TEMPLATE.md ./PROJECT_GUIDELINES.md
-```
-
-### 5. Start a Session
-
-Claude Code will automatically load the workflow. Start with `/plan` for any non-trivial task.
+</details>
 
 ---
 
 ## Team Onboarding
 
-Complete setup checklist for a new team member. Steps 1–2 run once per machine; steps 3–4 run once per project repo.
-
-### Step 1 — Install the plugin (per machine)
-
-```bash
-# Register the marketplace source
-/plugin marketplace add taipt1504/agent-skills
-
-# Install the plugin
-/plugin install devco-agent-skills
-```
-
-### Step 2 — Configure hooks (per machine)
-
-Hooks are registered automatically when installed via marketplace. If manual configuration is
-needed, see [Configure Hooks](#3-configure-hooks).
-
-Hook profiles (`minimal`, `standard`, `strict`) are controlled via the `HOOK_PROFILE` env var.
-
-### Step 3 — Run project setup (per project repo, required)
-
-From the **project root**, open Claude Code and run:
+### For the lead dev (one-time, then committed to git)
 
 ```
-/setup
+1. /plugin marketplace add taipt1504/agent-skills
+2. /plugin install devco-agent-skills
+3. /setup
+4. git add .claude/ && git commit -m "chore: add Claude Code project context"
+5. (Optional) cp templates/PROJECT_GUIDELINES_TEMPLATE.md ./PROJECT_GUIDELINES.md
 ```
 
-This installs `CLAUDE.md`, `WORKING_WORKFLOW.md`, and `rules/` under `.claude/`.
-**Commit these files** so every teammate gets the context on clone — no manual setup needed for them:
+### For every teammate after that
 
-```bash
-git add .claude/CLAUDE.md .claude/WORKING_WORKFLOW.md .claude/rules/
-git commit -m "chore: add Claude Code project context"
+```
+1. git clone <repo>
+2. claude                 ← prompted to install plugin automatically
+3. Start coding           ← all rules, hooks, memory already in .claude/
 ```
 
-Verify it worked:
-```bash
-test -f .claude/CLAUDE.md           && echo "✅ CLAUDE.md"
-test -f .claude/WORKING_WORKFLOW.md && echo "✅ WORKING_WORKFLOW.md"
-ls .claude/rules/ 2>/dev/null | head -3 && echo "✅ Rules"
-```
-
-### Step 4 — Add Project Guidelines (per project repo, recommended)
-
-```bash
-cp templates/PROJECT_GUIDELINES_TEMPLATE.md /path/to/your/project/PROJECT_GUIDELINES.md
-```
-
-Customize with project-specific rules: architecture decisions, naming conventions, dependency
-choices, etc. The `session-start` hook loads this file automatically at every session start.
+No `/setup` needed — everything is in git. The `extraKnownMarketplaces` config
+in `.claude/settings.json` auto-prompts plugin installation on first `claude` run.
 
 ### What auto-loads and when
 
-| What | When loaded | Requires setup? |
-|---|---|---|
-| `~/.claude/CLAUDE.md` (plugin rules) | Every session, every project | ✅ Run `/setup` once |
-| `.claude/rules/` (project rules) | Every session in this project | ✅ Run `--project` setup or commit the dir |
-| `PROJECT_GUIDELINES.md` | Every session in this project | Create from template |
-| Session context (workflow reminder) | Every session start via hook stdout | Automatic |
-| Skills / agents / commands | On demand | Automatic (registered by plugin) |
+| Component | Loaded when | Source | Requires setup? |
+|-----------|------------|--------|----------------|
+| Skills, agents, commands | On demand | Plugin install | No — auto-registered |
+| Hooks (10 scripts) | Every session | `.claude/settings.json` | No — committed to git |
+| CLAUDE.md (rules) | Every session | `.claude/CLAUDE.md` | `/setup` once, then git |
+| Workflow reference | When referenced | `.claude/WORKING_WORKFLOW.md` | `/setup` once, then git |
+| Rules (15 files) | Every session | `.claude/rules/` | `/setup` once, then git |
+| Memory (sessions) | Session start/end | `.claude/memory/` | Auto-initialized |
+| Knowledge graph | On demand (MCP) | `.claude/memory/knowledge-graph.jsonl` | Auto-created |
+| Plugin marketplace | First `claude` run | `.claude/settings.json` | `/setup` once, then git |
+
+### Hook profiles
+
+Controlled via `HOOK_PROFILE` env var. Default: `standard`.
+
+| Profile | Hooks active |
+|---------|-------------|
+| `minimal` | session-start, session-end, cost-tracker |
+| `standard` | + suggest-compact, java-compile-check, check-debug-statements, observe |
+| `strict` | + java-format, evaluate-session, pre-compact |
+
+### Health check
+
+Run `/status` to see what's installed and what's missing.
 
 ### Shared Settings (Optional)
 
@@ -212,7 +167,7 @@ agent-skills/
 │       ├── redis.json
 │       ├── kafka.json
 │       └── playwright.json
-├── agents/                                # 14 specialized sub-agents
+├── agents/                                # 15 specialized sub-agents
 │   ├── architect.md
 │   ├── blackbox-test-runner.md
 │   ├── build-error-resolver.md
@@ -224,6 +179,7 @@ agent-skills/
 │   ├── rabbitmq-reviewer.md
 │   ├── refactor-cleaner.md
 │   ├── security-reviewer.md
+│   ├── spec-writer.md
 │   ├── spring-reviewer.md
 │   ├── spring-webflux-reviewer.md
 │   └── tdd-guide.md
@@ -342,7 +298,7 @@ agent-skills/
 
 ---
 
-## Agents (14)
+## Agents (15)
 
 Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 
@@ -359,6 +315,7 @@ Specialized sub-agents invoked by orchestration commands. All use `model: opus`.
 | `rabbitmq-reviewer` | RabbitMQ config, message handling, DLQ setup, and Spring AMQP review |
 | `refactor-cleaner` | Dead code cleanup and consolidation — safely removes unused dependencies, classes, and methods |
 | `security-reviewer` | Security vulnerability detection — OWASP Top 10, secrets, injection, insecure crypto, reactive-specific issues |
+| `spec-writer` | Generates behavioral specifications from approved plans — contracts, scenarios, test mappings, task decomposition (opus) |
 | `spring-reviewer` | Spring Boot + MVC review — dependency injection, controllers, validation, security, configuration, testing |
 | `spring-webflux-reviewer` | Reactive programming review — backpressure handling, non-blocking patterns, Project Reactor best practices |
 | `tdd-guide` | TDD enforcement specialist — write-tests-first methodology with JUnit 5, Mockito, Testcontainers, 80%+ coverage |

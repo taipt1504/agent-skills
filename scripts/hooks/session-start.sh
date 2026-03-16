@@ -45,6 +45,16 @@ log "Project: $PROJECT_NAME"
 log "Root: $PROJECT_ROOT"
 
 # ---------------------------------------------------------------------------
+# 0. Auto-init memory directory if missing (non-destructive)
+# ---------------------------------------------------------------------------
+
+MEMORY_INIT="${CLAUDE_PLUGIN_ROOT:-$PROJECT_ROOT}/scripts/memory/init.sh"
+if [ ! -d ".claude/memory" ] && [ -x "$MEMORY_INIT" ]; then
+  bash "$MEMORY_INIT" "$PROJECT_ROOT" 2>/dev/null || true
+  log "Memory directory auto-initialized"
+fi
+
+# ---------------------------------------------------------------------------
 # 1. Detect project type
 # ---------------------------------------------------------------------------
 
@@ -311,9 +321,21 @@ if [ -f "$GRAPH_FILE" ]; then
   fi
 fi
 
-# --- Setup warning ---
+# --- Tier 0 fallback: inject CLAUDE.md inline when /setup hasn't been run ---
 if [ ! -f ".claude/CLAUDE.md" ] && ! grep -q "devco-agent-skills:start" "$HOME/.claude/CLAUDE.md" 2>/dev/null; then
-  CONTEXT="${CONTEXT}> ⚠️  Plugin rules not installed: Run \`/setup\` to initialize project context.\n"
+  # Try to inject core rules from the plugin's own CLAUDE.md so Tier 0 users still get context
+  PLUGIN_CLAUDE_MD="${CLAUDE_PLUGIN_ROOT:-$PROJECT_ROOT}/CLAUDE.md"
+  if [ -f "$PLUGIN_CLAUDE_MD" ]; then
+    INLINE_RULES="$(head -80 "$PLUGIN_CLAUDE_MD" 2>/dev/null || true)"
+    if [ -n "$INLINE_RULES" ]; then
+      CONTEXT="${CONTEXT}## Plugin Context (run /setup for full project setup)\n\n"
+      # Escape newlines for printf %b
+      INLINE_ESC="$(echo "$INLINE_RULES" | sed 's/\\/\\\\/g' | while IFS= read -r line; do printf '%s\\n' "$line"; done)"
+      CONTEXT="${CONTEXT}${INLINE_ESC}\n\n"
+    fi
+  else
+    CONTEXT="${CONTEXT}> ⚠️  Plugin rules not installed: Run \`/setup\` to initialize project context.\n"
+  fi
 fi
 
 # --- Fallback: legacy session context (if structured memory not available) ---
