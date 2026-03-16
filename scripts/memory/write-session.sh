@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Write a structured session to .claude/memory/sessions/
 # Usage: write-session.sh <session_id> <branch> <files_modified_count> <user_messages> <tool_calls> <summary_text>
-set -euo pipefail
+# NOTE: No set -euo pipefail — called from hooks that must never fail.
 
 SESSION_ID="${1:?session_id required}"
 BRANCH="${2:-unknown}"
@@ -20,48 +20,61 @@ mkdir -p "$SESSIONS_DIR"
 [ -f "$INDEX_FILE" ] || echo '{"sessions":[]}' > "$INDEX_FILE"
 
 DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-DATE_SHORT="$(date '+%Y-%m-%d')"
 
-# JSON-escape a string (no jq dependency)
-json_esc() {
-  local s="$1"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  s="${s//$'\n'/\\n}"
-  echo "$s"
+# Write full session JSON via python3 (safe escaping) or fallback
+SESSION_FILE="$SESSIONS_DIR/${SESSION_ID}.json"
+
+if command -v python3 &>/dev/null; then
+  # Use python3 for safe JSON generation — no shell escaping issues
+  python3 - "$SESSION_FILE" "$INDEX_FILE" "$SESSION_ID" "$BRANCH" "$SUMMARY" "$FILES_COUNT" "$USER_MESSAGES" "$TOOL_CALLS" "$DATE" <<'PYEOF'
+import json, sys
+
+session_file = sys.argv[1]
+index_file = sys.argv[2]
+session_id = sys.argv[3]
+branch = sys.argv[4]
+summary = sys.argv[5]
+files_count = int(sys.argv[6])
+user_messages = int(sys.argv[7])
+tool_calls = int(sys.argv[8])
+date = sys.argv[9]
+
+entry = {
+    "id": session_id,
+    "date": date,
+    "branch": branch,
+    "summary": summary,
+    "files_modified": files_count,
+    "user_messages": user_messages,
+    "tool_calls": tool_calls
 }
 
 # Write full session JSON
-SESSION_FILE="$SESSIONS_DIR/${SESSION_ID}.json"
-cat > "$SESSION_FILE" <<EOF
-{
-  "id": "$(json_esc "$SESSION_ID")",
-  "date": "$DATE",
-  "branch": "$(json_esc "$BRANCH")",
-  "summary": "$(json_esc "$SUMMARY")",
-  "files_modified": $FILES_COUNT,
-  "user_messages": $USER_MESSAGES,
-  "tool_calls": $TOOL_CALLS
-}
-EOF
+with open(session_file, 'w') as f:
+    json.dump(entry, f, indent=2)
 
-# Update index: prepend new session entry, keep last N sessions
-# Read existing index, inject new entry at front using awk/sed (no jq)
-NEW_ENTRY="{\"id\":\"$(json_esc "$SESSION_ID")\",\"date\":\"$DATE\",\"branch\":\"$(json_esc "$BRANCH")\",\"summary\":\"$(json_esc "$SUMMARY")\",\"files_modified\":$FILES_COUNT}"
+# Update index: prepend, cap at 50
+try:
+    with open(index_file) as f:
+        idx = json.load(f)
+except (json.JSONDecodeError, FileNotFoundError):
+    idx = {"sessions": []}
 
-if command -v python3 &>/dev/null; then
-  # Use python3 for reliable JSON manipulation
-  python3 -c "
-import json, sys
-idx = json.load(open('$INDEX_FILE'))
-entry = json.loads('$NEW_ENTRY')
-idx['sessions'].insert(0, entry)
-idx['sessions'] = idx['sessions'][:50]  # cap at 50
-json.dump(idx, open('$INDEX_FILE','w'), indent=2)
-" 2>/dev/null || true
+index_entry = {"id": session_id, "date": date, "branch": branch, "summary": summary, "files_modified": files_count}
+idx["sessions"].insert(0, index_entry)
+idx["sessions"] = idx["sessions"][:50]
+
+with open(index_file, 'w') as f:
+    json.dump(idx, f, indent=2)
+PYEOF
+
 else
-  # Fallback: just overwrite with single entry (lossy but safe)
-  echo "{\"sessions\":[$NEW_ENTRY]}" > "$INDEX_FILE"
+  # Fallback: write minimal JSON without shell escaping risks
+  # Only safe for simple ASCII strings
+  cat > "$SESSION_FILE" <<EOF
+{"id":"$SESSION_ID","date":"$DATE","branch":"$BRANCH","summary":"session","files_modified":$FILES_COUNT,"user_messages":$USER_MESSAGES,"tool_calls":$TOOL_CALLS}
+EOF
+  echo "{\"sessions\":[{\"id\":\"$SESSION_ID\",\"date\":\"$DATE\",\"branch\":\"$BRANCH\",\"summary\":\"session\",\"files_modified\":$FILES_COUNT}]}" > "$INDEX_FILE"
 fi
 
 echo "$SESSION_FILE"

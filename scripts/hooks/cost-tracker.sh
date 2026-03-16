@@ -15,7 +15,7 @@
 #   CLAUDE_SESSION_ID     — Session identifier
 # =============================================================================
 
-set -euo pipefail
+# NOTE: No set -euo pipefail — hooks must ALWAYS exit 0.
 
 source "$(dirname "$0")/run-with-flags.sh" "cost-tracker" || exit 0
 
@@ -34,7 +34,9 @@ mkdir -p "$(dirname "$COST_LOG")"
 INPUT=""
 if [ ! -t 0 ]; then
   INPUT="$(cat)"
-  echo "$INPUT"
+  if [ -n "$INPUT" ]; then
+    echo "$INPUT"
+  fi
 fi
 
 # Try to extract token counts from input JSON
@@ -42,17 +44,17 @@ INPUT_TOKENS=0
 OUTPUT_TOKENS=0
 
 if [ -n "$INPUT" ] && command -v python3 &>/dev/null; then
-  TOKENS="$(python3 -c "
+  TOKENS="$(echo "$INPUT" | python3 -c "
 import json, sys
 try:
-    data = json.loads(sys.argv[1])
+    data = json.load(sys.stdin)
     usage = data.get('usage', data.get('token_usage', {}))
     inp = usage.get('input_tokens', usage.get('prompt_tokens', 0))
     out = usage.get('output_tokens', usage.get('completion_tokens', 0))
     print(f'{inp} {out}')
 except:
     print('0 0')
-" "$INPUT" 2>/dev/null || echo "0 0")"
+" 2>/dev/null || echo "0 0")"
   INPUT_TOKENS="${TOKENS%% *}"
   OUTPUT_TOKENS="${TOKENS##* }"
 fi
@@ -61,9 +63,9 @@ fi
 # opus: $15/1M input, $75/1M output
 # sonnet: $3/1M input, $15/1M output
 # haiku: $0.25/1M input, $1.25/1M output
-# Default to sonnet pricing as most common
-COST_PER_INPUT=3    # per 1M tokens (sonnet)
-COST_PER_OUTPUT=15  # per 1M tokens (sonnet)
+# Default to sonnet pricing as most common; override via env vars
+COST_PER_INPUT="${COST_PER_INPUT_PER_1M:-3}"
+COST_PER_OUTPUT="${COST_PER_OUTPUT_PER_1M:-15}"
 
 # Calculate estimated cost in millicents for precision
 if [ "$INPUT_TOKENS" -gt 0 ] || [ "$OUTPUT_TOKENS" -gt 0 ]; then

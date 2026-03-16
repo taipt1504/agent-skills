@@ -27,20 +27,21 @@ FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E '\.(java)$' || true)
 HAS_DEBUG=false
 
 # Check each file for debug statements
-for FILE in $FILES; do
+echo "$FILES" | while IFS= read -r FILE; do
+    [ -z "$FILE" ] && continue
     if [ -f "$FILE" ]; then
         # Check for System.out.println
         if grep -q 'System\.out\.println\|System\.err\.println' "$FILE" 2>/dev/null; then
             echo "[Hook] WARNING: System.out.println found in $FILE" >&2
             HAS_DEBUG=true
         fi
-        
+
         # Check for e.printStackTrace()
         if grep -q '\.printStackTrace()' "$FILE" 2>/dev/null; then
             echo "[Hook] WARNING: e.printStackTrace() found in $FILE" >&2
             HAS_DEBUG=true
         fi
-        
+
         # Check for @Disabled tests (might be intentional but worth warning)
         if grep -q '@Disabled' "$FILE" 2>/dev/null; then
             echo "[Hook] INFO: @Disabled test found in $FILE" >&2
@@ -53,4 +54,4 @@ if [ "$HAS_DEBUG" = true ]; then
 fi
 
 # Output original data
-echo "$DATA"
+[ -n "$DATA" ] && echo "$DATA"

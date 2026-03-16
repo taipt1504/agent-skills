@@ -25,6 +25,8 @@ if [[ ! "$FILE_PATH" =~ \.java$ ]]; then
 fi
 
 # Try to format with Spotless (Gradle)
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+cd "$PROJECT_ROOT" 2>/dev/null || true
 if [ -f "gradlew" ]; then
     ./gradlew spotlessApply -q 2>/dev/null || true
 elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then

@@ -20,7 +20,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 cd "$PROJECT_ROOT" 2>/dev/null || true
 
 # Session tracking
-SESSION_ID="${CLAUDE_SESSION_ID:-${PPID:-default}}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$(echo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | cksum | cut -d' ' -f1)}"
 TEMP_DIR="${TMPDIR:-/tmp}"
 COUNTER_FILE="$TEMP_DIR/claude-tool-count-$SESSION_ID"
 THRESHOLD="${COMPACT_THRESHOLD:-50}"

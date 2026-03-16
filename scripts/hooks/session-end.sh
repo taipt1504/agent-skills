@@ -17,7 +17,8 @@
 #
 # ============================================================================
 
-set -euo pipefail
+# NOTE: No set -euo pipefail — hooks must ALWAYS exit 0.
+# Errors handled explicitly at each call site.
 
 # Profile gate — exit if not enabled for current HOOK_PROFILE
 source "$(dirname "$0")/run-with-flags.sh" "session-end" || exit 0
@@ -40,6 +41,16 @@ portable_date() {
 count_grep() {
     grep -c "$1" "$2" 2>/dev/null || echo 0
 }
+
+# ---------------------------------------------------------------------------
+# Read stdin IMMEDIATELY (Stop hook may pass session data as JSON)
+# Must happen before any other operation — stdin can only be read once.
+# ---------------------------------------------------------------------------
+
+STDIN_DATA=""
+if [ ! -t 0 ]; then
+    STDIN_DATA="$(cat 2>/dev/null || true)"
+fi
 
 # ---------------------------------------------------------------------------
 # Project root detection (works with worktrees)
@@ -137,13 +148,13 @@ QUALIFIES_FOR_LEARNING=false
 
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
     # Count user messages (JSON lines format: look for "type":"user" or role":"user")
-    USER_MESSAGES="$(count_grep '"type":"user"\|"role":"user"' "$TRANSCRIPT_PATH")"
+    USER_MESSAGES="$(grep -cE '"type":"user"|"role":"user"' "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)"
 
     # Count tool calls (look for tool_use blocks or "type":"tool_use")
-    TOOL_CALLS="$(count_grep '"type":"tool_use"\|"tool_use"\|"type":"tool_result"' "$TRANSCRIPT_PATH")"
+    TOOL_CALLS="$(grep -cE '"type":"tool_use"|"type":"tool_result"' "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)"
 
     # Total message blocks (rough: count "type" occurrences as proxy)
-    TOTAL_MESSAGES="$(count_grep '"type":' "$TRANSCRIPT_PATH")"
+    TOTAL_MESSAGES="$(grep -c '"type":' "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)"
 
     # Try to get session start time from file modification time of transcript
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -182,7 +193,7 @@ fi
 if [ -z "$SESSION_STARTED" ]; then
     EXISTING_TMP="$(find "$SESSIONS_DIR" -name "${TODAY}-${SHORT_ID}-session.tmp" 2>/dev/null | head -1)"
     if [ -n "$EXISTING_TMP" ] && [ -f "$EXISTING_TMP" ]; then
-        SESSION_STARTED="$(grep -oP '(?<=\*\*Started:\*\* )\S+' "$EXISTING_TMP" 2>/dev/null || echo "")"
+        SESSION_STARTED="$(grep -o '\*\*Started:\*\* [^ ]*' "$EXISTING_TMP" 2>/dev/null | sed 's/\*\*Started:\*\* //' || echo "")"
     fi
 fi
 
@@ -205,13 +216,8 @@ if git rev-parse --is-inside-work-tree &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# Parse stdin JSON for session metadata (Stop hook passes session data)
+# Parse stdin JSON for session metadata (read earlier at script start)
 # ---------------------------------------------------------------------------
-
-STDIN_DATA=""
-if [ ! -t 0 ]; then
-    STDIN_DATA="$(cat 2>/dev/null || true)"
-fi
 
 # Extract fields from stdin JSON (if available)
 if [ -n "$STDIN_DATA" ] && command -v python3 &>/dev/null; then
@@ -391,12 +397,14 @@ if curl -sf --max-time 2 "http://localhost:${CLAUDE_MEM_PORT}/health" > /dev/nul
     # Build JSON payload (manual — no jq dependency)
     # Escape special chars in strings for JSON safety
     json_escape() {
-        local s="$1"
-        s="${s//\\/\\\\}"     # backslash
-        s="${s//\"/\\\"}"     # double quote
-        s="${s//$'\n'/\\n}"   # newline
-        s="${s//$'\t'/\\t}"   # tab
-        echo "$s"
+        if command -v python3 &>/dev/null; then
+            python3 -c "import json,sys; print(json.dumps(sys.argv[1])[1:-1])" "$1" 2>/dev/null || echo "$1"
+        else
+            local s="$1"
+            s="${s//\\/\\\\}"
+            s="${s//\"/\\\"}"
+            printf '%s' "$s" | tr '\n' ' ' | tr '\t' ' '
+        fi
     }
 
     JSON_FILES_LIST=""
@@ -436,7 +444,7 @@ JSONEOF
         -w "%{http_code}" \
         "$CLAUDE_MEM_URL" 2>/dev/null || echo "000")"
 
-    if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ] 2>/dev/null; then
+    if [[ "$HTTP_CODE" =~ ^[0-9]+$ ]] && [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ] 2>/dev/null; then
         log "Session saved to claude-mem (HTTP ${HTTP_CODE})"
     else
         log "claude-mem POST returned HTTP ${HTTP_CODE} (session file still saved locally)"

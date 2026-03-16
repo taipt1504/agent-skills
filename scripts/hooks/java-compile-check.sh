@@ -37,11 +37,22 @@ done
 
 cd "$PROJECT_ROOT"
 
-# Run compile check with Gradle
+# Run compile check with Gradle (timeout 30s to prevent hanging)
+# macOS lacks GNU timeout; fall back to perl-based equivalent if needed
+_run_with_timeout() {
+    if command -v timeout &>/dev/null; then
+        timeout 30 "$@"
+    elif command -v perl &>/dev/null; then
+        perl -e 'alarm 30; exec @ARGV' -- "$@"
+    else
+        "$@"
+    fi
+}
+
 if [ -f "gradlew" ]; then
-    RESULT=$(./gradlew compileJava --console=plain 2>&1) || true
+    RESULT=$(_run_with_timeout ./gradlew compileJava --console=plain 2>&1) || RESULT=""
 elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
-    RESULT=$(gradle compileJava --console=plain 2>&1) || true
+    RESULT=$(_run_with_timeout gradle compileJava --console=plain 2>&1) || RESULT=""
 else
     echo "$DATA"
     exit 0
@@ -57,3 +68,4 @@ if [ -n "$ERRORS" ]; then
 fi
 
 echo "$DATA"
+exit 0

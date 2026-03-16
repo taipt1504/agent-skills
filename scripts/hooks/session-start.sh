@@ -14,7 +14,8 @@
 # Dependencies:   git, find, grep, curl (optional, for claude-mem)
 # =============================================================================
 
-set -euo pipefail
+# NOTE: No set -euo pipefail — hooks must ALWAYS exit 0, so we handle errors
+# explicitly at each call site (|| true). set -e would cause premature abort.
 
 # Profile gate — exit if not enabled for current HOOK_PROFILE
 source "$(dirname "$0")/run-with-flags.sh" "session-start" || exit 0
@@ -325,8 +326,9 @@ if [ ! -x "$READ_CONTEXT" ] && [ -d ".claude/sessions" ]; then
 fi
 
 # Output: plain text to stdout (Claude reads as context)
-# The CONTEXT variable uses \n for newlines — expand them
-printf '%b' "$CONTEXT"
+# Use printf %b to expand \n sequences in CONTEXT
+# Safe: all user-facing data (PROJECT_NAME, BRANCH) goes through log() to stderr, not CONTEXT
+printf '%b' "$CONTEXT" 2>/dev/null || true
 
 # Verbose diagnostics on stderr (terminal only)
 log "Workflow: PLAN → BUILD (TDD) → VERIFY → REVIEW → DELIVER"

@@ -31,16 +31,9 @@ PROJECT_NAME="$(basename "$PROJECT_ROOT")"
 SESSIONS_DIR=".claude/sessions"
 COMPACTION_LOG="$SESSIONS_DIR/compaction-log.txt"
 
-# Cross-platform timestamp (macOS date vs GNU date)
-if date --version >/dev/null 2>&1; then
-  # GNU/Linux
-  TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-  ISO_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-else
-  # macOS/BSD
-  TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-  ISO_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-fi
+# Timestamp (portable — same format on macOS and GNU/Linux)
+TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+ISO_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 TIME_STR=$(date "+%H:%M")
 
 # Ensure directory exists
@@ -111,19 +104,24 @@ fi
 
 # Save active files list to session recovery file
 RECOVERY_FILE="$SESSIONS_DIR/pre-compact-${SESSION_ID}.json"
+TMPJSON_RECOVERY="$(mktemp)"
+echo "$ACTIVE_FILES_JSON" > "$TMPJSON_RECOVERY"
 python3 -c "
 import json
+with open('$TMPJSON_RECOVERY') as f:
+    active_files = json.load(f)
 recovery = {
     'timestamp': '$ISO_TIMESTAMP',
     'session': '$SESSION_ID',
     'project': '$PROJECT_NAME',
-    'active_files': json.loads('''$ACTIVE_FILES_JSON'''),
+    'active_files': active_files,
     'compaction_marker': True
 }
 with open('$RECOVERY_FILE', 'w') as f:
     json.dump(recovery, f, indent=2)
     f.write('\n')
 " 2>/dev/null || true
+rm -f "$TMPJSON_RECOVERY"
 
 # ── 4. Collect active instincts ──────────────────────────────────────
 INSTINCTS_DIR="${HOME}/.claude/homunculus/instincts/personal"
@@ -191,6 +189,11 @@ _send_to_claude_mem() {
 
   # Parse config and build payload
   local payload_output
+  local TMPJSON_FILES TMPJSON_INSTINCTS
+  TMPJSON_FILES="$(mktemp)"
+  TMPJSON_INSTINCTS="$(mktemp)"
+  echo "$ACTIVE_FILES_JSON" > "$TMPJSON_FILES"
+  echo "$ACTIVE_INSTINCTS_JSON" > "$TMPJSON_INSTINCTS"
   payload_output=$(python3 -c "
 import json
 
@@ -211,8 +214,10 @@ timeout = cfg.get('timeout_seconds', 2)
 reason = 'auto'
 # Could be enhanced: check if user-requested via env var, etc.
 
-active_files = json.loads('''$ACTIVE_FILES_JSON''')
-active_instincts = json.loads('''$ACTIVE_INSTINCTS_JSON''')
+with open('$TMPJSON_FILES') as f:
+    active_files = json.load(f)
+with open('$TMPJSON_INSTINCTS') as f:
+    active_instincts = json.load(f)
 
 payload = {
     'project': '$PROJECT_NAME',
@@ -225,7 +230,10 @@ payload = {
 # Print config line then payload line
 print(json.dumps({'host': host, 'port': port, 'timeout': timeout}))
 print(json.dumps(payload))
-" 2>/dev/null) || return 0
+" 2>/dev/null)
+  local py_exit=$?
+  rm -f "$TMPJSON_FILES" "$TMPJSON_INSTINCTS"
+  [ $py_exit -ne 0 ] && return 0
 
   local cm_config cm_payload cm_host cm_port cm_timeout
   cm_config=$(echo "$payload_output" | head -1)
