@@ -331,18 +331,10 @@ fi
 log "Session file saved: ${SESSION_FILE}"
 
 # Write to structured memory (Phase 1)
-# Look for write-session.sh in multiple locations
-WRITE_SESSION=""
-for _candidate in \
-  "$PROJECT_ROOT/.claude/hooks/memory/write-session.sh" \
-  "$(dirname "$0")/../memory/write-session.sh" \
-  "${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/write-session.sh"; do
-  if [ -x "$_candidate" ]; then
-    WRITE_SESSION="$_candidate"
-    break
-  fi
-done
-if [ -n "$WRITE_SESSION" ]; then
+# Write to structured memory (Phase 1)
+WRITE_SESSION="$(dirname "$0")/../memory/write-session.sh"
+[ -x "$WRITE_SESSION" ] || WRITE_SESSION="${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/write-session.sh"
+if [ -x "$WRITE_SESSION" ]; then
     bash "$WRITE_SESSION" \
         "${TODAY}-${SHORT_ID}" \
         "$BRANCH" \

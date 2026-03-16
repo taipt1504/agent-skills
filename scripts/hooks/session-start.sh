@@ -48,18 +48,10 @@ log "Root: $PROJECT_ROOT"
 # 0. Auto-init memory directory if missing (non-destructive)
 # ---------------------------------------------------------------------------
 
-# Look for init.sh in multiple locations
-MEMORY_INIT=""
-for _candidate in \
-  "$PROJECT_ROOT/.claude/hooks/memory/init.sh" \
-  "$(dirname "$0")/../memory/init.sh" \
-  "${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/init.sh"; do
-  if [ -x "$_candidate" ]; then
-    MEMORY_INIT="$_candidate"
-    break
-  fi
-done
-if [ ! -d ".claude/memory" ] && [ -n "$MEMORY_INIT" ]; then
+# Auto-init memory: look relative to this script (works from plugin or project)
+MEMORY_INIT="$(dirname "$0")/../memory/init.sh"
+[ -x "$MEMORY_INIT" ] || MEMORY_INIT="${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/init.sh"
+if [ ! -d ".claude/memory" ] && [ -x "$MEMORY_INIT" ]; then
   bash "$MEMORY_INIT" "$PROJECT_ROOT" 2>/dev/null || true
   log "Memory directory auto-initialized"
 fi
@@ -297,20 +289,10 @@ fi
 CONTEXT=""
 
 # --- Structured memory context (tiered retrieval, ~750 tokens max) ---
-# Look for read-context.sh in multiple locations:
-#   1. .claude/hooks/memory/ (copied by /setup into project)
-#   2. ../memory/ (relative to this script in plugin repo)
-READ_CONTEXT=""
-for _candidate in \
-  "$PROJECT_ROOT/.claude/hooks/memory/read-context.sh" \
-  "$(dirname "$0")/../memory/read-context.sh" \
-  "${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/read-context.sh"; do
-  if [ -x "$_candidate" ]; then
-    READ_CONTEXT="$_candidate"
-    break
-  fi
-done
-if [ -n "$READ_CONTEXT" ]; then
+# Scripts live relative to this hook (../memory/) or under CLAUDE_PLUGIN_ROOT
+READ_CONTEXT="$(dirname "$0")/../memory/read-context.sh"
+[ -x "$READ_CONTEXT" ] || READ_CONTEXT="${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/read-context.sh"
+if [ -x "$READ_CONTEXT" ]; then
   MEMORY_CONTEXT="$(bash "$READ_CONTEXT" 2>/dev/null || true)"
   if [ -n "$MEMORY_CONTEXT" ]; then
     CONTEXT="## Memory Context\n\n${MEMORY_CONTEXT}\n\n"
