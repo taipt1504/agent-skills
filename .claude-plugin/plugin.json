@@ -23,25 +23,5 @@
     "redis",
     "postgresql",
     "mysql"
-  ],
-  "skills": [
-    "./skills/bootstrap",
-    "./skills/generic/spring-patterns",
-    "./skills/generic/spring-security",
-    "./skills/generic/database-patterns",
-    "./skills/generic/messaging-patterns",
-    "./skills/generic/testing-workflow",
-    "./skills/generic/coding-standards",
-    "./skills/generic/architecture",
-    "./skills/generic/api-design",
-    "./skills/generic/redis-patterns",
-    "./skills/generic/observability-patterns",
-    "./skills/summer/summer-core",
-    "./skills/summer/summer-rest",
-    "./skills/summer/summer-data",
-    "./skills/summer/summer-security",
-    "./skills/summer/summer-ratelimit",
-    "./skills/summer/summer-test",
-    "./skills/meta/continuous-learning"
   ]
 }
