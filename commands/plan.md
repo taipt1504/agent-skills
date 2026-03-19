@@ -1,8 +1,9 @@
 ---
+name: plan
 description: Restate requirements, assess risks, and create step-by-step implementation plan. WAIT for user CONFIRM before touching any code.
 ---
 
-# Plan Command
+# /plan -- Start Planning Phase
 
 This command invokes the **planner** agent to create a comprehensive implementation plan before writing any code.
 
@@ -22,6 +23,17 @@ Use `/plan` when:
 - Working on complex refactoring
 - Multiple files/components will be affected
 - Requirements are unclear or ambiguous
+
+## Skip Conditions
+
+Skip `/plan` only when ALL are true:
+
+| Condition | Example |
+|-----------|---------|
+| Change is 5 lines or fewer | Fix null check, update constant |
+| Single file affected | One config file, one typo |
+| No new observable behavior | Rename, reformat, comment fix |
+| No architectural impact | No new dependencies, no schema change |
 
 ## How It Works
 
@@ -51,25 +63,25 @@ Agent (planner):
 ## Implementation Phases
 
 ### Phase 1: Domain Events
-- Create `PaymentProcessedEvent` record in `src/main/java/com/example/order/domain/event/`
-- Create `OrderNotification` entity in `src/main/java/com/example/notification/domain/`
+- Create `PaymentProcessedEvent` record in domain/event/
+- Create `OrderNotification` entity in notification/domain/
 - Define `NotificationRepository` port (interface) in domain layer
 
 ### Phase 2: Notification Service
-- Create `NotificationService` in `src/main/java/com/example/notification/application/`
-- Implement reactive Kafka consumer (`@KafkaListener`) in infrastructure layer
-- Implement `R2dbcNotificationRepository` adapter in `src/main/java/com/example/notification/infrastructure/`
-- Wire R2DBC schema migration via Flyway (`V2__create_notifications.sql`)
+- Create `NotificationService` in notification/application/
+- Implement reactive Kafka consumer in infrastructure layer
+- Implement `R2dbcNotificationRepository` adapter
+- Wire R2DBC schema migration via Flyway
 
 ### Phase 3: REST Endpoint
-- Create `NotificationController` in `src/main/java/com/example/notification/interfaces/`
-- Implement `GET /api/notifications/{userId}` returning `Flux<NotificationDto>` with pagination
-- Add `@Valid` request parameter validation and structured error responses
+- Create `NotificationController` in notification/interfaces/
+- Implement GET /api/notifications/{userId} returning Flux<NotificationDto>
+- Add @Valid request parameter validation
 
 ### Phase 4: Integration Tests
-- Testcontainers setup: PostgreSQL + Kafka in `src/test/java/com/example/notification/`
-- `NotificationServiceIntegrationTest` using `StepVerifier`
-- Contract test for `GET /api/notifications/{userId}` with `WebTestClient`
+- Testcontainers setup: PostgreSQL + Kafka
+- NotificationServiceIntegrationTest using StepVerifier
+- Contract test for GET endpoint with WebTestClient
 
 ## Dependencies
 - Spring Kafka (reactive consumer)
@@ -78,24 +90,19 @@ Agent (planner):
 - Testcontainers (PostgreSQL + Kafka)
 
 ## Risks
-- HIGH: Kafka consumer offset management — ensure idempotent processing with deduplication key
-- MEDIUM: R2DBC connection pool sizing — tune `spring.r2dbc.pool.max-size` under load
-- MEDIUM: Notification backlog if consumer falls behind — configure DLT and monitoring
+- HIGH: Kafka consumer offset management -- ensure idempotent processing
+- MEDIUM: R2DBC connection pool sizing under load
+- MEDIUM: Notification backlog if consumer falls behind
 - LOW: Pagination cursor design for high-volume users
 
 ## Estimated Complexity: MEDIUM
-- Domain + infrastructure: 3-4 hours
-- REST endpoint: 1-2 hours
-- Integration tests: 2-3 hours
-- Total: 6-9 hours
 
 **WAITING FOR CONFIRMATION**: Proceed with this plan? (yes/no/modify)
 ```
 
-## Important Notes
+## Approval Protocol
 
-**CRITICAL**: The planner agent will **NOT** write any code until you explicitly confirm the plan with "yes" or "
-proceed" or similar affirmative response.
+**CRITICAL**: The planner agent will **NOT** write any code until you explicitly confirm the plan with "yes" or "proceed" or similar affirmative response.
 
 If you want changes, respond with:
 
@@ -103,10 +110,8 @@ If you want changes, respond with:
 - "different approach: [alternative]"
 - "skip phase 2 and do phase 3 first"
 
-## Integration with Other Commands
-
-After planning:
+## After Planning
 
 - Run `/spec` to define behavioral contracts before writing code
-- Use `/build-fix` if build errors occur
-- Use `/code-review` to review completed implementation
+- Run `/build` to start the TDD implementation cycle
+- Use `/build-fix` if build errors occur during implementation

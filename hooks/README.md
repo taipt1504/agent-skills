@@ -1,129 +1,124 @@
-# Hooks
+# Hook System (v3.0)
 
-Event-driven automations that fire during Claude Code sessions. Tailored for Java/Spring WebFlux development — enforcing compile checks, code quality, session continuity, and continuous learning.
+6 lifecycle hooks + 1 utility, all defined in `hooks.json` and executed via `${CLAUDE_PLUGIN_ROOT}`.
 
-## How Hooks Get Loaded
+## Hook Inventory
 
-**Plugin install** (`claude plugin add`): Claude Code auto-discovers `hooks/hooks.json` and registers all hooks. Scripts run from the plugin cache directory via `${CLAUDE_PLUGIN_ROOT}`.
-
-**Project setup** (`/setup`): Writes hook wiring to `.claude/settings.json` with `$CLAUDE_PROJECT_DIR` paths. This is the **recommended fallback** — it works reliably even when `${CLAUDE_PLUGIN_ROOT}` is not set (known Claude Code bug [#27145](https://github.com/anthropics/claude-code/issues/27145) for SessionStart/SessionEnd hooks).
-
-**Team sharing**: Commit `.claude/settings.json` to git. Every teammate who clones gets hooks automatically — no plugin install needed.
-
-## Hook Inventory (10 hooks)
-
-### Session Lifecycle
-
-| Hook | Event | Profile | What It Does |
-|------|-------|---------|-------------|
-| `session-start.sh` | SessionStart | minimal+ | Detect project type, load structured memory (tiered retrieval), inject workflow context |
-| `session-end.sh` | Stop | minimal+ | Write session file, structured memory JSON, post to claude-mem, learning signal |
-| `evaluate-session.sh` | Stop | strict | Signal Claude to extract patterns for learning (>= 10 user messages) |
-| `cost-tracker.sh` | Stop | minimal+ | Track token usage and costs to `.claude/sessions/cost-log.jsonl` |
-
-### Code Quality
-
-| Hook | Event | Matcher | Profile | What It Does |
-|------|-------|---------|---------|-------------|
-| `java-compile-check.sh` | PostToolUse | `Edit\|Write\|MultiEdit` | standard+ | Run `./gradlew compileJava` after Java file edits |
-| `java-format.sh` | PostToolUse | `Edit\|Write\|MultiEdit` | strict | Run `./gradlew spotlessApply` after Java file edits |
-| `check-debug-statements.sh` | Stop | — | standard+ | Scan for `System.out.println`, `printStackTrace`, `@Disabled` |
-
-### Context Management
-
-| Hook | Event | Matcher | Profile | What It Does |
-|------|-------|---------|---------|-------------|
-| `suggest-compact.sh` | PreToolUse | `Edit\|Write\|MultiEdit` | standard+ | Suggest `/compact` after 50 tool calls |
-| `pre-compact.sh` | PreCompact | — | strict | Save recovery JSON + instincts before compaction |
-
-### Continuous Learning
-
-| Hook | Event | Matcher | Profile | What It Does |
-|------|-------|---------|---------|-------------|
-| `observe.sh` | PostToolUse | all tools | standard+ | Capture tool observations to `observations.jsonl` |
-
-### Shared Helper
-
-| Script | Purpose |
-|--------|---------|
-| `run-with-flags.sh` | Profile-based gating — sourced by all hooks at startup |
+| Hook | Event | Responsibility |
+|------|-------|---------------|
+| `session-init.sh` | SessionStart | Inject bootstrap skill, detect project type, restore L2 memory |
+| `session-save.sh` | Stop | Save session summary, persist files list, learning signals |
+| `skill-router.sh` | PreToolUse (Edit/Write/MultiEdit) | File-to-skill matching, suggest relevant skill |
+| `quality-gate.sh` | PostToolUse (Edit/Write/MultiEdit) | Java compile check + debug statement audit |
+| `compact-advisor.sh` | PreToolUse (Edit/Write/MultiEdit) | 3-stage progressive unloading guidance |
+| `pre-compact.sh` | PreCompact | State checkpoint before context compaction |
+| `run-with-flags.sh` | (utility) | Profile-based hook gating, sourced by all hooks |
 
 ## Hook Profiles
 
-Controlled via `HOOK_PROFILE` env var. Default: `standard`.
+Controlled via `HOOK_PROFILE` env var.
 
-| Profile | Active Hooks |
-|---------|-------------|
-| `minimal` | session-start, session-end, cost-tracker |
-| `standard` | + suggest-compact, java-compile-check, check-debug-statements, observe |
-| `strict` | + java-format, evaluate-session, pre-compact |
+| Profile | Hooks Active | Default |
+|---------|-------------|---------|
+| `minimal` | session-init, session-save | |
+| `standard` | + skill-router, quality-gate, compact-advisor | yes |
+| `strict` | + pre-compact | |
 
-## Script Locations
+## hooks.json Configuration
 
-```
-scripts/hooks/
-├── session-start.sh         # SessionStart: context loader + memory retrieval
-├── session-end.sh           # Stop: session persister + structured memory write
-├── evaluate-session.sh      # Stop: learning extraction signal
-├── cost-tracker.sh          # Stop: token/cost tracking
-├── java-compile-check.sh    # PostToolUse: compilation guard
-├── java-format.sh           # PostToolUse: spotless format
-├── check-debug-statements.sh # Stop: debug statement scanner
-├── suggest-compact.sh       # PreToolUse: compact suggestion
-├── pre-compact.sh           # PreCompact: state saver
-├── run-with-flags.sh        # Helper: profile gating (sourced, not a hook)
-└── (observe.sh lives in skills/continuous-learning-v2/hooks/)
-```
-
-## Configuration Files
-
-| File | Scope | Path Variable | When Used |
-|------|-------|--------------|-----------|
-| `hooks/hooks.json` | Plugin (auto-discovered) | `${CLAUDE_PLUGIN_ROOT}` | When plugin is installed via marketplace |
-| `.claude/settings.json` | Project (committed to git) | `$CLAUDE_PROJECT_DIR` | When `/setup` is run — recommended fallback |
-
-Both files define the same hooks. `hooks/hooks.json` is the source of truth; `.claude/settings.json` is generated by `/setup` for reliability.
-
-## Known Limitations
-
-- `${CLAUDE_PLUGIN_ROOT}` not set for `SessionStart`/`SessionEnd` in some Claude Code versions ([#27145](https://github.com/anthropics/claude-code/issues/27145)) — workaround: `/setup` writes `$CLAUDE_PROJECT_DIR` paths
-- `SessionEnd` default timeout is 1.5 seconds — hooks must be fast or async
-- Hook config is snapshot at session start — changes during session require `/hooks` review
-- `UserPromptSubmit` hooks from plugins may not execute ([#10225](https://github.com/anthropics/claude-code/issues/10225))
-
-## Customizing
-
-### Disabling a Hook
-
-Remove the entry from `.claude/settings.json`, or override with an empty hooks array:
+Source of truth for hook registration. Claude Code auto-discovers this file on plugin install.
 
 ```json
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-init.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/skill-router.sh",
+            "timeout": 5,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/compact-advisor.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
-      { "matcher": "Edit|Write|MultiEdit", "hooks": [] }
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/quality-gate.sh",
+            "timeout": 90
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.sh",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-save.sh",
+            "timeout": 60,
+            "async": true
+          }
+        ]
+      }
     ]
   }
 }
 ```
 
-### Writing Your Own Hook
+## How Hooks Work
 
-Hooks receive tool input as JSON on stdin. Output to stderr for warnings, stdout for context injection (SessionStart) or passthrough.
+- All hooks use `${CLAUDE_PLUGIN_ROOT}` for portable paths across machines
+- All hooks exit 0 -- they never block the agent
+- stderr for logging, stdout for context injection (`session-init.sh` only)
+- `run-with-flags.sh` provides profile gating -- sourced at the top of each hook to check `HOOK_PROFILE`
+- Hooks receive tool input as JSON on stdin (PreToolUse/PostToolUse events)
+- `/setup` writes equivalent paths to `.claude/settings.json` using `$CLAUDE_PROJECT_DIR` as a fallback
 
-```bash
-#!/bin/bash
-INPUT=$(cat)
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
-echo "[Hook] Processing $TOOL_NAME" >&2
-echo "$INPUT"  # passthrough
+## Script Locations
+
 ```
-
-Exit codes: `0` = success, `2` = block (PreToolUse only), other = error (logged, doesn't block).
-
-## Related
-
-- [scripts/hooks/](../scripts/hooks/) — Hook script implementations
-- [scripts/memory/](../scripts/memory/) — Structured memory scripts (used by session hooks)
-- [skills/continuous-learning-v2/](../skills/continuous-learning-v2/) — Learning pipeline + observe.sh
-- [rules/](../rules/) — Coding rules enforced by the plugin
+scripts/hooks/
++-- session-init.sh       # SessionStart: bootstrap + memory restore
++-- session-save.sh       # Stop: session persist + learning
++-- skill-router.sh       # PreToolUse: file-to-skill matching
++-- quality-gate.sh       # PostToolUse: compile + debug audit
++-- compact-advisor.sh    # PreToolUse: progressive unloading
++-- pre-compact.sh        # PreCompact: state checkpoint
++-- run-with-flags.sh     # Utility: profile gating (sourced, not a hook)
+```

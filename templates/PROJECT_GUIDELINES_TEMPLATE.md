@@ -28,7 +28,7 @@
 | Migrations | Flyway | 9.x+ | `db/migration/` — SQL-based versioned migrations |
 | Caching | Redis | 7+ | Lettuce (reactive client) |
 | Messaging | Apache Kafka | 3.x | Reactor Kafka |
-| RPC | gRPC | `[version]` | `[if used, otherwise remove]` |
+| RPC | gRPC | `[version]` | `[if used, otherwise remove this row]` |
 | Build | Gradle | 8.x | Kotlin DSL (`build.gradle.kts`) |
 | Testing | JUnit 5 | 5.10+ | + Testcontainers, AssertJ, StepVerifier |
 | Containers | Docker | 24+ | + Docker Compose for local dev |
@@ -541,10 +541,11 @@ Docker:   docker build -t [service-name]:latest .
 
 ```
 /plan           → Plan before coding (mandatory)
+/spec           → Define behavioral contracts
+/build          → TDD cycle (RED → GREEN → REFACTOR)
 /verify         → Build + test + security check
-/code-review    → Review uncommitted changes
+/review         → Multi-aspect code review
 /build-fix      → Fix compilation errors
-/checkpoint     → Mark phase completion
 ```
 
 ---

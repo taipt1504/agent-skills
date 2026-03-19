@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-init.sh",
             "timeout": 30
           }
         ]
@@ -17,7 +17,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/suggest-compact.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/skill-router.sh",
+            "timeout": 5,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/compact-advisor.sh",
             "timeout": 5,
             "async": true
           }
@@ -30,24 +36,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/java-compile-check.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/quality-gate.sh",
             "timeout": 90
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/java-format.sh",
-            "timeout": 60,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-v2/hooks/observe.sh",
-            "timeout": 5,
-            "async": true
           }
         ]
       }
@@ -69,25 +59,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-debug-statements.sh",
-            "timeout": 15
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/cost-tracker.sh",
-            "timeout": 10,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-end.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-save.sh",
             "timeout": 60,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/evaluate-session.sh",
-            "timeout": 15,
             "async": true
           }
         ]

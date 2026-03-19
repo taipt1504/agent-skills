@@ -60,7 +60,7 @@ claude mcp add context7 -s user -- npx -y @upstash/context7-mcp@latest
 
 ### Quick Setup
 
-Run `/mcp-setup` inside Claude Code for guided installation with token budget tracking.
+Run `/setup mcp` inside Claude Code for guided installation with token budget tracking.
 
 ### Manual Install
 

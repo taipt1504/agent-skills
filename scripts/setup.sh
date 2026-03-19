@@ -5,8 +5,8 @@
 #
 # Default (project scope) — everything under PROJECT_ROOT/.claude/:
 #   1. Injects plugin CLAUDE.md    →  PROJECT_ROOT/.claude/CLAUDE.md   (markers, idempotent)
-#   2. Copies WORKING_WORKFLOW.md  →  PROJECT_ROOT/.claude/WORKING_WORKFLOW.md
-#   3. Copies rules/               →  PROJECT_ROOT/.claude/rules/
+#   2. Copies rules/               →  PROJECT_ROOT/.claude/rules/
+#   3. Initializes memory          →  PROJECT_ROOT/.claude/memory/
 #
 # Optional --global:
 #   4. Injects plugin CLAUDE.md into ~/.claude/CLAUDE.md
@@ -120,17 +120,7 @@ if [ "$SKIP_PROJECT" = "false" ]; then
     ok ".claude/CLAUDE.md created — auto-loads for this project"
   fi
 
-  # 1b. .claude/WORKING_WORKFLOW.md
-  WORKFLOW_SRC="$PLUGIN_DIR/WORKING_WORKFLOW.md"
-  WORKFLOW_DST="$CLAUDE_DIR/WORKING_WORKFLOW.md"
-  if [ -f "$WORKFLOW_SRC" ]; then
-    cp "$WORKFLOW_SRC" "$WORKFLOW_DST"
-    ok ".claude/WORKING_WORKFLOW.md copied ($WORKFLOW_DST)"
-  else
-    warn "WORKING_WORKFLOW.md not found in plugin dir — skipped"
-  fi
-
-  # 1c. .claude/rules/
+  # 1b. .claude/rules/
   RULES_SRC="$PLUGIN_DIR/rules"
   RULES_DST="$CLAUDE_DIR/rules"
 
@@ -147,13 +137,13 @@ if [ "$SKIP_PROJECT" = "false" ]; then
     info "Commit .claude/ to version control to share with your team."
   fi
 
-  # 1d. Initialize memory directory
+  # 1c. Initialize memory directory
   if [ -f "$PLUGIN_DIR/scripts/memory/init.sh" ]; then
     bash "$PLUGIN_DIR/scripts/memory/init.sh" "$PROJECT_ROOT"
     ok "Memory directory initialized → $CLAUDE_DIR/memory/"
   fi
 
-  # 1e. Team config → .claude/settings.json
+  # 1d. Team config → .claude/settings.json
   # Writes extraKnownMarketplaces + enabledPlugins so teammates are auto-prompted
   # to install the plugin on first `claude` run after git clone.
   # Hooks are NOT written here — they are handled by hooks/hooks.json via the
@@ -211,27 +201,26 @@ fi
 # 3. Summary
 # ---------------------------------------------------------------------------
 
-h "Done"
+h "Done (v3.0)"
 echo ""
 echo "  Installed at project scope (all under .claude/):"
-echo "    .claude/CLAUDE.md           — loaded by Claude for this project"
-echo "    .claude/WORKING_WORKFLOW.md — 7-phase workflow reference"
-echo "    .claude/rules/              — coding rules for this project"
-echo "    .claude/memory/             — structured session & knowledge storage"
+echo "    .claude/CLAUDE.md           — project conventions (~400 tokens)"
+echo "    .claude/rules/              — 9 coding rules (flat)"
+echo "    .claude/memory/             — 3-tier session & knowledge storage"
 echo "    .claude/settings.json       — team auto-install config"
 echo ""
-echo "  Hooks are registered via plugin system (hooks/hooks.json)."
-echo "  No hook wiring in settings.json — plugin install handles it."
+echo "  Workflow enforcement via bootstrap skill (hook-bootstrapped, not CLAUDE.md)."
+echo "  Hooks registered via plugin system (hooks/hooks.json)."
 if [ "$WITH_GLOBAL" = "true" ]; then
   echo ""
   echo "  Also installed globally:"
   echo "    ~/.claude/CLAUDE.md       — loaded in every session on this machine"
 fi
 echo ""
-echo "  Add to version control to share with your team:"
+echo "  Share with your team:"
 echo "    git add .claude/"
 echo "    git commit -m 'chore: add Claude Code project context'"
 echo ""
-echo "  To refresh after a plugin update:"
+echo "  Refresh after plugin update:"
 echo "    bash scripts/setup.sh --update"
 echo ""

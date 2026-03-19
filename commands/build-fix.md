@@ -1,4 +1,9 @@
-# Build and Fix
+---
+name: build-fix
+description: Incrementally fix Java/Gradle/Maven build and compilation errors for Spring Boot projects. One error at a time for safety.
+---
+
+# /build-fix -- Fix Build/Compile Errors
 
 Incrementally fix Java/Gradle build and compilation errors for Spring Boot (MVC and WebFlux) projects.
 
@@ -34,142 +39,60 @@ Incrementally fix Java/Gradle build and compilation errors for Spring Boot (MVC 
 
 Fix one error at a time for safety!
 
----
-
 ## Common Error Categories
 
 ### 1. Compilation Errors
 
 ```bash
-# Symbol not found
-error: cannot find symbol
-  symbol:   class OrderRepository
-  location: class OrderService
-
-# Fix: Add missing import
-import com.example.order.OrderRepository;
-```
-
-```bash
-# Type mismatch
-error: incompatible types: Mono<Order> cannot be converted to Order
-
-# Fix: Keep reactive chain, don't unwrap
-return orderRepository.findById(id);  // Not .block()
+# Symbol not found -> Add missing import
+# Type mismatch (Mono<Order> vs Order) -> Keep reactive chain, don't unwrap
 ```
 
 ### 2. Spring Boot Configuration Errors
 
 ```bash
-# Bean not found
-***************************
-APPLICATION FAILED TO START
-***************************
-Parameter 0 of constructor in com.example.OrderService required a bean of type 'OrderRepository' that could not be found.
-
-# Fix: Add @Repository annotation or check component scan
-```
-
-```bash
-# Circular dependency
-The dependencies of some of the beans in the application context form a cycle
-
-# Fix: Use @Lazy, refactor, or use ApplicationEventPublisher
+# Bean not found -> Add @Repository/@Component or check component scan
+# Circular dependency -> Use @Lazy, refactor, or use ApplicationEventPublisher
 ```
 
 ### 3. Gradle Dependency Errors
 
 ```bash
-# Dependency resolution failed
-Could not resolve org.springframework.boot:spring-boot-starter-webflux
-
-# Fix: Check repositories, version, or run:
-./gradlew --refresh-dependencies
+# Dependency resolution failed -> Check repositories, version, or --refresh-dependencies
+# Version conflict -> Add exclusions in build.gradle
 ```
 
-```bash
-# Version conflict
-Duplicate class found in modules
-
-# Fix: Add exclusions in build.gradle
-implementation('org.example:lib') {
-    exclude group: 'org.conflicting', module: 'conflict'
-}
-```
-
-### 4. Liquibase Migration Errors
+### 4. Liquibase/Flyway Migration Errors
 
 ```bash
-# Migration failed
-liquibase.exception.ValidationFailedException: Validation Failed
-
-# Fix: Check changeset format, ensure valid SQL
-# Run: ./gradlew liquibaseValidate
+# Migration failed -> Check changeset format, ensure valid SQL
 ```
 
 ### 5. JPA/Database Errors (Spring MVC)
 
 ```bash
-# Entity mapping error
-org.hibernate.MappingException: Could not determine type for
-
-# Fix: Add @Column annotation or check field type
-@Column(name = "created_at")
-private LocalDateTime createdAt;
-```
-
-```bash
-# LazyInitializationException
-org.hibernate.LazyInitializationException: could not initialize proxy - no Session
-
-# Fix: Use @Transactional or fetch eagerly
-@EntityGraph(attributePaths = {"items"})
-List<Order> findByCustomerId(String customerId);
+# Entity mapping error -> Add @Column annotation or check field type
+# LazyInitializationException -> Use @Transactional or @EntityGraph
 ```
 
 ### 6. R2DBC/Database Errors (Spring WebFlux)
 
 ```bash
-# Mapping error
-Could not read property @Id from Row
-
-# Fix: Check @Table, @Id annotations match DB schema
+# Mapping error -> Check @Table, @Id annotations match DB schema
 ```
 
 ### 7. Reactive Stream Errors (Spring WebFlux)
 
 ```bash
-# Blocking call detected
-java.lang.IllegalStateException: block()/blockFirst()/blockLast() are blocking, which is not supported in thread reactor-http-nio-X
-
-# Fix: Remove .block(), use flatMap/then instead
+# Blocking call detected -> Remove .block(), use flatMap/then instead
 ```
 
 ### 8. Spring MVC Specific Errors
 
 ```bash
-# Request mapping conflict
-Ambiguous handler methods mapped for '/api/orders'
-
-# Fix: Ensure unique URL patterns or HTTP methods
-@GetMapping("/orders")      // GET
-@PostMapping("/orders")     // POST - different method, OK
+# Request mapping conflict -> Ensure unique URL patterns or HTTP methods
+# RestTemplate timeout -> Configure timeouts in bean
 ```
-
-```bash
-# RestTemplate timeout
-org.springframework.web.client.ResourceAccessException: I/O error
-
-# Fix: Configure timeouts
-@Bean
-public RestTemplate restTemplate() {
-    var factory = new SimpleClientHttpRequestFactory();
-    factory.setConnectTimeout(5000);
-    factory.setReadTimeout(5000);
-    return new RestTemplate(factory);
-}
-
----
 
 ## Diagnostic Commands
 
@@ -188,12 +111,7 @@ public RestTemplate restTemplate() {
 
 # Check for dependency conflicts
 ./gradlew dependencyInsight --dependency spring-boot
-
-# Validate Liquibase
-./gradlew liquibaseValidate
 ```
-
----
 
 ## Fix Strategy
 
@@ -210,8 +128,6 @@ public RestTemplate restTemplate() {
 - Don't refactor while fixing
 - Keep existing code style
 - Add imports, not rewrite classes
-
----
 
 ## Output Format
 
@@ -230,17 +146,12 @@ FIXED:
 
 REMAINING: 0 errors
 
-WARNINGS (not blocking):
-- OrderService.java:67 - Deprecated method usage
-
-Final State: ✅ BUILD SUCCESSFUL
+Final State: BUILD SUCCESSFUL
 
 Next Steps:
 - Run tests: ./gradlew test
 - Review warnings when convenient
 ```
-
----
 
 ## Quick Fix Reference
 
@@ -257,11 +168,3 @@ Next Steps:
 | `Liquibase validation`        | Check XML/YAML syntax              |
 | `dependency not found`        | Check version, repositories        |
 | `RestTemplate timeout`        | Configure timeout in bean          |
-
----
-
-## Related Commands
-
-- `/verify` - Run full verification after fixes
-- `/code-review` - Review fixed code quality
-- Use **build-error-resolver** agent for complex issues

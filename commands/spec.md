@@ -1,51 +1,43 @@
 ---
 name: spec
-description: Generate behavioral spec from approved plan — define observable contracts before implementation. Gate between PLAN and BUILD phases.
-agent: spec-writer
-triggers:
-  - /spec
-tools:
-  - Read
-  - Write
-  - Grep
-  - Glob
+description: Generate behavioral spec from approved plan -- define observable contracts before implementation. Gate between PLAN and BUILD phases.
 ---
 
-# /spec — Spec-Driven Design
+# /spec -- Define Behavioral Contracts
 
-Generate a behavioral specification from the approved plan. Defines observable contracts (inputs, outputs, error cases) that become the test specification for BUILD/TDD.
+Generate a behavioral specification from the approved plan. Defines observable contracts (inputs, outputs, error cases) that become the test specification for the BUILD phase.
 
 ## Prerequisites
 
-- `/plan` must have been run and approved (checkpoint `plan-approved` exists)
-- If no plan exists: **STOP** — output: `"No approved plan found. Run /plan first."`
+- `/plan` must have been run and approved
+- If no plan exists: **STOP** -- output: `"No approved plan found. Run /plan first."`
 
 ## Workflow
 
 ```
 /spec
-  │
-  ├── 1. Read approved plan from session context
-  │       └── STOP if no /plan was run or plan was rejected
-  │
-  ├── 2. Detect task type from plan signals
-  │       ├── Controller, Handler, endpoint → REST Endpoint
-  │       ├── UseCase, Service, Command, domain → Domain Logic
-  │       ├── Kafka, RabbitMQ, event, consumer, producer → Messaging
-  │       ├── Migration, Flyway, DDL, schema → Database Migration
-  │       ├── Scheduler, cron, job, batch → Background Job
-  │       └── Multiple signals → Mixed (generate spec per component)
-  │
-  ├── 3. Generate spec using type-specific template
-  │       └── Fill with concrete values from plan context
-  │
-  ├── 4. Present spec for user approval
-  │       ├── ✅ Approve  → /checkpoint create "spec-approved", signal BUILD
-  │       ├── ✏️  Revise   → User provides feedback, regenerate
-  │       └── ❌ Reject   → Return to /plan
-  │
-  └── 5. On approve: map spec scenarios to test cases
-          └── Output: test case skeleton for tdd-guide
+  |
+  +-- 1. Read approved plan from session context
+  |       +-- STOP if no /plan was run or plan was rejected
+  |
+  +-- 2. Detect task type from plan signals
+  |       +-- Controller, Handler, endpoint -> REST Endpoint
+  |       +-- UseCase, Service, Command, domain -> Domain Logic
+  |       +-- Kafka, RabbitMQ, event, consumer -> Messaging
+  |       +-- Migration, Flyway, DDL, schema -> Database Migration
+  |       +-- Scheduler, cron, job, batch -> Background Job
+  |       +-- Multiple signals -> Mixed (generate spec per component)
+  |
+  +-- 3. Generate spec using type-specific template
+  |       +-- Fill with concrete values from plan context
+  |
+  +-- 4. Present spec for user approval
+  |       +-- Approve  -> proceed to BUILD
+  |       +-- Revise   -> User provides feedback, regenerate
+  |       +-- Reject   -> Return to /plan
+  |
+  +-- 5. On approve: map spec scenarios to test cases
+          +-- Output: test case skeleton for BUILD/TDD
 ```
 
 ## Task Type Detection
@@ -54,7 +46,7 @@ Generate a behavioral specification from the approved plan. Defines observable c
 |----------------|---------------|
 | `*Controller.java`, `*Handler.java`, `endpoint`, `REST`, `API` | REST Endpoint |
 | `*UseCase.java`, `*Service.java`, `Command`, `Query`, `domain` | Domain Logic |
-| `Kafka`, `RabbitMQ`, `*Consumer.java`, `*Producer.java`, `event`, `topic`, `exchange` | Messaging |
+| `Kafka`, `RabbitMQ`, `*Consumer.java`, `*Producer.java`, `event`, `topic` | Messaging |
 | `*.sql`, `migration`, `Flyway`, `DDL`, `ALTER TABLE`, `schema` | Database Migration |
 | `@Scheduled`, `cron`, `job`, `batch`, `*Job.java`, `*Task.java` | Background Job |
 
@@ -78,40 +70,22 @@ Generate a behavioral specification from the approved plan. Defines observable c
 
 ## Response
 ### Success (201 Created / 200 OK)
-```json
-{
-  "id": "uuid",
-  "field1": "value",
-  "status": "CREATED",
-  "createdAt": "2024-01-01T00:00:00Z"
-}
-```
+{ "id": "uuid", "field1": "value", "status": "CREATED" }
 
 ### Error (400 Bad Request)
-```json
-{
-  "error": "VALIDATION_ERROR",
-  "message": "field1 must not be blank",
-  "fields": [{"field": "field1", "message": "must not be blank"}]
-}
-```
+{ "error": "VALIDATION_ERROR", "message": "field1 must not be blank" }
 
 ## Scenarios
 | # | Scenario | Input | Expected | Status |
 |---|----------|-------|----------|--------|
-| 1 | Happy path — valid input | Valid request body | Resource created, event published | 201 |
-| 2 | Validation error — blank field | field1 = "" | Validation error response | 400 |
-| 3 | Conflict — duplicate | Existing resource ID | Conflict error | 409 |
-| 4 | Unauthorized — no token | No auth header | Unauthorized error | 401 |
+| 1 | Happy path | Valid request body | Resource created | 201 |
+| 2 | Validation error | field1 = "" | Validation error | 400 |
+| 3 | Conflict | Existing resource ID | Conflict error | 409 |
+| 4 | Unauthorized | No auth header | Unauthorized | 401 |
 
 ## Side Effects
-- Event published: `ResourceCreatedEvent` to topic/exchange
-- Database: new row in `resources` table
-
-## Contracts
-- Response `id` is always a valid UUID
-- `createdAt` is server-side, never from client
-- Idempotent on retry with same idempotency key (if applicable)
+- Event published: ResourceCreatedEvent
+- Database: new row in resources table
 ```
 
 ### Domain Logic Spec
@@ -120,41 +94,31 @@ Generate a behavioral specification from the approved plan. Defines observable c
 # Spec: [Use Case / Service Method]
 
 ## Operation
-[One-sentence description of what this operation does]
+[One-sentence description]
 
 ## Preconditions
 - [State that must be true before invocation]
-- [e.g., "Order must exist and be in PENDING status"]
 
 ## Inputs
 | Parameter | Type | Constraints |
 |-----------|------|-------------|
 | param1 | OrderId | Must reference existing order |
-| param2 | Amount | Positive, ≤ order total |
 
 ## Postconditions
 - [State after successful execution]
-- [e.g., "Order status changed to CONFIRMED"]
-- [e.g., "OrderConfirmedEvent published"]
 
 ## Invariants
 - [Rules that must always hold]
-- [e.g., "Order total = sum of line item amounts"]
-- [e.g., "Status transitions: PENDING → CONFIRMED → SHIPPED (no skip)"]
 
 ## Error Cases
 | Condition | Exception | Message |
 |-----------|-----------|---------|
 | Order not found | OrderNotFoundException | "Order {id} not found" |
-| Invalid status transition | InvalidOrderStateException | "Cannot confirm order in {status} status" |
-| Insufficient stock | InsufficientStockException | "Item {sku} has only {available} units" |
 
 ## Scenarios
 | # | Scenario | Precondition | Action | Postcondition |
 |---|----------|--------------|--------|---------------|
-| 1 | Happy path | Order PENDING, stock available | Confirm order | Status = CONFIRMED, event published |
-| 2 | Wrong status | Order SHIPPED | Confirm order | InvalidOrderStateException |
-| 3 | No stock | Order PENDING, item OOS | Confirm order | InsufficientStockException |
+| 1 | Happy path | Order PENDING | Confirm order | Status = CONFIRMED |
 ```
 
 ### Messaging Spec
@@ -163,43 +127,24 @@ Generate a behavioral specification from the approved plan. Defines observable c
 # Spec: [Event / Message]
 
 ## Event Schema
-- **Topic / Exchange**: order.events / order-exchange
-- **Key / Routing Key**: order.{orderId}
-- **Payload**:
-```json
-{
-  "eventId": "uuid",
-  "eventType": "ORDER_CREATED",
-  "timestamp": "ISO-8601",
-  "payload": {
-    "orderId": "uuid",
-    "customerId": "uuid",
-    "totalAmount": 99.99
-  }
-}
-```
+- **Topic / Exchange**: order.events
+- **Key**: order.{orderId}
+- **Payload**: { eventId, eventType, timestamp, payload }
 
 ## Delivery Guarantee
-- [ ] At-least-once / [ ] Exactly-once
-- Consumer group: `order-service-group`
+- At-least-once / Exactly-once
+- Consumer group: order-service-group
 
 ## Idempotency
-- Dedup key: `eventId`
+- Dedup key: eventId
 - Strategy: Check processed_events table before handling
 
 ## Consumer Behavior
-| # | Scenario | Input | Expected | Side Effect |
-|---|----------|-------|----------|-------------|
-| 1 | Happy path | Valid event | Process successfully | State updated |
-| 2 | Duplicate event | Same eventId twice | Skip silently | No state change |
-| 3 | Malformed payload | Missing required field | Send to DLT | Error logged |
-| 4 | Processing failure | DB timeout | Retry 3x, then DLT | Alert on DLT |
-
-## DLQ / DLT Behavior
-- Max retries: 3
-- Backoff: exponential (1s, 2s, 4s)
-- DLT topic: `order.events.dlt`
-- Alert: on DLT message count > 0
+| # | Scenario | Input | Expected |
+|---|----------|-------|----------|
+| 1 | Happy path | Valid event | Process successfully |
+| 2 | Duplicate | Same eventId | Skip silently |
+| 3 | Malformed | Missing field | Send to DLT |
 ```
 
 ### Database Migration Spec
@@ -208,33 +153,21 @@ Generate a behavioral specification from the approved plan. Defines observable c
 # Spec: [Migration Name]
 
 ## DDL Changes
-```sql
 -- Phase 1: Expand (backwards compatible)
-ALTER TABLE orders ADD COLUMN new_status VARCHAR(50);
-
 -- Phase 2: Migrate data
-UPDATE orders SET new_status = status WHERE new_status IS NULL;
-
 -- Phase 3: Contract (after deployment verified)
-ALTER TABLE orders DROP COLUMN old_status;
-```
 
 ## Zero-Downtime Strategy
-- Phase 1 (expand): Add new column, nullable — deploy new code that writes to both
-- Phase 2 (migrate): Backfill existing rows
-- Phase 3 (contract): Drop old column after all code uses new column
+- Expand -> Migrate -> Contract
 
 ## Rollback
-```sql
--- Reverse Phase 1
-ALTER TABLE orders DROP COLUMN IF EXISTS new_status;
-```
+[Reverse DDL]
 
 ## Validation
-- [ ] Migration runs on empty database
-- [ ] Migration runs on database with existing data
-- [ ] Rollback script works
-- [ ] No locks > 5 seconds on production-size table
+- Migration runs on empty database
+- Migration runs on database with existing data
+- Rollback script works
+- No locks > 5 seconds on production-size table
 ```
 
 ### Background Job Spec
@@ -243,48 +176,32 @@ ALTER TABLE orders DROP COLUMN IF EXISTS new_status;
 # Spec: [Job Name]
 
 ## Trigger
-- Schedule: cron `0 2 * * *` (daily at 2 AM)
-- OR Event-triggered: on `DailyReportRequested`
+- Schedule: cron expression
+- OR Event-triggered
 
-## Inputs
-- Date range: previous 24 hours
-- Source: orders table (status = COMPLETED)
-
-## Outputs / Side Effects
-- Generated report stored in S3 / database
-- Notification sent to admin channel
-- Metrics updated: `reports.generated.count`
+## Inputs / Outputs
+[Data sources and side effects]
 
 ## Idempotency
-- Job ID: `daily-report-{date}`
-- Strategy: Check if report for date already exists, skip if so
+- Job ID format and dedup strategy
 
 ## Error Cases
 | Condition | Behavior |
 |-----------|----------|
-| No data for period | Generate empty report, log warning |
-| DB connection failure | Retry 3x with backoff, then alert |
-| Partial failure (50% processed) | Resume from last processed ID |
-
-## Scenarios
-| # | Scenario | Input | Expected |
-|---|----------|-------|----------|
-| 1 | Happy path | 100 completed orders | Report generated, notification sent |
-| 2 | No data | 0 orders in range | Empty report, warning logged |
-| 3 | Duplicate run | Same date, report exists | Skip, log "already generated" |
-| 4 | Mid-job failure | DB timeout at row 50 | Resume from row 50 on retry |
+| No data | Generate empty result, log warning |
+| DB failure | Retry 3x with backoff, then alert |
 ```
 
-## Spec → Test Case Mapping
+## Spec to Test Case Mapping
 
 After spec approval, output a test case skeleton:
 
 ```
-Spec Scenarios → Test Cases:
-  Scenario 1 (happy path)     → shouldCreateOrderWhenValidInput()
-  Scenario 2 (validation)     → shouldReturn400WhenFieldBlank()
-  Scenario 3 (conflict)       → shouldReturn409WhenDuplicate()
-  Scenario 4 (auth)           → shouldReturn401WhenNoToken()
+Spec Scenarios -> Test Cases:
+  Scenario 1 (happy path)     -> shouldCreateOrderWhenValidInput()
+  Scenario 2 (validation)     -> shouldReturn400WhenFieldBlank()
+  Scenario 3 (conflict)       -> shouldReturn409WhenDuplicate()
+  Scenario 4 (auth)           -> shouldReturn401WhenNoToken()
 ```
 
 This feeds directly into the BUILD phase TDD cycle.
@@ -295,7 +212,7 @@ After spec approval, decompose into ordered atomic tasks:
 
 | # | Task | Files | Test Method | Depends On |
 |---|------|-------|-------------|------------|
-| 1 | Create DTO record | CreateOrderRequest.java | — | — |
+| 1 | Create DTO record | CreateOrderRequest.java | -- | -- |
 | 2 | Write repository method | OrderRepository.java | shouldFindByIdWhenExists() | 1 |
 | 3 | Implement use case | CreateOrderUseCase.java | shouldCreateOrderWhenValid() | 1,2 |
 | 4 | Add controller endpoint | OrderController.java | shouldReturn201WhenCreated() | 3 |
@@ -307,21 +224,10 @@ Each task is independently testable. BUILD phase processes tasks in order.
 Present the completed spec and WAIT:
 
 ```
-⏸️ SPEC REVIEW
+SPEC REVIEW
 
 Approve this spec? (approve / revise / reject)
-- approve → /checkpoint create "spec-approved" — proceed to BUILD
-- revise  → provide feedback, I'll update the spec
-- reject  → return to /plan for re-planning
+- approve -> proceed to BUILD
+- revise  -> provide feedback, I'll update the spec
+- reject  -> return to /plan for re-planning
 ```
-
-## Skip Conditions
-
-Same as `/plan` — skip only when ALL are true:
-
-| Condition | Example |
-|-----------|---------|
-| Change is ≤ 5 lines of code | Fix null check, update constant |
-| Single file affected | One config file, one typo |
-| No new observable behavior | Rename, reformat, comment fix |
-| No architectural impact | No new dependencies, no schema change |

@@ -1,7 +1,7 @@
 {
   "name": "devco-agent-skills",
-  "version": "2.0.1",
-  "description": "Battle-tested Claude Code plugin for Java/Spring WebFlux stack — agents, skills, hooks, commands, and rules for reactive microservices development",
+  "version": "3.0.0",
+  "description": "Lightweight, context-efficient Claude Code plugin for Java Spring backend — hook-bootstrapped skills, 3-tier organization, lazy loading",
   "author": {
     "name": "TaiPT",
     "url": "https://github.com/taipt1504"
@@ -14,13 +14,14 @@
     "java",
     "spring-boot",
     "spring-webflux",
+    "spring-mvc",
     "reactive",
     "microservices",
     "tdd",
     "hexagonal-architecture",
-    "grpc",
     "kafka",
     "redis",
-    "postgresql"
+    "postgresql",
+    "mysql"
   ]
 }

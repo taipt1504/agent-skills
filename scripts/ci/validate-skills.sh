@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
-# validate-skills.sh — Validate all skill directories
+# validate-skills.sh — Validate all skill directories (v3.0)
 # =============================================================================
+# Supports 3-tier structure: bootstrap/, generic/, summer/, meta/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,52 +13,55 @@ ERRORS=0
 WARNINGS=0
 CHECKED=0
 
-echo "Validating skills in $SKILLS_DIR..."
+echo "Validating skills in $SKILLS_DIR (3-tier)..."
 
-for skill_dir in "$SKILLS_DIR"/*/; do
-  [ -d "$skill_dir" ] || continue
+# Find all SKILL.md files across all tiers
+while IFS= read -r skill_file; do
+  [ -f "$skill_file" ] || continue
   CHECKED=$((CHECKED + 1))
-  dirname="$(basename "$skill_dir")"
-  skill_file="$skill_dir/SKILL.md"
 
-  # Check SKILL.md exists
-  if [ ! -f "$skill_file" ]; then
-    echo "  FAIL: $dirname/ — missing SKILL.md"
-    ERRORS=$((ERRORS + 1))
-    continue
-  fi
+  # Get relative path for display
+  rel_path="${skill_file#$SKILLS_DIR/}"
+  skill_dir="$(dirname "$skill_file")"
+  dirname="$(basename "$skill_dir")"
 
   # Check YAML frontmatter exists
   if ! head -1 "$skill_file" | grep -q '^---$'; then
-    echo "  FAIL: $dirname/SKILL.md — missing YAML frontmatter"
+    echo "  FAIL: $rel_path — missing YAML frontmatter"
     ERRORS=$((ERRORS + 1))
     continue
   fi
 
-  # Extract frontmatter — macOS compatible
+  # Extract frontmatter
   frontmatter="$(awk 'BEGIN{found=0} /^---$/{found++; next} found==1{print} found>=2{exit}' "$skill_file")"
 
   # Check required fields: name, description
   for field in name description; do
     if ! echo "$frontmatter" | grep -q "^${field}:"; then
-      echo "  FAIL: $dirname/SKILL.md — missing required field: $field"
+      echo "  FAIL: $rel_path — missing required field: $field"
       ERRORS=$((ERRORS + 1))
     fi
   done
 
-  # Check file size (max 500 lines)
+  # Check file size (max 500 lines for body)
   line_count="$(wc -l < "$skill_file" | tr -d ' ')"
   if [ "$line_count" -gt 500 ]; then
-    echo "  WARN: $dirname/SKILL.md — $line_count lines (recommended max: 500)"
+    echo "  WARN: $rel_path — $line_count lines (recommended max: 500)"
     WARNINGS=$((WARNINGS + 1))
   fi
 
-  # Check "When to Activate" section exists
-  if ! grep -q "## When to Activate" "$skill_file" 2>/dev/null; then
-    echo "  WARN: $dirname/SKILL.md — missing 'When to Activate' section"
-    WARNINGS=$((WARNINGS + 1))
+  # Token budget check (rough: words * 1.3 ≈ tokens, body should be ≤800 tokens)
+  # Skip bootstrap which has 1500 token budget
+  if [ "$dirname" != "bootstrap" ]; then
+    word_count="$(wc -w < "$skill_file" | tr -d ' ')"
+    est_tokens=$((word_count * 13 / 10))
+    if [ "$est_tokens" -gt 1200 ]; then
+      echo "  WARN: $rel_path — ~$est_tokens estimated tokens (budget: ≤800 body)"
+      WARNINGS=$((WARNINGS + 1))
+    fi
   fi
-done
+
+done < <(find "$SKILLS_DIR" -name "SKILL.md" -type f 2>/dev/null | sort)
 
 echo ""
 echo "Skills checked: $CHECKED, Errors: $ERRORS, Warnings: $WARNINGS"

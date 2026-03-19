@@ -62,7 +62,7 @@ except (json.JSONDecodeError, FileNotFoundError):
 
 index_entry = {"id": session_id, "date": date, "branch": branch, "summary": summary, "files_modified": files_count}
 idx["sessions"].insert(0, index_entry)
-idx["sessions"] = idx["sessions"][:50]
+idx["sessions"] = idx["sessions"][:5]  # Retain last 5, matching auto-prune policy
 
 with open(index_file, 'w') as f:
     json.dump(idx, f, indent=2)

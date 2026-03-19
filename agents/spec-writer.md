@@ -114,7 +114,7 @@ Use the template for the detected task type. Fill every field with concrete valu
 | Parameter | Type | Constraints |
 |-----------|------|-------------|
 | param1 | OrderId | References existing order |
-| param2 | Money | Positive, ≤ order total |
+| param2 | Money | Positive, <= order total |
 
 ## Postconditions
 - [State after success — e.g., "Order status = CONFIRMED"]
@@ -122,7 +122,7 @@ Use the template for the detected task type. Fill every field with concrete valu
 
 ## Invariants
 - [Always-true rule — e.g., "Total = sum(lineItems)"]
-- [e.g., "Status transitions: PENDING → CONFIRMED only"]
+- [e.g., "Status transitions: PENDING -> CONFIRMED only"]
 
 ## Error Cases
 | Condition | Exception | Message |
@@ -238,11 +238,11 @@ ALTER TABLE xxx DROP COLUMN IF EXISTS yyy;
 After generating the spec, produce a test case mapping:
 
 ```
-Spec → Test Cases:
-  Scenario 1 (happy path)   → shouldCreateXxxWhenValidInput()
-  Scenario 2 (validation)   → shouldReturn400WhenFieldBlank()
-  Scenario 3 (not found)    → shouldThrowNotFoundWhenXxxMissing()
-  Scenario 4 (conflict)     → shouldReturn409WhenDuplicate()
+Spec -> Test Cases:
+  Scenario 1 (happy path)   -> shouldCreateXxxWhenValidInput()
+  Scenario 2 (validation)   -> shouldReturn400WhenFieldBlank()
+  Scenario 3 (not found)    -> shouldThrowNotFoundWhenXxxMissing()
+  Scenario 4 (conflict)     -> shouldReturn409WhenDuplicate()
 ```
 
 Test method naming: `shouldDoXWhenY` — always camelCase, always specific.
@@ -274,9 +274,9 @@ SPEC REVIEW
 [Full spec here]
 
 Approve this spec? (approve / revise / reject)
-- approve → checkpoint "spec-approved" set — proceed to BUILD
-- revise  → provide feedback, spec will be updated
-- reject  → return to /plan
+- approve -> checkpoint "spec-approved" set — proceed to BUILD
+- revise  -> provide feedback, spec will be updated
+- reject  -> return to /plan
 ```
 
 Do not proceed to BUILD until the user responds with "approve".

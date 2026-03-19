@@ -1,21 +1,21 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "devco-agent-skills",
-  "description": "Battle-tested Claude Code plugin for Java/Spring WebFlux stack — agents, skills, hooks, commands, and rules for reactive microservices development",
+  "description": "Lightweight, context-efficient Claude Code plugin for Java Spring backend — hook-bootstrapped skills, 3-tier organization, lazy loading",
   "owner": {
     "name": "TaiPT",
     "email": "taipt1504@gmail.com"
   },
   "metadata": {
-    "description": "Production-ready Claude Code plugin tailored for Java/Spring Boot/WebFlux reactive microservices — hexagonal architecture, TDD, gRPC, Kafka, Redis, PostgreSQL"
+    "description": "Context-efficient Claude Code plugin for Java/Spring Boot backend — 3-tier skill system (bootstrap + generic + summer), 8 agents, hook-bootstrapped workflow, lazy loading, ≤5K auto-loaded tokens"
   },
   "plugins": [
     {
       "name": "devco-agent-skills",
       "source": "./",
       "npmPackage": "@devco/agent-skills",
-      "description": "Complete Claude Code plugin for Java/Spring WebFlux stack — specialized agents, skills, hooks, commands, and rules for building reactive microservices with hexagonal architecture, TDD-first development, and production-grade patterns",
-      "version": "1.0.1",
+      "description": "Lightweight Claude Code plugin for Java Spring backend — bootstrap skill enforcement, 10 generic skills, 6 Summer Framework skills, 8 specialized agents, 12 commands, 9 rules, 6 hooks with 3 profiles",
+      "version": "3.0.0",
       "author": {
         "name": "TaiPT",
         "email": "taipt1504@gmail.com"
@@ -28,28 +28,30 @@
         "java",
         "spring-boot",
         "spring-webflux",
+        "spring-mvc",
         "reactive",
         "microservices",
         "tdd",
         "hexagonal-architecture",
-        "grpc",
         "kafka",
         "redis",
-        "postgresql"
+        "postgresql",
+        "mysql"
       ],
       "category": "workflow",
       "tags": [
         "java",
         "spring-boot",
         "spring-webflux",
+        "spring-mvc",
         "reactive",
         "microservices",
         "tdd",
         "hexagonal-architecture",
-        "grpc",
         "kafka",
         "redis",
         "postgresql",
+        "mysql",
         "agents",
         "skills",
         "hooks",

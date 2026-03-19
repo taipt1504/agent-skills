@@ -1,15 +1,20 @@
-# Verification Command
+---
+name: verify
+description: Run build, test, lint, security, and static analysis pipeline. Modes -- quick, pre-commit, full, gate.
+---
+
+# /verify -- Build + Test + Security Pipeline
 
 Run verification on current Java/Spring codebase. Supports multiple modes.
 
 ## Usage
 
 ```
-/verify              → defaults to "full"
-/verify quick        → build + compile only
-/verify pre-commit   → build + compile + tests + debug audit
-/verify full         → build + compile + lint + tests + security + debug audit
-/verify gate         → full + all reviewers + coverage gate + PR readiness check
+/verify              -> defaults to "full"
+/verify quick        -> build + compile only
+/verify pre-commit   -> build + compile + tests + debug audit
+/verify full         -> build + compile + lint + tests + security + debug audit
+/verify gate         -> full + all reviewers + coverage gate + PR readiness check
 ```
 
 ## Instructions
@@ -26,7 +31,7 @@ Run verification on current Java/Spring codebase. Supports multiple modes.
    ./gradlew compileJava compileTestJava  # Gradle
    ./mvnw compile test-compile -q         # Maven
    ```
-   If either fails → STOP and report errors with file:line.
+   If either fails -> STOP and report errors with file:line.
 
 ### Mode: `pre-commit`
 

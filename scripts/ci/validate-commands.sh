@@ -28,7 +28,7 @@ for cmd_file in "$COMMANDS_DIR"/*.md; do
 
   # Check agent references point to existing files
   # Look for patterns like: agent name references (planner, architect, etc.)
-  for agent_ref in $(grep -oE '\b(planner|architect|code-reviewer|build-error-resolver|tdd-guide|e2e-runner|blackbox-test-runner|refactor-cleaner|security-reviewer|spring-boot-reviewer|spring-mvc-reviewer|spring-webflux-reviewer|database-reviewer|mysql-reviewer|performance-reviewer|rabbitmq-reviewer)\b' "$cmd_file" 2>/dev/null | sort -u); do
+  for agent_ref in $(grep -oE '\b(planner|spec-writer|implementer|reviewer|build-fixer|test-runner|database-reviewer|refactorer)\b' "$cmd_file" 2>/dev/null | sort -u); do
     if [ ! -f "$AGENTS_DIR/${agent_ref}.md" ]; then
       echo "  WARN: $filename — references agent '$agent_ref' but $AGENTS_DIR/${agent_ref}.md not found"
       WARNINGS=$((WARNINGS + 1))
