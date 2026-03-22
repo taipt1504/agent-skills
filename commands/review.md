@@ -16,6 +16,11 @@ Comprehensive security and quality review of uncommitted changes for Java Spring
 /review <file>       -> review specific file
 ```
 
+## Prerequisites
+
+- Run `/verify` before `/review` to catch compilation and test failures first
+- If reviewing a feature implementation, ensure the approved spec is available for adherence checking
+
 ## Instructions
 
 1. Get changed files:

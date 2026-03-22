@@ -20,10 +20,25 @@
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/skill-router.sh",
             "timeout": 5,
             "async": true
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/compact-advisor.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/git-guard.sh",
             "timeout": 5,
             "async": true
           }

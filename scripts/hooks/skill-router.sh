@@ -77,11 +77,7 @@ fi
 
 if [ -n "$SKILL" ]; then
   # Resolve skill path for the agent to load
-  SKILL_PATH=""
-  case "$SKILL" in
-    summer-*) SKILL_PATH="skills/summer/$SKILL/SKILL.md" ;;
-    *)        SKILL_PATH="skills/generic/$SKILL/SKILL.md" ;;
-  esac
+  SKILL_PATH="skills/$SKILL/SKILL.md"
   echo "[SkillRouter] LOAD skill '$SKILL' for $FILENAME → read ${SKILL_PATH}" >&2
 fi
 

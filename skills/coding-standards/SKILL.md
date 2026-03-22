@@ -75,7 +75,7 @@ triggers:
 
 | Smell | Fix |
 |-------|-----|
-| Long method (>30 lines) | Extract named private methods |
+| Long method (>50 lines) | Extract named private methods |
 | Deep nesting (>3 levels) | Early return / guard clauses |
 | Magic numbers | Named constants |
 | God class | Split by responsibility |

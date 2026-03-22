@@ -23,7 +23,16 @@ if [ -f "$INDEX_FILE" ]; then
 import json, sys
 try:
     idx = json.load(open(sys.argv[1]))
-    sessions = idx.get("sessions", [])[:5]
+    # Deduplicate by ID, keep latest
+    seen = set()
+    sessions = []
+    for s in idx.get("sessions", []):
+        sid = s.get("id", "")
+        if sid not in seen:
+            seen.add(sid)
+            sessions.append(s)
+        if len(sessions) >= 5:
+            break
     if sessions:
         print("Recent sessions:")
         for s in sessions:

@@ -9,6 +9,8 @@ triggers:
   - pattern extraction
 ---
 
+> **Status: EXPERIMENTAL** — The observation hook (`observe.sh`) is not yet automated in hooks.json. This skill requires manual setup. The instinct pipeline is functional but not triggered automatically.
+
 # Continuous Learning — Instinct-Based Architecture
 
 Turns Claude Code sessions into reusable knowledge through atomic "instincts" — small learned behaviors with confidence scoring.

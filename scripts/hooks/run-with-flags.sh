@@ -36,13 +36,13 @@ case "$_HOOK_PROFILE" in
     _ENABLED_HOOKS="session-init session-save"
     ;;
   standard)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard"
     ;;
   strict)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor pre-compact"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor pre-compact git-guard"
     ;;
   *)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard"
     ;;
 esac
 

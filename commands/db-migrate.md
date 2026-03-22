@@ -7,6 +7,13 @@ description: Create and validate Flyway database migrations for schema changes. 
 
 Create and validate a Flyway database migration for schema changes.
 
+## SDD Notice
+
+Schema changes are a **spec-required task type** per the SDD workflow. For non-trivial migrations (new tables, column type changes, data migrations):
+- Run `/plan` first to analyze impact
+- Run `/spec` to define the migration spec (DDL, zero-downtime strategy, rollback)
+- Exception: Simple column additions with NULL default can skip SDD
+
 ## Instructions
 
 1. Gather migration context:

@@ -30,12 +30,10 @@ else
   SHORT_ID="$(printf '%05d' $$)"
 fi
 
-SESSIONS_DIR=".claude/sessions"
-mkdir -p "$SESSIONS_DIR"
-SESSION_FILE="$SESSIONS_DIR/${TODAY}-${SHORT_ID}-session.md"
-
-# Idempotency check
-MARKER_FILE="$SESSIONS_DIR/.written-${SHORT_ID}"
+# Idempotency check (stored in memory dir)
+MARKER_DIR=".claude/memory/sessions"
+mkdir -p "$MARKER_DIR"
+MARKER_FILE="$MARKER_DIR/.written-${SHORT_ID}"
 [ -f "$MARKER_FILE" ] && { log "Already written — skipping"; exit 0; }
 
 # --- Git context ---
@@ -67,35 +65,20 @@ DIFF_STAT="$(git diff --stat HEAD 2>/dev/null | tail -1 || true)"
 SUMMARY_TEXT="Session on ${TODAY} (${BRANCH}): ${USER_MESSAGES} user messages, ${TOOL_CALLS} tool calls, ${FILE_COUNT} files modified, ${TEST_COUNT} tests touched."
 [ -n "$DIFF_STAT" ] && SUMMARY_TEXT="${SUMMARY_TEXT} Changes: ${DIFF_STAT}"
 
-# --- Write session file ---
-{
-  echo "# Session: ${TODAY}"
-  echo ""
-  echo "**Date:** ${TODAY} | **Branch:** ${BRANCH} | **Messages:** ${USER_MESSAGES} | **Tools:** ${TOOL_CALLS}"
-  echo ""
-  echo "## Files Modified"
-  if [ -n "$FILES_MODIFIED" ]; then
-    echo "$FILES_MODIFIED" | while IFS= read -r f; do [ -n "$f" ] && echo "- ${f}"; done
-  else
-    echo "_No files modified._"
-  fi
-  echo ""
-  echo "## Summary"
-  echo "${SUMMARY_TEXT}"
-  echo ""
-  if [ "$HAS_UNCOMMITTED" = true ]; then
-    echo "## Uncommitted Changes"
-    echo "$UNCOMMITTED_FILES" | head -20 | while IFS= read -r f; do [ -n "$f" ] && echo "- [ ] ${f}"; done
-  fi
-} > "$SESSION_FILE"
-
-log "Session file saved: ${SESSION_FILE}"
-
 # --- Write to structured memory ---
 WRITE_SESSION="$(dirname "$0")/../memory/write-session.sh"
 [ -x "$WRITE_SESSION" ] || WRITE_SESSION="${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/write-session.sh"
 if [ -x "$WRITE_SESSION" ]; then
   bash "$WRITE_SESSION" "${TODAY}-${SHORT_ID}" "$BRANCH" "$FILE_COUNT" "$USER_MESSAGES" "$TOOL_CALLS" "$SUMMARY_TEXT" 2>/dev/null || true
+fi
+
+# --- Update active work context ---
+ACTIVE_WORK_FILE="$PROJECT_ROOT/.claude/memory/context/active-work.json"
+if [ -d "$PROJECT_ROOT/.claude/memory/context" ]; then
+  RECENT_COMMIT="$(git log -1 --oneline 2>/dev/null || echo "none")"
+  cat > "$ACTIVE_WORK_FILE" <<EOF
+{"current_task":"$BRANCH","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","notes":["Last commit: $RECENT_COMMIT"]}
+EOF
 fi
 
 # --- Debug knowledge base (append error patterns) ---
@@ -124,7 +107,6 @@ if [ "$USER_MESSAGES" -ge 10 ]; then
     echo "date=${TODAY}"
     echo "branch=${BRANCH}"
     echo "user_messages=${USER_MESSAGES}"
-    echo "session_file=${SESSION_FILE}"
     echo "timestamp=${CURRENT_EPOCH}"
   } > "$SIGNALS_DIR/learning-${TODAY}-${SHORT_ID}.signal"
   log "Learning signal written"
@@ -132,9 +114,6 @@ fi
 
 # Write idempotency marker
 echo "$CURRENT_EPOCH" > "$MARKER_FILE"
-
-# Clean up .tmp session file
-find "$SESSIONS_DIR" -name "${TODAY}-${SHORT_ID}-session.tmp" -delete 2>/dev/null || true
 
 # Warn about uncommitted changes
 if [ "$HAS_UNCOMMITTED" = true ]; then

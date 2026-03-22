@@ -77,5 +77,25 @@ if [ -f "$FILE_PATH" ]; then
   fi
 fi
 
+# --- 3. Anti-pattern checks ---
+if [ -f "$FILE_PATH" ]; then
+  # .block() in non-test files
+  if [[ ! "$FILE_PATH" =~ [Tt]est ]] && grep -qn '\.block()' "$FILE_PATH" 2>/dev/null; then
+    echo "[QualityGate] CRITICAL: .block() found in $FILENAME — never block in reactive code" >&2
+  fi
+  # @Autowired field injection (without constructor injection)
+  if grep -n '@Autowired' "$FILE_PATH" 2>/dev/null | grep -v 'constructor\|//\|/\*' | head -1 | grep -q '@Autowired'; then
+    AUTOWIRED_LINES=$(grep -c '@Autowired' "$FILE_PATH" 2>/dev/null || echo 0)
+    CONSTRUCTOR_COUNT=$(grep -c '@RequiredArgsConstructor\|@AllArgsConstructor' "$FILE_PATH" 2>/dev/null || echo 0)
+    if [ "$AUTOWIRED_LINES" -gt 0 ] && [ "$CONSTRUCTOR_COUNT" -eq 0 ]; then
+      echo "[QualityGate] WARNING: @Autowired without constructor injection in $FILENAME — use @RequiredArgsConstructor" >&2
+    fi
+  fi
+  # SELECT * in queries
+  if grep -qin 'SELECT \*' "$FILE_PATH" 2>/dev/null; then
+    echo "[QualityGate] WARNING: SELECT * found in $FILENAME — specify column names" >&2
+  fi
+fi
+
 echo "$DATA"
 exit 0

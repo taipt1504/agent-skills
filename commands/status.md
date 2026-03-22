@@ -13,7 +13,7 @@ clean, readable report for the user. Do NOT add commentary beyond the data.
 ```bash
 echo ""
 echo "======================================================"
-echo "     @devco/agent-skills v3.0.0 -- Plugin Status       "
+echo "     @devco/agent-skills v3.0.1 -- Plugin Status       "
 echo "======================================================"
 echo ""
 
@@ -108,43 +108,28 @@ else
 fi
 
 echo "  Generic (Java/Spring):"
-if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/skills/generic" ]; then
-  for skill_dir in "$PLUGIN_ROOT/skills/generic"/*/; do
+if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/skills" ]; then
+  for skill_dir in "$PLUGIN_ROOT/skills"/*/; do
     [ -f "${skill_dir}SKILL.md" ] || continue
     skill_name="$(basename "$skill_dir")"
+    # Skip summer skills and bootstrap (handled separately)
+    [[ "$skill_name" == summer-* ]] && continue
+    [[ "$skill_name" == "bootstrap" ]] && continue
     echo "    $PASS $skill_name"
     SKILL_COUNT=$((SKILL_COUNT + 1))
   done
-else
-  echo "    $WARN generic skills directory not found"
 fi
 
 echo "  Summer:"
 if [ "$SUMMER_DETECTED" = "yes" ]; then
-  if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/skills/summer" ]; then
-    for skill_dir in "$PLUGIN_ROOT/skills/summer"/*/; do
-      [ -f "${skill_dir}SKILL.md" ] || continue
-      skill_name="$(basename "$skill_dir")"
-      echo "    $PASS $skill_name"
-      SKILL_COUNT=$((SKILL_COUNT + 1))
-    done
-  else
-    echo "    $WARN summer skills directory not found"
-  fi
-else
-  echo "    -- skipped (summer not detected)"
-fi
-
-echo "  Meta:"
-if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/skills/meta" ]; then
-  for skill_dir in "$PLUGIN_ROOT/skills/meta"/*/; do
+  for skill_dir in "$PLUGIN_ROOT/skills"/summer-*/; do
     [ -f "${skill_dir}SKILL.md" ] || continue
     skill_name="$(basename "$skill_dir")"
     echo "    $PASS $skill_name"
     SKILL_COUNT=$((SKILL_COUNT + 1))
   done
 else
-  echo "    $WARN meta skills directory not found"
+  echo "    -- skipped (summer not detected)"
 fi
 echo "  Total skills:   $SKILL_COUNT"
 echo ""

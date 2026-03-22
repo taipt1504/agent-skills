@@ -35,18 +35,26 @@ echo "$COUNT" > "$COUNTER_FILE"
 # Stage 3 (100 calls): Suggest full /compact at workflow boundary
 # ---------------------------------------------------------------------------
 
-if [ "$COUNT" -eq "$THRESHOLD" ]; then
-  echo "[CompactAdvisor] ${THRESHOLD} tool calls — Stage 1: Unload meta skills if not in use (continuous-learning). Consider /compact if transitioning phases." >&2
-fi
-
 STAGE2=$((THRESHOLD + 25))
-if [ "$COUNT" -eq "$STAGE2" ]; then
-  echo "[CompactAdvisor] ${STAGE2} tool calls — Stage 2: Unload unused domain skills (skills not referenced in last 20 tool calls). Keep only actively-used skills loaded." >&2
+STAGE3=$((THRESHOLD + 50))
+
+STAGE1_FLAG="$TEMP_DIR/claude-compact-stage1-$SESSION_ID"
+STAGE2_FLAG="$TEMP_DIR/claude-compact-stage2-$SESSION_ID"
+STAGE3_FLAG="$TEMP_DIR/claude-compact-stage3-$SESSION_ID"
+
+if [ "$COUNT" -ge "$THRESHOLD" ] && [ ! -f "$STAGE1_FLAG" ]; then
+  echo "[CompactAdvisor] ${THRESHOLD} tool calls — Stage 1: Unload meta skills if not in use (continuous-learning). Consider /compact if transitioning phases." >&2
+  touch "$STAGE1_FLAG"
 fi
 
-STAGE3=$((THRESHOLD + 50))
-if [ "$COUNT" -eq "$STAGE3" ]; then
+if [ "$COUNT" -ge "$STAGE2" ] && [ ! -f "$STAGE2_FLAG" ]; then
+  echo "[CompactAdvisor] ${STAGE2} tool calls — Stage 2: Unload unused domain skills (skills not referenced in last 20 tool calls). Keep only actively-used skills loaded." >&2
+  touch "$STAGE2_FLAG"
+fi
+
+if [ "$COUNT" -ge "$STAGE3" ] && [ ! -f "$STAGE3_FLAG" ]; then
   echo "[CompactAdvisor] ${STAGE3} tool calls — Stage 3: Context likely >70%. Run /compact NOW at next workflow boundary (after VERIFY or REVIEW). Preserve: current phase, plan summary, spec summary, failing tests." >&2
+  touch "$STAGE3_FLAG"
 fi
 
 # Recurring reminder every 25 calls after stage 3

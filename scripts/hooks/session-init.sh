@@ -20,7 +20,7 @@ log "Project: $PROJECT_NAME | Root: $PROJECT_ROOT"
 # --- Auto-init memory ---
 MEMORY_INIT="$(dirname "$0")/../memory/init.sh"
 [ -x "$MEMORY_INIT" ] || MEMORY_INIT="${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/init.sh"
-if [ ! -d ".claude/memory" ] && [ -x "$MEMORY_INIT" ]; then
+if [ -x "$MEMORY_INIT" ]; then
   bash "$MEMORY_INIT" "$PROJECT_ROOT" 2>/dev/null || true
 fi
 

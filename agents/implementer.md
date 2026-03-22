@@ -8,6 +8,7 @@ description: >
   When NOT to use: for E2E/integration tests (use test-runner), for code review (use reviewer).
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 model: opus
+maxTurns: 25
 ---
 
 # Implementer (TDD Guide)

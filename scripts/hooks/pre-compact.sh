@@ -38,11 +38,10 @@ ACTIVE_FILES="[]"
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   STAGED="$(git diff --cached --name-only 2>/dev/null || true)"
   MODIFIED="$(git diff --name-only 2>/dev/null || true)"
-  ACTIVE_FILES=$(python3 -c "
-import json
+  ACTIVE_FILES=$(STAGED="$STAGED" MODIFIED="$MODIFIED" python3 -c "
+import json, os
 files = set()
-for line in '''$STAGED
-$MODIFIED'''.strip().splitlines():
+for line in (os.environ.get('STAGED','') + '\n' + os.environ.get('MODIFIED','')).strip().splitlines():
     line = line.strip()
     if line:
         files.add(line)

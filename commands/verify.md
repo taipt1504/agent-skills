@@ -17,6 +17,12 @@ Run verification on current Java/Spring codebase. Supports multiple modes.
 /verify gate         -> full + all reviewers + coverage gate + PR readiness check
 ```
 
+## Prerequisites
+
+- BUILD phase should be complete before running verification
+- If no recent test runs exist, consider running `/build` first
+- For `gate` mode, ensure all implementation tasks from the spec are complete
+
 ## Instructions
 
 ### Mode: `quick`

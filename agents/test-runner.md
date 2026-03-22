@@ -8,6 +8,7 @@ description: >
   When NOT to use: for unit tests (use implementer), for code review (use reviewer).
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 model: sonnet
+maxTurns: 20
 ---
 
 # Test Runner (E2E + Blackbox)
@@ -154,7 +155,7 @@ await().atMost(Duration.ofSeconds(5))
 Before writing blackbox tests, read the blackbox-test skill to understand the standard:
 
 ```
-Read skills/generic/testing-workflow/references/blackbox-test.md
+Read skills/testing-workflow/references/blackbox-test.md
 ```
 
 Load reference files as needed:

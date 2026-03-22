@@ -24,9 +24,13 @@ DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 # Write full session JSON via python3 (safe escaping) or fallback
 SESSION_FILE="$SESSIONS_DIR/${SESSION_ID}.json"
 
+LOCK_FILE="$SESSIONS_DIR/.write.lock"
 if command -v python3 &>/dev/null; then
   # Use python3 for safe JSON generation — no shell escaping issues
-  python3 - "$SESSION_FILE" "$INDEX_FILE" "$SESSION_ID" "$BRANCH" "$SUMMARY" "$FILES_COUNT" "$USER_MESSAGES" "$TOOL_CALLS" "$DATE" <<'PYEOF'
+  # flock around the index.json update to prevent race conditions from concurrent writes
+  (
+    flock -n 200 || { echo "[WriteSession] Could not acquire lock, skipping index update" >&2; exit 0; }
+    python3 - "$SESSION_FILE" "$INDEX_FILE" "$SESSION_ID" "$BRANCH" "$SUMMARY" "$FILES_COUNT" "$USER_MESSAGES" "$TOOL_CALLS" "$DATE" <<'PYEOF'
 import json, sys
 
 session_file = sys.argv[1]
@@ -67,6 +71,7 @@ idx["sessions"] = idx["sessions"][:5]  # Retain last 5, matching auto-prune poli
 with open(index_file, 'w') as f:
     json.dump(idx, f, indent=2)
 PYEOF
+  ) 200>"$LOCK_FILE"
 
 else
   # Fallback: write minimal JSON without shell escaping risks

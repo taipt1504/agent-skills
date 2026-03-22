@@ -6,6 +6,7 @@ description: >
   When NOT to use: for feature changes (use planner + implementer), for architectural redesign (use planner).
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 model: sonnet
+maxTurns: 15
 ---
 
 # Refactorer

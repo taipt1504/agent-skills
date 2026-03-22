@@ -69,11 +69,14 @@ public Mono<UserProfile> updateUser(String userId, UserProfile updated) {
 ```java
 public <T> Mono<T> executeWithLock(String resourceId, Duration wait, Duration lease, Mono<T> task) {
     RLockReactive lock = redissonClient.reactive().getLock("lock:" + resourceId);
-    return lock.tryLock(wait.toMillis(), lease.toMillis(), TimeUnit.MILLISECONDS)
-        .flatMap(acquired -> {
-            if (!acquired) return Mono.error(new LockAcquisitionException(resourceId));
-            return task.doFinally(signal -> lock.unlock().subscribe());
-        });
+    return Mono.usingWhen(
+        lock.tryLock(wait.toMillis(), lease.toMillis(), TimeUnit.MILLISECONDS)
+            .flatMap(acquired -> acquired
+                ? Mono.just(lock)
+                : Mono.error(new LockAcquisitionException(resourceId))),
+        acquired -> task,
+        acquired -> acquired.unlock()
+    );
 }
 ```
 

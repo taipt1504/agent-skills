@@ -15,7 +15,7 @@
       "source": "./",
       "npmPackage": "@devco/agent-skills",
       "description": "Lightweight Claude Code plugin for Java Spring backend — bootstrap skill enforcement, 10 generic skills, 6 Summer Framework skills, 8 specialized agents, 12 commands, 9 rules, 6 hooks with 3 profiles",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "author": {
         "name": "TaiPT",
         "email": "taipt1504@gmail.com"
