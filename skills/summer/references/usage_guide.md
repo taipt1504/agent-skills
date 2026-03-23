@@ -439,7 +439,7 @@ public class CreateUserRequest {
   @Email
     private String email;
 
-  private final UserRole role = UserRole.USER;
+    private final UserRole role = UserRole.USER;
 }
 ```
 

@@ -22,18 +22,19 @@ Modules added in specific versions:
 
 ## Modules At a Glance
 
-| Module                             | Config Prefix                                   | Activation                                |
-|------------------------------------|-------------------------------------------------|-------------------------------------------|
-| `summer-rest-autoconfigure`        | `f8a.common`                                    | Auto (Spring Boot on classpath)           |
-| `summer-data-autoconfigure`        | —                                               | Auto (R2DBC on classpath)                 |
-| `summer-data-audit-autoconfigure`  | `f8a.audit`                                     | Auto (R2DBC on classpath)                 |
-| `summer-data-outbox-autoconfigure` | `f8a.outbox`                                    | `f8a.outbox.enabled=true` (default true)  |
-| `summer-security-autoconfigure`    | `f8a.security.apisix.resource-server`           | `enabled=true` (default true since 0.2.3) |
-| `summer-jwt-resource-server`       | —                                               | Transitive via security-autoconfigure     |
-| `summer-apikey-resource-server`    | —                                               | Manual (`ReactiveApiKeyWebFilter`)        |
-| `summer-ratelimit-autoconfigure`   | `f8a.rate-limiter`                              | Auto (0.2.2+ only)                        |
-| `summer-keycloak` (client)         | —                                               | Manual bean creation                      |
-| `summer-keycloak` (role sync)      | `f8a.security.apisix.resource-server.sync-role` | When `sync-role.server-url` is non-blank  |
+| Module                             | Config Prefix                                                  | Activation                                       |
+|------------------------------------|----------------------------------------------------------------|--------------------------------------------------|
+| `summer-rest-autoconfigure`        | `f8a.common`                                                   | Auto (Spring Boot on classpath)                  |
+| `summer-data-autoconfigure`        | —                                                              | Auto (R2DBC on classpath)                        |
+| `summer-data-audit-autoconfigure`  | `f8a.audit`                                                    | Auto (R2DBC on classpath)                        |
+| `summer-data-outbox-autoconfigure` | `f8a.outbox`                                                   | `f8a.outbox.enabled=true` (default true)         |
+| `summer-security-autoconfigure`    | `f8a.security.apisix.resource-server`                          | `enabled=true` (default true since 0.2.3)        |
+| `summer-jwt-resource-server`       | —                                                              | Transitive via security-autoconfigure            |
+| `summer-apikey-resource-server`    | —                                                              | Manual (`ReactiveApiKeyWebFilter`)               |
+| `summer-ratelimit-autoconfigure`   | `f8a.rate-limiter`                                             | Auto (0.2.2+ only)                               |
+| `summer-keycloak` (client)         | —                                                              | Manual bean creation                             |
+| `summer-keycloak` (role sync)      | `f8a.security.apisix.resource-server.sync-role`                | When `keycloak.server-url` is non-blank (0.2.4+) |
+| `summer-keycloak` (group-role)     | `f8a.security.apisix.resource-server.group-role-authorization` | `enabled=true` (0.2.4+)                          |
 
 ## Exception Handling
 

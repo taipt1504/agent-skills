@@ -28,6 +28,7 @@ Before doing anything, determine which version the user is on:
 - `SummerGlobalExceptionHandler` → 0.2.1+
 - `RateLimiterService` → 0.2.2+
 - `sync-role.enabled` (not `sync-role.enable`) → 0.2.3+
+- `GroupRoleResolver` or `group-role-authorization` → 0.2.4+
 
 4. If still unclear — ask the user before proceeding. Never guess.
 
@@ -38,6 +39,7 @@ Before doing anything, determine which version the user is on:
 | 0.2.1   | `references/v0.2.1.md` | Breaking: tracing, security modules, audit API   |
 | 0.2.2   | `references/v0.2.2.md` | Rate limiting module                             |
 | 0.2.3   | `references/v0.2.3.md` | Keycloak exception expansion, role sync defaults |
+| 0.2.4   | `references/v0.2.4.md` | Group-role auth, keycloak API expansion          |
 
 **Always also read** `references/common.md` for shared patterns across all versions.
 

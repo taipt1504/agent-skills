@@ -98,9 +98,8 @@ f8a:
       resource-server:
         enabled: true              # default true (matchIfMissing since 0.2.3)
         role-hierarchy: ""         # e.g. "ROLE_ADMIN > ROLE_USER"
-        sync-role:
-          # enabled: true          # default true — set false to disable (0.2.3+: "enabled", pre-0.2.3: "enable")
-          server-url: https://keycloak.example.com  # non-blank value triggers sync (0.2.3+ uses hasText check)
+        keycloak: # shared Keycloak connection (0.2.4+ — was under sync-role)
+          server-url: https://keycloak.example.com
           realm: master
           client-id: admin-cli
           client-secret: secret
@@ -108,6 +107,22 @@ f8a:
             service-accounts-enabled: true
             public-client: false
             protocol: openid-connect
+        sync-role:
+          enabled: true            # only flag (0.2.4+) — keycloak config moved to parent
+        group-role-authorization: # 0.2.4+ — alternative to resource_access claim
+          enabled: false
+          claim-name: role_groups
+          l1:
+            ttl: 60s
+          l2: # omit = L1-only mode
+            ttl: 5m
+            invalidation-channel: "group-role-changes"
+            key-prefix: "auth-group-role:"
+            redis:
+              host: localhost
+              port: 6379
+              password: ""
+              database: 0
 ```
 
 ### `f8a.rate-limiter` (Rate Limiting)
@@ -239,21 +254,22 @@ Use `@RestTransactional` on the handler class or method for reactive transaction
 
 ## Auto-Configuration Classes
 
-| Class                                           | Module                    | Trigger                                                    |
-|-------------------------------------------------|---------------------------|------------------------------------------------------------|
-| `SummerRestAutoConfiguration`                   | rest-autoconfigure        | Always                                                     |
-| `SummerActuatorAutoConfiguration`               | rest-autoconfigure        | `InfoContributor` present                                  |
-| `SummerApiDocAutoConfiguration`                 | rest-autoconfigure        | `f8a.common.api-doc.enabled=true`                          |
-| `JacksonAutoConfiguration`                      | rest-autoconfigure        | `f8a.common.jackson.enabled=true`                          |
-| `SummerR2dbcAutoConfiguration`                  | data-autoconfigure        | `R2dbcCustomConversions` present                           |
-| `SummerR2dbcAuditAutoConfiguration`             | data-audit-autoconfigure  | `R2dbcRepository` present                                  |
-| `AuditTableValidator`                           | data-audit-autoconfigure  | `f8a.audit.validate-on-startup=true` (default)             |
-| `SummerR2dbcOutboxAutoConfiguration`            | data-outbox-autoconfigure | `R2dbcRepository` present                                  |
-| `OutboxTableValidator`                          | data-outbox-autoconfigure | `f8a.outbox.validate-on-startup=true` (default)            |
-| `ReactiveBaseResourceServerAutoConfiguration`   | security-autoconfigure    | Always (reactive + security)                               |
-| `ReactiveApisixResourceServerAutoConfiguration` | security-autoconfigure    | `apisix.resource-server.enabled=true`                      |
-| `ReactiveApisixRoleSyncAutoConfiguration`       | security-autoconfigure    | `sync-role.server-url` non-blank (0.2.3+: `hasText` check) |
-| `SummerRateLimitAutoConfiguration`              | ratelimit-autoconfigure   | Auto (ratelimit-autoconfigure on classpath)                |
+| Class                                           | Module                    | Trigger                                                        |
+|-------------------------------------------------|---------------------------|----------------------------------------------------------------|
+| `SummerRestAutoConfiguration`                   | rest-autoconfigure        | Always                                                         |
+| `SummerActuatorAutoConfiguration`               | rest-autoconfigure        | `InfoContributor` present                                      |
+| `SummerApiDocAutoConfiguration`                 | rest-autoconfigure        | `f8a.common.api-doc.enabled=true`                              |
+| `JacksonAutoConfiguration`                      | rest-autoconfigure        | `f8a.common.jackson.enabled=true`                              |
+| `SummerR2dbcAutoConfiguration`                  | data-autoconfigure        | `R2dbcCustomConversions` present                               |
+| `SummerR2dbcAuditAutoConfiguration`             | data-audit-autoconfigure  | `R2dbcRepository` present                                      |
+| `AuditTableValidator`                           | data-audit-autoconfigure  | `f8a.audit.validate-on-startup=true` (default)                 |
+| `SummerR2dbcOutboxAutoConfiguration`            | data-outbox-autoconfigure | `R2dbcRepository` present                                      |
+| `OutboxTableValidator`                          | data-outbox-autoconfigure | `f8a.outbox.validate-on-startup=true` (default)                |
+| `ReactiveBaseResourceServerAutoConfiguration`   | security-autoconfigure    | Always (reactive + security)                                   |
+| `ReactiveApisixResourceServerAutoConfiguration` | security-autoconfigure    | `apisix.resource-server.enabled=true`                          |
+| `ReactiveApisixRoleSyncAutoConfiguration`       | security-autoconfigure    | `keycloak.server-url` non-blank + `sync-role.enabled` (0.2.4+) |
+| `ReactiveGroupRoleAutoConfiguration`            | security-autoconfigure    | `group-role-authorization.enabled=true` (0.2.4+)               |
+| `SummerRateLimitAutoConfiguration`              | ratelimit-autoconfigure   | Auto (ratelimit-autoconfigure on classpath)                    |
 
 ---
 
@@ -318,7 +334,6 @@ Entry point — self-creates `WebClient` from `KeycloakConfig.serverUrl`. Uses `
 `KeycloakTokenProvider` for admin token caching.
 
 **Construction:**
-
 ```java
 var config = new KeycloakConfig();
 config.
@@ -340,7 +355,6 @@ var keycloak = new ReactiveKeycloakClient(config, customTokenProvider);
 ```
 
 **Navigation:**
-
 ```java
 keycloak.realm()              // ReactiveRealmResource (default realm)
 keycloak.
@@ -363,9 +377,11 @@ tokenProvider()      // KeycloakTokenProvider
 ### Resource Interfaces
 
 **ReactiveRealmResource**
-
 - `users()` → `ReactiveUsersResource`
 - `clients()` → `ReactiveClientsResource`
+- `groups()` → `ReactiveGroupsResource`
+- `clientScopes()` → `ReactiveClientScopesResource` (0.2.4+)
+- `groupByPath(String path)` → `Mono<GroupRepresentation>` (0.2.4+)
 
 **ReactiveUsersResource**
 | Method | Return | Description |
@@ -399,12 +415,57 @@ tokenProvider()      // KeycloakTokenProvider
 | `toRepresentation()` | `Mono<ClientRepresentation>` | Get client details |
 | `update(ClientRepresentation)` | `Mono<Void>` | Update client |
 | `roles()` | `ReactiveRolesResource` | Client role management |
+| `getDefaultClientScopes()` | `Flux<ClientScopeRepresentation>` | List default scopes (0.2.4+) |
+| `addDefaultClientScope(String)` | `Mono<Void>` | Add default scope (0.2.4+) |
+| `removeDefaultClientScope(String)` | `Mono<Void>` | Remove default scope (0.2.4+) |
+| `getOptionalClientScopes()` | `Flux<ClientScopeRepresentation>` | List optional scopes (0.2.4+) |
+| `addOptionalClientScope(String)` | `Mono<Void>` | Add optional scope (0.2.4+) |
+| `removeOptionalClientScope(String)` | `Mono<Void>` | Remove optional scope (0.2.4+) |
 
 **ReactiveRolesResource**
 | Method | Return | Description |
 |--------|--------|-------------|
 | `list()` | `Flux<RoleRepresentation>` | List client roles |
 | `create(RoleRepresentation)` | `Mono<Void>` | Create client role |
+
+**ReactiveGroupResource** (0.2.4+: `roles()` added)
+| Method | Return | Description |
+|--------|--------|-------------|
+| `toRepresentation()` | `Mono<GroupRepresentation>` | Get group details |
+| `update(GroupRepresentation)` | `Mono<Void>` | Update group |
+| `remove()` | `Mono<Void>` | Delete group |
+| `members(Integer, Integer)` | `Flux<UserRepresentation>` | List group members |
+| `roles()` | `ReactiveRoleMappingResource` | Group role mappings (0.2.4+) |
+
+**ReactiveRoleMappingResource** (0.2.4+)
+| Method | Return | Description |
+|--------|--------|-------------|
+| `realmLevel()` | `ReactiveRoleScopeResource` | Realm-level role mappings |
+| `clientLevel(String)` | `ReactiveRoleScopeResource` | Client-level role mappings |
+
+**ReactiveRoleScopeResource** (0.2.4+)
+| Method | Return | Description |
+|--------|--------|-------------|
+| `listAll()` | `Flux<RoleRepresentation>` | All assigned roles |
+| `listAvailable()` | `Flux<RoleRepresentation>` | Available (unassigned) roles |
+| `listEffective()` | `Flux<RoleRepresentation>` | Effective (including composites) |
+| `add(List<RoleRepresentation>)` | `Mono<Void>` | Assign roles |
+| `remove(List<RoleRepresentation>)` | `Mono<Void>` | Unassign roles |
+
+**ReactiveClientScopesResource** (0.2.4+)
+| Method | Return | Description |
+|--------|--------|-------------|
+| `findAll()` | `Flux<ClientScopeRepresentation>` | List all client scopes |
+| `create(ClientScopeRepresentation)` | `Mono<String>` | Create client scope |
+| `get(String)` | `ReactiveClientScopeResource` | Sub-resource for single scope |
+
+**ReactiveClientScopeResource** (0.2.4+)
+| Method | Return | Description |
+|--------|--------|-------------|
+| `toRepresentation()` | `Mono<ClientScopeRepresentation>` | Get scope details |
+| `update(ClientScopeRepresentation)` | `Mono<Void>` | Update scope |
+| `remove()` | `Mono<Void>` | Delete scope |
+| `protocolMappers()` | `ReactiveProtocolMappersResource` | Protocol mapper management |
 
 **ReactiveTokenResource** (no admin auth — uses separate WebClient)
 | Method | Return | Description |
@@ -502,7 +563,6 @@ Extends `ViewableException`. Comprehensive auto-mapping of Keycloak error respon
 **`@AuthRoles`** — marks class as role definition source
 
 ```java
-
 @AuthRoles(resources = {
         @ResourceDef(code = "my-svc", name = "My Service",
                 attributes = @AttributeDef(key = "tier", value = "premium"),
