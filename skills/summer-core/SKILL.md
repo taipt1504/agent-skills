@@ -30,20 +30,23 @@ Check `build.gradle` or `pom.xml` for `io.f8a.summer:summer-platform`.
 
 1. Read `gradle.properties` → `version=X.Y.Z`
 2. Check `build.gradle` for `summer-platform` version
-3. Pattern detection: `SummerGlobalExceptionHandler` → 0.2.1+ | `RateLimiterService` → 0.2.2+ | `sync-role.enabled` (not `.enable`) → 0.2.3+
+3. Pattern detection: `SummerGlobalExceptionHandler` → 0.2.1+ | `RateLimiterService` → 0.2.2+ | `sync-role.enabled` (not
+   `.enable`) → 0.2.3+ | `GroupRoleResolver` or `group-role-authorization` → 0.2.4+
 4. If unclear → ask the user. Never guess.
 
 ## Module Overview
 
-| Module | Config Prefix | Activation |
-|---|---|---|
-| `summer-rest-autoconfigure` | `f8a.common` | Auto (Spring Boot on classpath) |
-| `summer-data-autoconfigure` | — | Auto (R2DBC on classpath) |
-| `summer-data-audit-autoconfigure` | `f8a.audit` | Auto (R2DBC on classpath) |
-| `summer-data-outbox-autoconfigure` | `f8a.outbox` | `f8a.outbox.enabled=true` (default) |
-| `summer-security-autoconfigure` | `f8a.security.apisix.resource-server` | `enabled=true` (default since 0.2.3) |
-| `summer-ratelimit-autoconfigure` | `f8a.rate-limiter` | Auto (0.2.2+ only) |
-| `summer-keycloak` | — | Manual bean / `sync-role.server-url` non-blank |
+| Module                             | Config Prefix                                                  | Activation                                       |
+|------------------------------------|----------------------------------------------------------------|--------------------------------------------------|
+| `summer-rest-autoconfigure`        | `f8a.common`                                                   | Auto (Spring Boot on classpath)                  |
+| `summer-data-autoconfigure`        | —                                                              | Auto (R2DBC on classpath)                        |
+| `summer-data-audit-autoconfigure`  | `f8a.audit`                                                    | Auto (R2DBC on classpath)                        |
+| `summer-data-outbox-autoconfigure` | `f8a.outbox`                                                   | `f8a.outbox.enabled=true` (default)              |
+| `summer-security-autoconfigure`    | `f8a.security.apisix.resource-server`                          | `enabled=true` (default since 0.2.3)             |
+| `summer-ratelimit-autoconfigure`   | `f8a.rate-limiter`                                             | Auto (0.2.2+ only)                               |
+| `summer-keycloak` (client)         | —                                                              | Manual bean creation                             |
+| `summer-keycloak` (role sync)      | `f8a.security.apisix.resource-server.sync-role`                | When `keycloak.server-url` is non-blank (0.2.4+) |
+| `summer-keycloak` (group-role)     | `f8a.security.apisix.resource-server.group-role-authorization` | `enabled=true` (0.2.4+)                          |
 
 ## Gradle Setup
 

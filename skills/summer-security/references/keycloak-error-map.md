@@ -93,11 +93,17 @@
 
 ### ReactiveClientResource
 
-| Method | Return | Description |
-|---|---|---|
-| `toRepresentation()` | `Mono<ClientRepresentation>` | Get client details |
-| `update(ClientRepresentation)` | `Mono<Void>` | Update client |
-| `roles()` | `ReactiveRolesResource` | Client role management |
+| Method                              | Return                            | Description                    |
+|-------------------------------------|-----------------------------------|--------------------------------|
+| `toRepresentation()`                | `Mono<ClientRepresentation>`      | Get client details             |
+| `update(ClientRepresentation)`      | `Mono<Void>`                      | Update client                  |
+| `roles()`                           | `ReactiveRolesResource`           | Client role management         |
+| `getDefaultClientScopes()`          | `Flux<ClientScopeRepresentation>` | List default scopes (0.2.4+)   |
+| `addDefaultClientScope(String)`     | `Mono<Void>`                      | Add default scope (0.2.4+)     |
+| `removeDefaultClientScope(String)`  | `Mono<Void>`                      | Remove default scope (0.2.4+)  |
+| `getOptionalClientScopes()`         | `Flux<ClientScopeRepresentation>` | List optional scopes (0.2.4+)  |
+| `addOptionalClientScope(String)`    | `Mono<Void>`                      | Add optional scope (0.2.4+)    |
+| `removeOptionalClientScope(String)` | `Mono<Void>`                      | Remove optional scope (0.2.4+) |
 
 ### ReactiveRolesResource
 
@@ -105,6 +111,50 @@
 |---|---|---|
 | `list()` | `Flux<RoleRepresentation>` | List client roles |
 | `create(RoleRepresentation)` | `Mono<Void>` | Create client role |
+
+### ReactiveGroupResource (0.2.4+: `roles()` added)
+
+| Method                        | Return                        | Description                  |
+|-------------------------------|-------------------------------|------------------------------|
+| `toRepresentation()`          | `Mono<GroupRepresentation>`   | Get group details            |
+| `update(GroupRepresentation)` | `Mono<Void>`                  | Update group                 |
+| `remove()`                    | `Mono<Void>`                  | Delete group                 |
+| `members(Integer, Integer)`   | `Flux<UserRepresentation>`    | List group members           |
+| `roles()`                     | `ReactiveRoleMappingResource` | Group role mappings (0.2.4+) |
+
+### ReactiveRoleMappingResource (0.2.4+)
+
+| Method                | Return                      | Description                |
+|-----------------------|-----------------------------|----------------------------|
+| `realmLevel()`        | `ReactiveRoleScopeResource` | Realm-level role mappings  |
+| `clientLevel(String)` | `ReactiveRoleScopeResource` | Client-level role mappings |
+
+### ReactiveRoleScopeResource (0.2.4+)
+
+| Method                             | Return                     | Description                      |
+|------------------------------------|----------------------------|----------------------------------|
+| `listAll()`                        | `Flux<RoleRepresentation>` | All assigned roles               |
+| `listAvailable()`                  | `Flux<RoleRepresentation>` | Available (unassigned) roles     |
+| `listEffective()`                  | `Flux<RoleRepresentation>` | Effective (including composites) |
+| `add(List<RoleRepresentation>)`    | `Mono<Void>`               | Assign roles                     |
+| `remove(List<RoleRepresentation>)` | `Mono<Void>`               | Unassign roles                   |
+
+### ReactiveClientScopesResource (0.2.4+)
+
+| Method                              | Return                            | Description                   |
+|-------------------------------------|-----------------------------------|-------------------------------|
+| `findAll()`                         | `Flux<ClientScopeRepresentation>` | List all client scopes        |
+| `create(ClientScopeRepresentation)` | `Mono<String>`                    | Create client scope           |
+| `get(String)`                       | `ReactiveClientScopeResource`     | Sub-resource for single scope |
+
+### ReactiveClientScopeResource (0.2.4+)
+
+| Method                              | Return                            | Description                |
+|-------------------------------------|-----------------------------------|----------------------------|
+| `toRepresentation()`                | `Mono<ClientScopeRepresentation>` | Get scope details          |
+| `update(ClientScopeRepresentation)` | `Mono<Void>`                      | Update scope               |
+| `remove()`                          | `Mono<Void>`                      | Delete scope               |
+| `protocolMappers()`                 | `ReactiveProtocolMappersResource` | Protocol mapper management |
 
 ### ReactiveTokenResource (no admin auth)
 
