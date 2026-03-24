@@ -11,6 +11,14 @@ model: opus
 maxTurns: 25
 ---
 
+## Before Starting Work (MANDATORY)
+
+1. **Load bootstrap**: Use the Skill tool to load `devco-agent-skills:bootstrap` — contains the skill registry and workflow engine
+2. **Check Summer**: Scan `build.gradle`/`pom.xml` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core`
+3. **Load domain skills**: Match files you'll touch against the bootstrap skill registry → load each matching skill via Skill tool. Start with `devco-agent-skills:testing-workflow` for test patterns and verification pipeline
+4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
+5. **Phase**: You are in the **BUILD** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+
 # Implementer (TDD Guide)
 
 Test-Driven Development specialist that implements tasks from approved specs. All code is developed test-first with JUnit 5, Mockito, and reactive testing.
@@ -27,42 +35,19 @@ Test-Driven Development specialist that implements tasks from approved specs. Al
 
 ### Step 1: Write Test First (RED)
 
-```java
-@Test
-void shouldFindOrderById() {
-    // Arrange
-    String orderId = "ORDER-001";
-    Order expected = Order.builder().id(orderId).status("PENDING").build();
-    when(orderRepository.findById(orderId)).thenReturn(Mono.just(expected));
-
-    // Act & Assert
-    StepVerifier.create(orderService.findById(orderId))
-        .expectNext(expected)
-        .verifyComplete();
-}
-```
+Write a failing test that describes the expected behavior. The test should compile but fail because the implementation doesn't exist yet.
 
 ### Step 2: Run Test (Verify FAILS)
 
-```bash
-./gradlew test --tests "OrderServiceTest.shouldFindOrderById"
-# Test should fail - not implemented yet
-```
+Run the specific test to confirm it fails. This validates that the test is actually testing something meaningful.
 
 ### Step 3: Write Minimal Implementation (GREEN)
 
-```java
-public Mono<Order> findById(String orderId) {
-    return orderRepository.findById(orderId);
-}
-```
+Write the minimum code needed to make the failing test pass. No more, no less.
 
 ### Step 4: Run Test (Verify PASSES)
 
-```bash
-./gradlew test --tests "OrderServiceTest"
-# Test should now pass
-```
+Run the test again to confirm it passes with the new implementation.
 
 ### Step 5: Refactor (IMPROVE)
 
@@ -70,176 +55,11 @@ Clean up while keeping tests green.
 
 ### Step 6: Verify Coverage
 
-```bash
-./gradlew test jacocoTestReport
-open build/reports/jacoco/test/html/index.html
-```
+Run the full test suite with coverage report to ensure 80%+ coverage.
 
-## Test Types
+### Test & Mock Patterns
 
-### 1. Unit Tests (Mandatory)
-
-```java
-@ExtendWith(MockitoExtension.class)
-class OrderServiceTest {
-
-    @Mock
-    private OrderRepository orderRepository;
-
-    @InjectMocks
-    private OrderService orderService;
-
-    @Test
-    void shouldCreateOrder() {
-        CreateOrderCommand command = new CreateOrderCommand("CUST-001", List.of());
-        Order expected = Order.create(command);
-        when(orderRepository.save(any())).thenReturn(Mono.just(expected));
-
-        StepVerifier.create(orderService.create(command))
-            .expectNextMatches(order -> order.getCustomerId().equals("CUST-001"))
-            .verifyComplete();
-
-        verify(orderRepository).save(any());
-    }
-
-    @Test
-    void shouldReturnEmptyForNonExistentOrder() {
-        when(orderRepository.findById("INVALID")).thenReturn(Mono.empty());
-
-        StepVerifier.create(orderService.findById("INVALID"))
-            .verifyComplete();  // Empty Mono
-    }
-}
-```
-
-### 2. Integration Tests (Mandatory)
-
-```java
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class OrderApiIntegrationTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15");
-
-    @Autowired
-    private WebTestClient webTestClient;
-
-    @Test
-    void shouldCreateOrderViaApi() {
-        CreateOrderRequest request = new CreateOrderRequest("CUST-001", List.of());
-
-        webTestClient.post()
-            .uri("/api/orders")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody()
-            .jsonPath("$.orderId").isNotEmpty();
-    }
-
-    @Test
-    void shouldReturn404ForNonExistentOrder() {
-        webTestClient.get()
-            .uri("/api/orders/INVALID")
-            .exchange()
-            .expectStatus().isNotFound();
-    }
-}
-```
-
-### 3. Reactive Stream Tests
-
-```java
-@Test
-void shouldHandleBackpressure() {
-    Flux<Order> orders = orderService.findAll();
-
-    StepVerifier.create(orders, StepVerifierOptions.create().initialRequest(5))
-        .expectNextCount(5)
-        .thenRequest(5)
-        .expectNextCount(5)
-        .thenCancel()
-        .verify();
-}
-
-@Test
-void shouldHandleError() {
-    when(repository.findById(any()))
-        .thenReturn(Mono.error(new RuntimeException("DB Error")));
-
-    StepVerifier.create(orderService.findById("TEST"))
-        .expectError(ServiceException.class)
-        .verify();
-}
-
-@Test
-void shouldTimeout() {
-    when(repository.findById(any()))
-        .thenReturn(Mono.delay(Duration.ofSeconds(10)).then(Mono.empty()));
-
-    StepVerifier.create(orderService.findById("TEST").timeout(Duration.ofSeconds(1)))
-        .expectError(TimeoutException.class)
-        .verify();
-}
-```
-
-## Mocking External Dependencies
-
-### Mock Repository
-
-```java
-@Mock
-private OrderRepository orderRepository;
-
-@BeforeEach
-void setup() {
-    when(orderRepository.findById("ORDER-001"))
-        .thenReturn(Mono.just(testOrder));
-    when(orderRepository.findAll())
-        .thenReturn(Flux.just(order1, order2, order3));
-}
-```
-
-### Mock WebClient
-
-```java
-@Mock
-private WebClient webClient;
-@Mock
-private WebClient.RequestHeadersUriSpec requestHeadersUriSpec;
-@Mock
-private WebClient.ResponseSpec responseSpec;
-
-@BeforeEach
-void setup() {
-    when(webClient.get()).thenReturn(requestHeadersUriSpec);
-    when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersUriSpec);
-    when(requestHeadersUriSpec.retrieve()).thenReturn(responseSpec);
-    when(responseSpec.bodyToMono(ExternalResponse.class))
-        .thenReturn(Mono.just(expectedResponse));
-}
-```
-
-### Mock Kafka
-
-```java
-@MockBean
-private KafkaTemplate<String, OrderEvent> kafkaTemplate;
-
-@Test
-void shouldPublishEvent() {
-    when(kafkaTemplate.send(anyString(), anyString(), any()))
-        .thenReturn(CompletableFuture.completedFuture(null));
-
-    StepVerifier.create(orderService.create(command))
-        .expectNextCount(1)
-        .verifyComplete();
-
-    verify(kafkaTemplate).send(eq("orders.created"), anyString(), any(OrderCreatedEvent.class));
-}
-```
+Load `devco-agent-skills:testing-workflow` — it contains all test code patterns, mock setups, and verification pipeline. Do NOT write test code from memory.
 
 ## Edge Cases to Test
 
@@ -268,27 +88,6 @@ void shouldPublishEvent() {
 - Using `.block()` in reactive tests instead of `StepVerifier`
 - Random/hardcoded test data instead of factory methods
 - `@SpringBootTest` for controller-only tests (use `@WebMvcTest`/`@WebFluxTest`)
-
-## Coverage Commands
-
-```bash
-./gradlew test jacocoTestReport
-open build/reports/jacoco/test/html/index.html
-```
-
-Required thresholds (build.gradle):
-
-```groovy
-jacocoTestCoverageVerification {
-    violationRules {
-        rule {
-            limit {
-                minimum = 0.80
-            }
-        }
-    }
-}
-```
 
 ---
 

@@ -33,16 +33,16 @@ _HOOK_PROFILE="${HOOK_PROFILE:-standard}"
 # Define which hooks are enabled per profile
 case "$_HOOK_PROFILE" in
   minimal)
-    _ENABLED_HOOKS="session-init session-save"
+    _ENABLED_HOOKS="session-init session-save subagent-init"
     ;;
   standard)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard subagent-init"
     ;;
   strict)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor pre-compact git-guard"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor pre-compact git-guard subagent-init"
     ;;
   *)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard subagent-init"
     ;;
 esac
 

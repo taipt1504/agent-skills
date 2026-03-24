@@ -76,10 +76,14 @@ if [ -n "$BUILD_FILE" ] && grep -q "io.f8a.summer" "$BUILD_FILE" 2>/dev/null; th
 fi
 
 if [ -n "$SKILL" ]; then
-  # Resolve skill path for the agent to load
   SKILL_PATH="skills/$SKILL/SKILL.md"
-  echo "[SkillRouter] LOAD skill '$SKILL' for $FILENAME → read ${SKILL_PATH}" >&2
+  MSG="LOAD SKILL before editing $FILENAME: Use Skill tool to load devco-agent-skills:$SKILL (or read $SKILL_PATH)"
+  # Output structured JSON with additionalContext — agent will see this
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"%s"}}' \
+    "$(printf '%s' "$MSG" | sed 's/"/\\"/g')"
+  exit 0
 fi
 
-echo "$DATA"
+# No skill match — pass through original data
+printf '%s' "$DATA"
 exit 0

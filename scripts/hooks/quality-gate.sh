@@ -26,6 +26,8 @@ if [[ ! "$FILE_PATH" =~ \.java$ ]]; then
 fi
 
 FILENAME="$(basename "$FILE_PATH")"
+CRITICAL_VIOLATIONS=""
+HIGH_VIOLATIONS=""
 
 # --- 1. Compile check ---
 PROJECT_ROOT="$PWD"
@@ -59,21 +61,21 @@ fi
 if [ -n "$RESULT" ]; then
   ERRORS=$(echo "$RESULT" | grep -i "error:" | grep -i "$FILENAME" | head -5)
   if [ -n "$ERRORS" ]; then
-    echo "[QualityGate] Compilation errors in $FILE_PATH:" >&2
-    echo "$ERRORS" >&2
+    ESCAPED_ERRORS="$(printf '%s' "$ERRORS" | sed 's/"/\\"/g' | tr '\n' ' ')"
+    CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}Compilation errors in $FILENAME: $ESCAPED_ERRORS. "
   fi
 fi
 
 # --- 2. Debug statement check ---
 if [ -f "$FILE_PATH" ]; then
   if grep -q 'System\.out\.println\|System\.err\.println' "$FILE_PATH" 2>/dev/null; then
-    echo "[QualityGate] WARNING: System.out.println found in $FILENAME — use SLF4J" >&2
+    HIGH_VIOLATIONS="${HIGH_VIOLATIONS}System.out.println found in $FILENAME — use SLF4J. "
   fi
   if grep -q '\.printStackTrace()' "$FILE_PATH" 2>/dev/null; then
-    echo "[QualityGate] WARNING: printStackTrace() found in $FILENAME — use proper logging" >&2
+    HIGH_VIOLATIONS="${HIGH_VIOLATIONS}printStackTrace() found in $FILENAME — use proper logging. "
   fi
   if grep -q '@Disabled' "$FILE_PATH" 2>/dev/null; then
-    echo "[QualityGate] INFO: @Disabled test found in $FILENAME" >&2
+    HIGH_VIOLATIONS="${HIGH_VIOLATIONS}@Disabled test found in $FILENAME. "
   fi
 fi
 
@@ -81,21 +83,35 @@ fi
 if [ -f "$FILE_PATH" ]; then
   # .block() in non-test files
   if [[ ! "$FILE_PATH" =~ [Tt]est ]] && grep -qn '\.block()' "$FILE_PATH" 2>/dev/null; then
-    echo "[QualityGate] CRITICAL: .block() found in $FILENAME — never block in reactive code" >&2
+    CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}.block() found in $FILENAME — never block in reactive code. "
   fi
   # @Autowired field injection (without constructor injection)
   if grep -n '@Autowired' "$FILE_PATH" 2>/dev/null | grep -v 'constructor\|//\|/\*' | head -1 | grep -q '@Autowired'; then
     AUTOWIRED_LINES=$(grep -c '@Autowired' "$FILE_PATH" 2>/dev/null || echo 0)
     CONSTRUCTOR_COUNT=$(grep -c '@RequiredArgsConstructor\|@AllArgsConstructor' "$FILE_PATH" 2>/dev/null || echo 0)
     if [ "$AUTOWIRED_LINES" -gt 0 ] && [ "$CONSTRUCTOR_COUNT" -eq 0 ]; then
-      echo "[QualityGate] WARNING: @Autowired without constructor injection in $FILENAME — use @RequiredArgsConstructor" >&2
+      HIGH_VIOLATIONS="${HIGH_VIOLATIONS}@Autowired without constructor injection in $FILENAME — use @RequiredArgsConstructor. "
     fi
   fi
   # SELECT * in queries
   if grep -qin 'SELECT \*' "$FILE_PATH" 2>/dev/null; then
-    echo "[QualityGate] WARNING: SELECT * found in $FILENAME — specify column names" >&2
+    HIGH_VIOLATIONS="${HIGH_VIOLATIONS}SELECT * found in $FILENAME — specify column names. "
   fi
 fi
 
-echo "$DATA"
+# --- Output ---
+if [ -n "$CRITICAL_VIOLATIONS" ]; then
+  REASON="$(printf '%s' "[QualityGate] CRITICAL: ${CRITICAL_VIOLATIONS}" | sed 's/"/\\"/g')"
+  printf '{"decision":"block","reason":"%s"}' "$REASON"
+  exit 2
+fi
+
+if [ -n "$HIGH_VIOLATIONS" ]; then
+  MSG="$(printf '%s' "[QualityGate] HIGH: ${HIGH_VIOLATIONS}" | sed 's/"/\\"/g')"
+  printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}' "$MSG"
+  exit 0
+fi
+
+# No violations — pass through
+printf '%s' "$DATA"
 exit 0

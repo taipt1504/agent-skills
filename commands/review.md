@@ -21,6 +21,17 @@ Comprehensive security and quality review of uncommitted changes for Java Spring
 - Run `/verify` before `/review` to catch compilation and test failures first
 - If reviewing a feature implementation, ensure the approved spec is available for adherence checking
 
+## Subagent Context (pass to spawned agent)
+
+When invoking the **reviewer** agent, include in its prompt:
+
+- **Phase**: You are in the **REVIEW** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
+- **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first
+- **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
+- **Classify first**: For each changed file, classify its type, then load the matching skill BEFORE running that checklist (e.g., `devco-agent-skills:spring-security` for security files, `devco-agent-skills:database-patterns` for repositories)
+- **Suggested skill**: Dynamic — determined per file classification
+
 ## Instructions
 
 1. Get changed files:

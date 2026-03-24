@@ -100,6 +100,20 @@ else
   CONTEXT="${CONTEXT}**Hard blocks**: No code without /plan+/spec approval · Tests first · No .block() in src/main/ · No git commit\n\n"
 fi
 
+# --- Summer active injection ---
+if [ "$SUMMER_DETECTED" = true ]; then
+  SUMMER_SKILL="${CLAUDE_PLUGIN_ROOT:-}/skills/summer-core/SKILL.md"
+  [ ! -f "$SUMMER_SKILL" ] && SUMMER_SKILL="$(dirname "$0")/../../skills/summer-core/SKILL.md"
+  if [ -f "$SUMMER_SKILL" ]; then
+    SUMMER_CONTENT="$(cat "$SUMMER_SKILL" 2>/dev/null || true)"
+    if [ -n "$SUMMER_CONTENT" ]; then
+      SUMMER_ESC="$(echo "$SUMMER_CONTENT" | sed 's/\\/\\\\/g' | while IFS= read -r line; do printf '%s\\n' "$line"; done)"
+      CONTEXT="${CONTEXT}## Summer Framework (ACTIVE — load summer skills for this project)\n\n${SUMMER_ESC}\n\n"
+      log "Summer core skill injected ✓"
+    fi
+  fi
+fi
+
 # ---------------------------------------------------------------------------
 # L2 memory context
 # ---------------------------------------------------------------------------

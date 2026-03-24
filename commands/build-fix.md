@@ -7,6 +7,17 @@ description: Incrementally fix Java/Gradle/Maven build and compilation errors fo
 
 Incrementally fix Java/Gradle build and compilation errors for Spring Boot (MVC and WebFlux) projects.
 
+## Subagent Context (pass to spawned agent)
+
+When invoking the **build-fixer** agent, include in its prompt:
+
+- **Phase**: You are in the **BUILD** phase (exception path) of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
+- **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first
+- **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
+- **Exception path**: Build-fix is an exception path — PLAN/SPEC gates do not apply. Fix errors only, no architecture changes.
+- **Suggested skill**: `devco-agent-skills:coding-standards` for Java patterns and import conventions
+
 ## Instructions
 
 1. **Run build:**

@@ -88,6 +88,17 @@ If the test still fails after implementation, debug and fix before moving on.
 ./gradlew test 2>&1 | tail -20
 ```
 
+## Subagent Context (pass to spawned agent)
+
+When invoking each **implementer** subagent (one per task), include in its prompt:
+
+- **Phase**: You are in the **BUILD** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
+- **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first
+- **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
+- **Fresh context**: Each implementer subagent gets a fresh context — pass the skill and spec scenario explicitly
+- **Suggested skills**: `devco-agent-skills:testing-workflow` + domain-specific skill matching the files being touched (e.g., `devco-agent-skills:spring-patterns`, `devco-agent-skills:database-patterns`)
+
 ## Skill Loading
 
 Based on the files being touched, automatically load relevant skills:

@@ -11,6 +11,14 @@ model: sonnet
 maxTurns: 20
 ---
 
+## Before Starting Work (MANDATORY)
+
+1. **Load bootstrap**: Use the Skill tool to load `devco-agent-skills:bootstrap` — contains the skill registry and workflow engine
+2. **Check Summer**: Scan `build.gradle`/`pom.xml` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core`
+3. **Load domain skills**: Match files you'll touch against the bootstrap skill registry → load each matching skill via Skill tool. Start with `devco-agent-skills:testing-workflow` for E2E test patterns and verification pipeline
+4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
+5. **Phase**: You are in the **VERIFY** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+
 # Test Runner (E2E + Blackbox)
 
 Expert end-to-end and blackbox testing specialist for Java Spring WebFlux/MVC backends.
@@ -42,109 +50,9 @@ Expert end-to-end and blackbox testing specialist for Java Spring WebFlux/MVC ba
 
 ---
 
-## Part 1: E2E Tests (Testcontainers + WebTestClient)
+### E2E Test Patterns
 
-### Base Test Configuration
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-@ActiveProfiles("test")
-public abstract class BaseE2ETest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
-
-    @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-        .withExposedPorts(6379);
-
-    @Container
-    static KafkaContainer kafka = new KafkaContainer(
-        DockerImageName.parse("confluentinc/cp-kafka:7.4.0"));
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.r2dbc.url", () ->
-            String.format("r2dbc:postgresql://%s:%d/%s",
-                postgres.getHost(), postgres.getFirstMappedPort(), postgres.getDatabaseName()));
-        registry.add("spring.r2dbc.username", postgres::getUsername);
-        registry.add("spring.r2dbc.password", postgres::getPassword);
-        registry.add("spring.redis.host", redis::getHost);
-        registry.add("spring.redis.port", () -> redis.getFirstMappedPort());
-        registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
-    }
-
-    @Autowired
-    protected WebTestClient webTestClient;
-}
-```
-
-### CRUD Operations
-
-```java
-@Test
-void shouldCreateOrder() {
-    webTestClient.post()
-        .uri("/api/orders")
-        .contentType(MediaType.APPLICATION_JSON)
-        .bodyValue(createRequest)
-        .exchange()
-        .expectStatus().isCreated()
-        .expectBody()
-        .jsonPath("$.orderId").isNotEmpty()
-        .jsonPath("$.status").isEqualTo("PENDING");
-}
-
-@Test
-void shouldReturnOrderById() {
-    webTestClient.get()
-        .uri("/api/orders/{id}", orderId)
-        .exchange()
-        .expectStatus().isOk()
-        .expectBody()
-        .jsonPath("$.orderId").isEqualTo(orderId);
-}
-```
-
-### Async Event Testing
-
-```java
-@Test
-void shouldPublishOrderCreatedEvent() {
-    CountDownLatch latch = new CountDownLatch(1);
-    consumer.setHandler(event -> latch.countDown());
-
-    webTestClient.post().uri("/api/orders")
-        .bodyValue(request).exchange().expectStatus().isCreated();
-
-    assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
-}
-
-@Test
-void shouldProcessPaymentEvent() {
-    kafkaTemplate.send("payment.completed", orderId, paymentEvent);
-
-    await().atMost(Duration.ofSeconds(10))
-        .untilAsserted(() ->
-            webTestClient.get().uri("/api/orders/{id}", orderId)
-                .exchange().expectBody()
-                .jsonPath("$.status").isEqualTo("PAID"));
-}
-```
-
-### Flaky Test Fixes
-
-```java
-// FLAKY: Immediate assertion after async operation
-webTestClient.post()...;
-webTestClient.get()...expectBody().jsonPath("$.status").isEqualTo("DONE");
-
-// STABLE: Wait for async with Awaitility
-await().atMost(Duration.ofSeconds(5))
-    .untilAsserted(() ->
-        webTestClient.get()...expectBody().jsonPath("$.status").isEqualTo("DONE"));
-```
+Load `devco-agent-skills:testing-workflow` — contains all E2E test base configuration, CRUD patterns, async testing, and flaky test fixes.
 
 ---
 

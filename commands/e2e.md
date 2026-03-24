@@ -25,6 +25,16 @@ Use `/e2e` when:
 - Validating Kafka/RabbitMQ event flows
 - Preparing for production deployment
 
+## Subagent Context (pass to spawned agent)
+
+When invoking the **test-runner** agent, include in its prompt:
+
+- **Phase**: You are in the **VERIFY/E2E** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
+- **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first, then `devco-agent-skills:summer-test` for Summer-specific test utilities
+- **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
+- **Suggested skill**: `devco-agent-skills:testing-workflow` for TDD cycle, StepVerifier, and Testcontainers patterns
+
 ## How It Works
 
 The test-runner agent will:

@@ -10,6 +10,14 @@ memory: project
 maxTurns: 15
 ---
 
+## Before Starting Work (MANDATORY)
+
+1. **Load bootstrap**: Use the Skill tool to load `devco-agent-skills:bootstrap` — contains the skill registry and workflow engine
+2. **Check Summer**: Scan `build.gradle`/`pom.xml` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core`
+3. **Load domain skills**: Classify changed files (see File Classification below) → load each matching skill via Skill tool
+4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
+5. **Phase**: You are in the **REVIEW** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+
 ## Memory
 
 Persistent knowledge graph: `search_nodes` before work, `create_entities`/`add_observations` after. Entity naming: PascalCase for services/tech, kebab-case for decisions.
@@ -44,43 +52,9 @@ Multiple checklists can (and should) apply to a single file.
 
 ## Checklist 1: Language Quality (ALWAYS ACTIVE)
 
-### Readability & Naming (HIGH)
+Activated for ALL `.java` files.
 
-- Self-documenting names: variables, methods, classes
-- Consistent naming (camelCase methods, PascalCase classes, UPPER_SNAKE constants)
-- No abbreviations (`q`, `tmp`, `mgr`) — use full descriptive names
-- Methods describe what they do (verb-noun: `fetchMarketData`, `validateOrder`)
-
-### Complexity & Structure (HIGH)
-
-- Methods <= 50 lines, classes <= 400 lines (800 absolute max)
-- Nesting depth <= 3 levels — use guard clauses / early returns
-- Single responsibility per method and class
-
-### Code Smells (HIGH)
-
-| Smell | Rule | Fix |
-|-------|------|-----|
-| Long Method | > 50 lines | Extract named private methods |
-| Deep Nesting | > 3 levels | Guard clauses / early return |
-| Magic Numbers | `if (count > 3)` | `static final int MAX_RETRIES = 3` |
-| God Class | Service doing payments + notifications | Split by responsibility |
-| Duplicated Code | Same logic in 2+ places | Extract shared method |
-| Fully-Qualified Names | `java.util.List<com.example.Order>` inline | Add `import` — never use FQN in code body |
-
-### General Quality (MEDIUM)
-
-- No empty catch blocks
-- No `System.out.println` or `printStackTrace` in production code
-- TODO/FIXME without ticket numbers
-- Commented-out code (should be deleted)
-- Poor variable naming (`x`, `data`, `result`, `flag`)
-
-### Algorithms & Performance (MEDIUM)
-
-- Time complexity: flag O(n^2) when O(n log n) possible
-- Unnecessary object creation in loops
-- Unbounded collections without size limits
+Load `devco-agent-skills:coding-standards` and apply its patterns.
 
 ### Spec Adherence Check (SDD)
 
@@ -98,50 +72,7 @@ When an approved spec exists in the conversation context:
 
 Activated when file contains: `@RestController`, `@Controller`, `@GetMapping`, `@PostMapping`, `@ControllerAdvice`, `@WebMvcTest`, `@WebFluxTest`, `ServerRequest`, `ServerResponse`
 
-### Dependency Injection (CRITICAL)
-
-```java
-// WRONG: Field injection
-@Autowired private OrderRepository orderRepository;
-
-// CORRECT: Constructor injection
-@RequiredArgsConstructor
-public class OrderService {
-    private final OrderRepository orderRepository;
-}
-```
-
-- Circular dependencies must be broken with events or interfaces
-
-### Controller Design (HIGH)
-
-- `@ResponseStatus(HttpStatus.CREATED)` for POST, `NO_CONTENT` for DELETE
-- Return DTOs/records — never raw entities
-- 404 via domain exception, not manual `ResponseEntity.notFound()`
-- Business logic in `@Service`, not controller
-- `@Valid` on all `@RequestBody` parameters
-
-### Exception Handling (CRITICAL)
-
-- `@RestControllerAdvice` for centralized error handling
-- Catch-all does NOT return `ex.getMessage()` to client
-- Consistent error response shape across all controllers
-
-### Configuration (HIGH)
-
-- `@ConfigurationProperties` for grouped config, not scattered `@Value`
-- No hardcoded secrets in code or config files
-- Profile-specific files for different environments
-
-### Filters (HIGH)
-
-- `OncePerRequestFilter` (not raw Filter)
-- `MDC.clear()` in `finally` block
-
-### Testing (MEDIUM)
-
-- `@WebMvcTest`/`@WebFluxTest` for controller tests (not `@SpringBootTest`)
-- Tests cover 401 (unauthenticated), 400 (validation), and domain 4xx errors
+Load `devco-agent-skills:spring-patterns` and apply its checklist.
 
 ---
 
@@ -149,38 +80,7 @@ public class OrderService {
 
 Activated when file contains: `HttpSecurity`, `SecurityWebFilterChain`, `@PreAuthorize`, `@EnableMethodSecurity`, `PasswordEncoder`, `JwtDecoder`, or when new API endpoints are added
 
-### OWASP Top 10
-
-- **Injection**: Parameterized queries only — no string concatenation in SQL
-- **Broken Auth**: BCrypt for passwords, never plaintext comparison
-- **Sensitive Data**: No logging PII/credentials; DTOs strip sensitive fields
-- **Broken Access Control**: `@PreAuthorize` or method-level security on protected endpoints
-- **Security Misconfiguration**: `.anyRequest().authenticated()` as default, not `.permitAll()`
-
-### Spring Security Config (CRITICAL)
-
-```java
-// Stateless REST API security
-http.csrf(AbstractHttpConfigurer::disable)   // Stateless — CSRF not needed
-    .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-    .authorizeHttpRequests(auth -> auth
-        .anyRequest().authenticated())        // Secure by default
-    .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
-    .exceptionHandling(ex -> ex
-        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
-```
-
-### Secrets Detection (CRITICAL)
-
-- No hardcoded API keys, passwords, tokens in source
-- `@Value("${api.key}")` from environment, not static fields
-- No secrets in git history
-
-### Reactive Security (HIGH)
-
-- Rate limiting (Resilience4j)
-- Timeout protection on external calls
-- Race condition prevention in financial operations (optimistic locking)
+Load `devco-agent-skills:spring-security` and apply OWASP rules.
 
 ---
 
@@ -188,47 +88,7 @@ http.csrf(AbstractHttpConfigurer::disable)   // Stateless — CSRF not needed
 
 Activated when file contains: `import reactor.core.publisher`, `Mono<`, `Flux<`, `StepVerifier`, `WebClient`, `R2DBC`, `ReactiveRedisTemplate`
 
-### Never Block the Event Loop (CRITICAL)
-
-- No `.block()`, `.blockFirst()`, `.blockLast()` in reactive code
-- No `Thread.sleep()` in reactive chains
-- Blocking I/O must use `Schedulers.boundedElastic()`
-
-### Anti-Patterns (CRITICAL)
-
-- No `.subscribe()` inside reactive pipelines (loses backpressure)
-- No `Mono.just(expensiveComputation())` — use `Mono.fromCallable()`
-- No throwing exceptions in `.map()` — use `.flatMap()` + `Mono.error()`
-
-### Error Handling (HIGH)
-
-- `onErrorResume`/`onErrorMap` for specific errors, not `onErrorReturn(null)`
-- `doOnError` for logging before transforming errors
-
-### Backpressure (HIGH)
-
-- `.limitRate()` or `.buffer()` for unbounded Flux
-- Overflow strategy for hot publishers
-
-### WebClient (MEDIUM)
-
-- Timeout configuration on all WebClient instances
-- Retry with exponential backoff and max attempts
-
-### Context Propagation (MEDIUM)
-
-- `ReactiveSecurityContextHolder` instead of `SecurityContextHolder`
-- MDC context propagation via `contextWrite`
-
-### R2DBC (HIGH)
-
-- `@Transactional` for multi-step operations
-- No N+1: use JOIN queries or batch fetch
-- Return reactive types from controllers
-
-### Testing (MEDIUM)
-
-- `StepVerifier` instead of `.block()` in tests
+Load `devco-agent-skills:spring-patterns` (WebFlux section) and apply its reactive correctness checklist.
 
 ---
 
@@ -236,39 +96,7 @@ Activated when file contains: `import reactor.core.publisher`, `Mono<`, `Flux<`,
 
 Activated when file contains: `@Entity`, `@Table`, `JpaRepository`, `R2dbcRepository`, `@Query`, `*.sql`, HikariCP config, `@Cacheable`
 
-### Query Performance (CRITICAL)
-
-- No `SELECT *` / `findAll()` without pagination on large tables
-- N+1 eliminated with JOIN FETCH, `@EntityGraph`, or `@BatchSize`
-- Keyset pagination for large result sets (not OFFSET on deep pages)
-
-### Connection Pooling (HIGH)
-
-- HikariCP `maximum-pool-size` tuned (CPU_CORES * 2 + 1, not default)
-- `max-lifetime` set (< MySQL `wait_timeout`)
-
-### Caching (HIGH)
-
-- `@Cacheable` for stable, frequently-read data
-- Cache eviction on writes (`@CacheEvict`)
-- No blocking cache calls in reactive chains — use `ReactiveRedisTemplate`
-
-### JPA Patterns (HIGH)
-
-- `FetchType.LAZY` on all collections (never EAGER)
-- `@DynamicUpdate` on entities
-- Projections instead of full entity loads when possible
-- `BigDecimal` for monetary fields (never float/double)
-
-### Batch Operations (MEDIUM)
-
-- `saveAll()` or `jdbcTemplate.batchUpdate()` for bulk operations
-- No single-row loops for batch inserts
-
-### Async Execution (MEDIUM)
-
-- Independent operations use `Mono.zip` / `Flux.merge` (parallel, not sequential)
-- Background operations use `@Async` in MVC / non-blocking in WebFlux
+Load `devco-agent-skills:database-patterns` and apply its verification checklist.
 
 ---
 
@@ -276,28 +104,7 @@ Activated when file contains: `@Entity`, `@Table`, `JpaRepository`, `R2dbcReposi
 
 Activated when file contains: `@RabbitListener`, `RabbitTemplate`, `KafkaTemplate`, `@KafkaListener`, `QueueBuilder`, `TopicExchange`, messaging config in YAML
 
-### RabbitMQ (CRITICAL)
-
-- All production queues have `x-dead-letter-exchange` configured
-- Consumers use MANUAL ack mode (`channel.basicAck/Nack`)
-- `prefetchCount` tuned appropriately (not default 250)
-- `publisher-confirm-type: correlated` in application.yml
-- `default-requeue-rejected: false` to prevent poison message loops
-- Retry configured with bounded max-attempts (not infinite)
-- `Jackson2JsonMessageConverter` used (not Java serialization)
-
-### Kafka (HIGH)
-
-- Consumer group configured properly
-- Idempotent consumer pattern for at-least-once delivery
-- DLT configured for failed messages
-- Proper serializer/deserializer configuration
-
-### General Messaging (HIGH)
-
-- Retry with bounded max-attempts and exponential backoff
-- Dead-letter topic/queue for unprocessable messages
-- Idempotency strategy documented
+Load `devco-agent-skills:messaging-patterns` and apply its patterns.
 
 ---
 

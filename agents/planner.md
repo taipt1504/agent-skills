@@ -7,6 +7,14 @@ maxTurns: 15
 memory: project
 ---
 
+## Before Starting Work (MANDATORY)
+
+1. **Load bootstrap**: Use the Skill tool to load `devco-agent-skills:bootstrap` — contains the skill registry and workflow engine
+2. **Check Summer**: Scan `build.gradle`/`pom.xml` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core`
+3. **Load domain skills**: Match files you'll touch against the bootstrap skill registry → load each matching skill via Skill tool. Start with `devco-agent-skills:architecture` for architectural patterns
+4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
+5. **Phase**: You are in the **PLAN** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+
 ## Memory
 
 Persistent knowledge graph: `search_nodes` before work, `create_entities`/`add_observations` after. Entity naming: PascalCase for services/tech, kebab-case for decisions.
@@ -105,102 +113,9 @@ Create detailed steps with:
 - Handle errors with onErrorResume/onErrorReturn
 - Use Schedulers appropriately (boundedElastic for blocking I/O)
 
-### CQRS Pattern (Primary)
+### Architecture & Patterns
 
-```java
-// Command Side - Write Operations
-@Component
-public class CreateOrderCommandHandler implements CommandHandler<CreateOrderCommand> {
-    private final OrderRepository repository;
-    private final EventPublisher eventPublisher;
-
-    @Override
-    public Mono<OrderId> handle(CreateOrderCommand command) {
-        return repository.save(Order.create(command))
-            .flatMap(order -> eventPublisher.publish(new OrderCreatedEvent(order))
-                .thenReturn(order.getId()));
-    }
-}
-
-// Query Side - Read Operations
-@Component
-public class OrderQueryHandler implements QueryHandler<GetOrderQuery, OrderDTO> {
-    private final OrderReadRepository readRepository;
-
-    @Override
-    public Mono<OrderDTO> handle(GetOrderQuery query) {
-        return readRepository.findById(query.getOrderId())
-            .map(OrderMapper::toDTO);
-    }
-}
-```
-
-### Hexagonal Architecture
-
-```
-src/main/java/com/example/
-├── application/          # Application Services, Use Cases
-│   ├── command/          # Command Handlers
-│   ├── query/            # Query Handlers
-│   └── service/          # Application Services
-├── domain/               # Domain Layer (Pure Java)
-│   ├── model/            # Aggregates, Entities, Value Objects
-│   ├── event/            # Domain Events
-│   ├── repository/       # Repository Interfaces (Ports)
-│   └── service/          # Domain Services
-├── infrastructure/       # Infrastructure Layer
-│   ├── persistence/      # R2DBC Repositories (Adapters)
-│   ├── messaging/        # Kafka/RabbitMQ Adapters
-│   ├── cache/            # Redis Adapters
-│   └── external/         # External API Clients
-└── interfaces/           # Interface Layer
-    ├── rest/             # REST Controllers (WebFlux)
-    ├── graphql/          # GraphQL Handlers
-    └── messaging/        # Message Listeners
-```
-
-### Domain-Driven Design (DDD)
-
-- Define Bounded Contexts clearly
-- Use Aggregates with invariants
-- Implement Value Objects for immutability
-- Apply Domain Events for state changes
-- Design rich domain models, not anemic
-
-### Event Sourcing
-
-```java
-public interface EventStore {
-    Mono<Void> append(AggregateId id, List<DomainEvent> events, long expectedVersion);
-    Flux<DomainEvent> loadEvents(AggregateId id);
-    Flux<DomainEvent> loadEventsAfterVersion(AggregateId id, long version);
-}
-```
-
-## Common Patterns
-
-### Backend Patterns
-
-- **Repository Pattern**: Abstract data access with R2DBC
-- **Circuit Breaker**: Resilience4j for fault tolerance
-- **Event-Driven Architecture**: Kafka/RabbitMQ for async operations
-- **Saga Pattern**: Distributed transaction management
-- **Outbox Pattern**: Reliable event publishing
-
-### Data Patterns
-
-- **CQRS Projections**: Optimized read models
-- **Caching Layers**: Redis for hot data
-- **Change Data Capture**: Debezium for database events
-- **Eventual Consistency**: For distributed systems
-
-### Reactive Patterns
-
-- **Backpressure**: Handle fast producers/slow consumers
-- **Retry with Backoff**: Resilient external calls
-- **Timeout/Fallback**: Graceful degradation
-- **Bulkhead**: Isolate failures
-- **Rate Limiting**: Protect downstream services
+Load skills as needed: architecture, spring-patterns, database-patterns, messaging-patterns. Do NOT embed patterns from memory — load the skill first.
 
 ## Plan Format
 

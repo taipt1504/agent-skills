@@ -35,6 +35,17 @@ Skip `/plan` only when ALL are true:
 | No new observable behavior | Rename, reformat, comment fix |
 | No architectural impact | No new dependencies, no schema change |
 
+## Subagent Context (pass to spawned agent)
+
+When invoking the **planner** agent, include in its prompt:
+
+- **Phase**: You are in the **PLAN** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
+- **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first
+- **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
+- **Do not write code** — PLAN phase produces a plan document only
+- **Suggested skill**: `devco-agent-skills:architecture` for hexagonal structure and solution design
+
 ## How It Works
 
 The planner agent will:

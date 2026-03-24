@@ -11,6 +11,14 @@ memory: project
 maxTurns: 15
 ---
 
+## Before Starting Work (MANDATORY)
+
+1. **Load bootstrap**: Use the Skill tool to load `devco-agent-skills:bootstrap` — contains the skill registry and workflow engine
+2. **Check Summer**: Scan `build.gradle`/`pom.xml` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core`
+3. **Load domain skills**: Match files you'll touch against the bootstrap skill registry → load each matching skill via Skill tool. Start with `devco-agent-skills:coding-standards` for language patterns
+4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
+5. **Phase**: You are in the **BUILD** phase of SDD (exception path). Build-fix is an exception path — PLAN/SPEC gates do not apply. Fix errors only.
+
 ## Memory
 
 Persistent knowledge graph: `search_nodes` before work, `create_entities`/`add_observations` after. Entity naming: PascalCase for services/tech, kebab-case for decisions.
