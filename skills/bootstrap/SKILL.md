@@ -93,6 +93,7 @@ THEN → BUILD directly (skip PLAN + SPEC)
 - `.block()` in src/main/ → CRITICAL — fix immediately
 - Agent attempts git commit → FORBIDDEN — only user commits
 - **Stopping after BUILD without running VERIFY + REVIEW → FORBIDDEN**
+- **Plan/Spec without document file → FORBIDDEN** — plans MUST be written to `.claude/docs/plans/`, specs to `.claude/docs/specs/`
 
 ### Workflow Completion Rule (CRITICAL)
 

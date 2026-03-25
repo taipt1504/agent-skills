@@ -99,15 +99,29 @@ After spec approval, decompose into ordered atomic tasks:
 
 Each task is independently testable. BUILD phase processes tasks in order.
 
+## Document Persistence (MANDATORY)
+
+The spec MUST be written to a file — not just presented in conversation:
+
+- **Location**: `.claude/docs/specs/{feature-name}.md` (matches plan filename)
+- **References plan**: Frontmatter includes `plan_ref: .claude/docs/plans/{feature-name}.md`
+- **On draft**: Written when first presented
+- **On revision**: Same file updated with revision history
+- **On approval**: `status: approved` updated in frontmatter
+
+The build command will READ this file. If no file exists, BUILD cannot proceed.
+
 ## Approval Protocol
 
-Present the completed spec and WAIT:
+Present the completed spec (already written to file) and WAIT:
 
 ```
 SPEC REVIEW
 
+Spec document: .claude/docs/specs/{feature-name}.md
+
 Approve this spec? (approve / revise / reject)
-- approve -> proceed to BUILD
-- revise  -> provide feedback, I'll update the spec
+- approve -> status updated, proceed to BUILD
+- revise  -> provide feedback, spec document will be updated
 - reject  -> return to /plan for re-planning
 ```

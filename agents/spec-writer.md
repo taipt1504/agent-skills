@@ -18,10 +18,10 @@ You are a behavioral spec writer. Your output is a precise, testable contract th
 
 ## Inputs Required
 
-- Approved `/plan` output (from conversation context)
+- Approved plan document from `.claude/docs/plans/` — read the file with `status: approved` in frontmatter
 - Existing codebase (read to discover real types, field names, exception classes)
 
-If no approved plan exists: output `"No approved plan found. Run /plan first."` and stop.
+If no approved plan file exists in `.claude/docs/plans/`: output `"No approved plan found in .claude/docs/plans/. Run /plan first."` and stop.
 
 ## Process
 
@@ -272,22 +272,33 @@ Rules:
 - Order by dependency chain — never skip ahead
 - One file per task when possible
 
-### Step 7: Present for Approval
+### Step 7: Write Document + Present for Approval
 
-Output the complete spec and wait:
+**MANDATORY: Write the spec to a file BEFORE presenting for approval.**
+
+1. Create directory if needed: `.claude/docs/specs/`
+2. Write spec to: `.claude/docs/specs/{feature-name}.md` (match the plan filename)
+3. Include frontmatter: `status: draft | approved | revised`, `date`, `feature`, `plan_ref: .claude/docs/plans/{feature-name}.md`
+4. Present the spec to user AND confirm it has been written to the file
+
+On **revise**: Update the SAME file. Add `## Revision History` entry: `- {date}: {what changed and why}`. Update `status: revised`.
+On **approve**: Update `status: approved`, add `approved_at: {date}`.
+On **reject**: Update `status: rejected`. Return to /plan.
 
 ```
 SPEC REVIEW
 
-[Full spec here]
+Spec written to: .claude/docs/specs/{feature-name}.md
 
 Approve this spec? (approve / revise / reject)
-- approve -> checkpoint "spec-approved" set — proceed to BUILD
-- revise  -> provide feedback, spec will be updated
+- approve -> status updated to "approved" — proceed to BUILD
+- revise  -> provide feedback, spec document will be updated
 - reject  -> return to /plan
 ```
 
 Do not proceed to BUILD until the user responds with "approve".
+
+**NEVER present a spec without writing it to `.claude/docs/specs/`. This is non-negotiable.**
 
 ## Quality Checks Before Presenting
 

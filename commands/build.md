@@ -9,9 +9,10 @@ Explicit BUILD phase trigger. Invokes the implementer agent to follow the RED-GR
 
 ## Prerequisites
 
-- `/plan` must have been run and approved
-- `/spec` must have been run and approved (spec scenarios and task decomposition available)
-- If no spec exists: **STOP** -- output: `"No approved spec found. Run /spec first."`
+- `/plan` must have been run and approved — check `.claude/docs/plans/` for an approved plan file
+- `/spec` must have been run and approved — check `.claude/docs/specs/` for an approved spec file with `status: approved`
+- If no approved spec file exists: **STOP** -- output: `"No approved spec found in .claude/docs/specs/. Run /spec first."`
+- Read the spec file to get task decomposition and scenarios
 
 ## Usage
 

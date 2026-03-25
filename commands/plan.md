@@ -111,18 +111,29 @@ Agent (planner):
 **WAITING FOR CONFIRMATION**: Proceed with this plan? (yes/no/modify)
 ```
 
+## Document Persistence (MANDATORY)
+
+The plan MUST be written to a file — not just presented in conversation:
+
+- **Location**: `.claude/docs/plans/{feature-name}.md`
+- **On draft**: Written when first presented
+- **On revision**: Same file updated with revision history
+- **On approval**: `status: approved` updated in frontmatter
+
+The spec-writer will READ this file in the next phase. If no file exists, the workflow breaks.
+
 ## Approval Protocol
 
 **CRITICAL**: The planner agent will **NOT** write any code until you explicitly confirm the plan with "yes" or "proceed" or similar affirmative response.
 
 If you want changes, respond with:
 
-- "modify: [your changes]"
-- "different approach: [alternative]"
-- "skip phase 2 and do phase 3 first"
+- "modify: [your changes]" → plan document updated with revision history
+- "different approach: [alternative]" → plan document rewritten
+- "skip phase 2 and do phase 3 first" → plan document adjusted
 
 ## After Planning
 
-- Run `/spec` to define behavioral contracts before writing code
+- Run `/spec` to define behavioral contracts (reads from `.claude/docs/plans/`)
 - Run `/build` to start the TDD implementation cycle
 - Use `/build-fix` if build errors occur during implementation

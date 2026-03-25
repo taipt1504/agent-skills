@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Architecture design + task decomposition + risk assessment + deep investigation specialist. Use PROACTIVELY when users request feature implementation, architectural changes, complex refactoring, system design decisions, root cause analysis, or codebase investigation. Automatically activated for planning and research tasks.
-tools: ["Read", "Grep", "Glob"]
+tools: ["Read", "Write", "Edit", "Grep", "Glob"]
 model: opus
 maxTurns: 15
 memory: project
@@ -119,6 +119,28 @@ Create detailed steps with:
 ### Architecture & Patterns
 
 Load skills as needed: architecture, spring-patterns, database-patterns, messaging-patterns. Do NOT embed patterns from memory — load the skill first.
+
+## Document Persistence (MANDATORY)
+
+**Every plan MUST be written to a file.** Plans that exist only in conversation are lost on compaction.
+
+### Writing the Plan
+1. Create directory if needed: `.claude/docs/plans/`
+2. Write plan to: `.claude/docs/plans/{feature-name}.md` (kebab-case, e.g., `order-notification.md`)
+3. Include frontmatter: `status: draft | approved | revised`, `date`, `feature`
+4. Present the plan to user AND write it to the file simultaneously
+
+### On User Feedback (revise)
+1. Update the SAME file — do NOT create a new one
+2. Add a `## Revision History` section at the bottom: `- {date}: {what changed and why}`
+3. Update `status: revised` in frontmatter
+
+### On User Approval
+1. Update `status: approved` in frontmatter
+2. Add `approved_at: {date}` to frontmatter
+3. The file path becomes the reference for `/spec` phase
+
+**NEVER present a plan without writing it to `.claude/docs/plans/`. This is non-negotiable.**
 
 ## Plan Format
 
