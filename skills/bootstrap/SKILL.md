@@ -92,6 +92,16 @@ THEN → BUILD directly (skip PLAN + SPEC)
 - No tests → BLOCK — code does not ship without tests
 - `.block()` in src/main/ → CRITICAL — fix immediately
 - Agent attempts git commit → FORBIDDEN — only user commits
+- **Stopping after BUILD without running VERIFY + REVIEW → FORBIDDEN**
+
+### Workflow Completion Rule (CRITICAL)
+
+**A task is NOT complete until ALL phases execute.** After BUILD completes:
+1. **IMMEDIATELY** run `/verify full` — no asking, no waiting
+2. After VERIFY passes → **IMMEDIATELY** run `/review`
+3. Only after REVIEW verdict is the task done
+
+**You MUST drive the workflow to completion. Never stop at BUILD.**
 
 ## Subagent Isolation (BUILD phase)
 

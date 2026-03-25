@@ -1,94 +1,86 @@
 ---
 name: continuous-learning
-description: Instinct-based learning system that observes sessions via hooks, creates atomic instincts with confidence scoring, and evolves them into skills/commands/agents.
-version: 2.0.0
+description: Observable learning system — automatic via native memory + MCP knowledge graph, observable via /meta learn commands. Replaces the old instinct-based pipeline.
+version: 3.0.0
 triggers:
   - /meta learn
-  - /meta evolve
-  - /meta instinct
+  - /meta create-skill
   - pattern extraction
 ---
 
-> **Status: EXPERIMENTAL** — The observation hook (`observe.sh`) is not yet automated in hooks.json. This skill requires manual setup. The instinct pipeline is functional but not triggered automatically.
+# Continuous Learning — Automatic & Observable
 
-# Continuous Learning — Instinct-Based Architecture
+Learning happens automatically through two systems working together. No manual setup required.
 
-Turns Claude Code sessions into reusable knowledge through atomic "instincts" — small learned behaviors with confidence scoring.
-
-## The Instinct Model
-
-An instinct is a small learned behavior:
-
-```yaml
----
-id: prefer-functional-style
-trigger: "when writing new functions"
-confidence: 0.7
-domain: "code-style"
-source: "session-observation"
----
-# Prefer Functional Style
-## Action
-Use functional patterns over classes when appropriate.
-## Evidence
-- Observed 5 instances of functional pattern preference
-- User corrected class-based approach to functional on 2025-01-15
-```
-
-**Properties:** Atomic (one trigger, one action), confidence-weighted (0.3-0.9), domain-tagged, evidence-backed.
-
-## How It Works
+## How Learning Works
 
 ```
-Session Activity → Hooks capture prompts + tool use (100% reliable)
-      ↓
-observations.jsonl → Observer agent (background, Haiku)
-      ↓
-PATTERN DETECTION (user corrections, error resolutions, repeated workflows)
-      ↓
-instincts/personal/ (confidence-scored .md files)
-      ↓
-/meta evolve clusters → evolved/ (commands, skills, agents)
+During Session:
+  Claude native auto-memory captures:
+    → User corrections → feedback memories (automatic)
+    → Project decisions → project memories (automatic)
+    → User preferences → user memories (automatic)
+
+  Agents with memory: project capture:
+    → Architectural decisions → MCP knowledge graph entities
+    → Resolved bugs/patterns → MCP knowledge graph observations
+    → Anti-patterns found → MCP knowledge graph entities
+
+Between Sessions:
+  → Native Auto Dream consolidates memories (prune, merge, date-convert)
+  → Knowledge graph persists across sessions (entities + relations)
+  → /meta learn extract distills session into high-value patterns
 ```
 
-## Commands
+## What Gets Learned (Automatically)
 
-| Command                   | Description                                    |
-|---------------------------|------------------------------------------------|
-| `/meta instinct status`        | Show all learned instincts with confidence     |
-| `/meta evolve`                 | Cluster related instincts into skills/commands |
-| `/meta instinct export`        | Export instincts for sharing                   |
-| `/meta instinct import <file>` | Import instincts from others                   |
+| Source | What | Stored In | How |
+|--------|------|-----------|-----|
+| User corrections | "Don't mock DB" / "Use constructor injection" | Native `feedback` memory | Claude saves automatically |
+| Project decisions | "Chose PostgreSQL over MySQL because..." | Native `project` memory | Claude saves automatically |
+| Architecture patterns | Service X uses Y, decided Z | MCP knowledge graph entities | Agents create after work |
+| Bug resolutions | Error pattern → fix applied | MCP knowledge graph observations | Agents add after fix |
+| User preferences | Code style, response format | Native `user` memory | Claude saves automatically |
 
-## Confidence Scoring
+## Observable Learning — /meta Commands
 
-| Score | Meaning      | Behavior                      |
-|-------|--------------|-------------------------------|
-| 0.3   | Tentative    | Suggested but not enforced    |
-| 0.5   | Moderate     | Applied when relevant         |
-| 0.7   | Strong       | Auto-approved for application |
-| 0.9   | Near-certain | Core behavior                 |
+### /meta learn status
+Shows what has been learned across both systems:
+1. Read native memory files from project memory directory
+2. Query MCP knowledge graph: `mcp__memory__read_graph`
+3. Present dashboard:
+   - Memory count by type (user/feedback/project/reference)
+   - Knowledge graph entity count by type
+   - Recent learnings (last 5 memories + last 5 entities)
+   - Knowledge graph health (total entities, relations, observations)
 
-**Increases:** repeated observation, user doesn't correct, corroborating sources.
-**Decreases:** user corrects, pattern not seen for extended periods, contradicting evidence.
+### /meta learn extract
+Distill current session into high-value patterns:
+1. Review session for extractable insights
+2. For corrections/preferences: save as native memory (user asks Claude to `/remember`)
+3. For structured patterns: create MCP knowledge graph entities
+4. Report what was extracted
 
-## Setup
+### /meta learn report
+Periodic summary of learning activity:
+1. Count native memories created in last 7 days
+2. Count MCP entities/observations added in last 7 days
+3. Show most-referenced entities (frequently queried)
+4. Identify stale entities (not referenced in 30+ days)
 
-1. Add PreToolUse/PostToolUse hooks to `~/.claude/settings.json` pointing to `hooks/observe.sh`.
-2. Initialize: `mkdir -p ~/.claude/homunculus/{instincts/{personal,inherited},evolved/{agents,skills,commands}}`
-3. Optional: run background observer via `agents/start-observer.sh`.
+## Design Principles
 
-Configure via `config.json` (observation store, confidence thresholds, observer model, evolution settings).
+1. **Automatic** — learning happens without user intervention
+2. **Observable** — users can SEE what was learned via /meta learn
+3. **Dual-system** — native memory for qualitative, MCP graph for structured
+4. **Minimal** — don't store what git log or reading code can tell you
+5. **Prunable** — Auto Dream handles native memory; stale graph entities flagged via /meta learn report
 
-## File Structure
+## What NOT to Learn
 
-```
-~/.claude/homunculus/
-├── observations.jsonl      # Session observations
-├── instincts/
-│   ├── personal/           # Auto-learned instincts
-│   └── inherited/          # Imported from others
-└── evolved/                # Generated agents, skills, commands
-```
-
-Observations stay local. Only instincts (patterns) can be exported — no code or conversation content is shared.
+Per Claude Code's design principle:
+- Code patterns/conventions → read the code
+- Git history → git log/blame
+- Debugging solutions → the fix is in the code
+- Architecture → read the project structure
+- Anything in CLAUDE.md or rules/

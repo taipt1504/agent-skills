@@ -140,13 +140,13 @@ If a test cannot be made to pass after 3 attempts:
    - Return to `/spec` to revise the scenario
    - Run `/build-fix` for compilation issues
 
-## Completion
+## Completion — MANDATORY: Continue to VERIFY + REVIEW
 
 When all tasks are complete:
 
 1. Run full test suite: `./gradlew test`
 2. Check coverage: `./gradlew jacocoTestReport`
-3. Report final status
+3. Report BUILD status
 
 ```
 BUILD COMPLETE
@@ -155,15 +155,20 @@ Tasks: 4/4 completed
 Tests: 12 passed, 0 failed
 Coverage: 84% (target: 80% -- PASS)
 
-Next steps:
-- Run /verify to check quality, security, and style
-- Run /review before committing
+Proceeding to VERIFY phase...
 ```
+
+4. **IMMEDIATELY invoke `/verify full`** — do NOT stop, do NOT ask the user, do NOT wait. This is MANDATORY.
+5. After VERIFY passes, **IMMEDIATELY invoke `/review`** — do NOT stop. This is MANDATORY.
+6. Only after REVIEW produces a verdict (APPROVE/BLOCK) is the workflow complete.
+
+**CRITICAL: Stopping after BUILD without running VERIFY and REVIEW is a workflow violation. The task is NOT done until REVIEW completes.**
 
 ## Integration with Workflow
 
 ```
 /plan -> /spec -> /build -> /verify -> /review
+                              ↑ YOU ARE HERE    ↑ MUST REACH HERE
 ```
 
-The BUILD phase sits between SPEC (contracts defined) and VERIFY (quality gates). Each task in the build follows the TDD cycle independently, producing tested, incremental code.
+The BUILD phase is step 3 of 5. You MUST continue through VERIFY (step 4) and REVIEW (step 5) to complete the workflow.

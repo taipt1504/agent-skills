@@ -1,196 +1,129 @@
 ---
 name: meta
-description: Meta-learning commands -- extract patterns, evolve instincts into skills, get quick guidance, and create new skills from patterns.
+description: Observable learning commands — view what agents have learned, extract session patterns, generate learning reports.
 ---
 
-# /meta -- Meta-Learning & Self-Improvement
-
-Unified command for pattern extraction, instinct management, skill evolution, and skill creation.
+# /meta -- Observable Learning & Skill Creation
 
 ## Usage
 
 ```
-/meta learn              -> extract patterns from current session
-/meta evolve             -> cluster instincts into skills/commands
-/meta instinct           -> show instinct status (default)
-/meta instinct export    -> export instincts to shareable YAML
-/meta instinct import    -> import instincts from file
+/meta learn status       -> show learning dashboard (memories + knowledge graph)
+/meta learn extract      -> distill current session into learnings
+/meta learn report       -> weekly learning summary
 /meta create-skill       -> create new skill from repo patterns
 ```
 
 ---
 
-## Subcommand: /meta learn
+## /meta learn status
 
-Extract reusable patterns from the current session and save them as skills.
-
-### What to Extract
-
-1. **Error Resolution Patterns** - What error occurred, root cause, what fixed it
-2. **Debugging Techniques** - Non-obvious debugging steps, tool combinations
-3. **Workarounds** - Library quirks, API limitations, version-specific fixes
-4. **Project-Specific Patterns** - Codebase conventions, architecture decisions
+Show what has been learned across native memory and MCP knowledge graph.
 
 ### Process
 
-1. Review the session for extractable patterns
-2. Identify the most valuable/reusable insight
-3. Draft the skill file
-4. Ask user to confirm before saving
-5. Save to `~/.claude/skills/learned/`
+1. **Read native memories**: List files in the project's memory directory, categorize by type (user/feedback/project/reference)
+2. **Query knowledge graph**: Use `mcp__memory__read_graph` to get all entities and relations
+3. **Present dashboard**:
 
-### Output Format
-
-Create a skill file at `~/.claude/skills/learned/[pattern-name].md`:
-
-```markdown
-# [Descriptive Pattern Name]
-
-**Extracted:** [Date]
-**Context:** [Brief description of when this applies]
-
-## Problem
-[What problem this solves]
-
-## Solution
-[The pattern/technique/workaround]
-
-## Example
-[Code example if applicable]
-
-## When to Use
-[Trigger conditions]
 ```
+LEARNING DASHBOARD
+==================
+Native Memory:
+  user:      2 memories (preferences, expertise)
+  feedback:  5 memories (corrections, confirmed approaches)
+  project:   3 memories (decisions, context)
+  reference: 1 memory (external systems)
 
-### Guidelines
+Knowledge Graph:
+  Entities:     12 (5 services, 3 decisions, 2 patterns, 2 blockers)
+  Relations:    8
+  Observations: 24
 
-- Don't extract trivial fixes (typos, simple syntax errors)
-- Don't extract one-time issues (specific API outages)
-- Focus on patterns that will save time in future sessions
-- Keep skills focused -- one pattern per skill
+Recent Learnings:
+  [feedback] Don't mock DB in integration tests (2026-03-24)
+  [project]  Auth middleware rewrite for compliance (2026-03-23)
+  [entity]   OrderService uses PostgreSQL+R2DBC (2026-03-22)
+
+Stale (>30 days, consider pruning):
+  (none)
+```
 
 ---
 
-## Subcommand: /meta evolve
+## /meta learn extract
 
-Analyze instincts and cluster related ones into higher-level structures (commands, skills, or agents).
-
-### Evolution Rules
-
-**-> Command** (user-invoked actions):
-When instincts describe actions a user would explicitly request with a repeatable sequence.
-
-**-> Skill** (auto-triggered behaviors):
-When instincts describe behaviors that should happen automatically -- pattern-matching triggers, error handling, code style enforcement.
-
-**-> Agent** (needs depth/isolation):
-When instincts describe complex, multi-step processes that benefit from isolation -- debugging workflows, refactoring sequences, research tasks.
+Distill the current session into reusable knowledge.
 
 ### Process
 
-1. Read all instincts from `~/.claude/homunculus/instincts/`
-2. Group instincts by domain similarity, trigger pattern overlap, action sequence
-3. For each cluster of 3+ related instincts, determine evolution type
-4. Generate the appropriate file
-5. Save to `~/.claude/homunculus/evolved/{commands,skills,agents}/`
+1. Review the conversation for high-value patterns:
+   - User corrections (things the agent got wrong → feedback memory)
+   - Architectural decisions (why X over Y → project memory + MCP entity)
+   - Bug resolutions (error → fix pattern → MCP entity with observation)
+   - New conventions discovered (naming, patterns → project memory)
 
-### Flags
+2. For each pattern found, determine storage:
+   - Qualitative (preferences, corrections): suggest user runs `/remember` to save as native memory
+   - Structured (entities, decisions, relations): create MCP knowledge graph entries directly
 
-- `--execute` - Actually create the evolved structures (default is preview)
-- `--dry-run` - Preview without creating
-- `--domain <name>` - Only evolve instincts in specified domain
-- `--threshold <n>` - Minimum instincts to form cluster (default: 3)
-- `--type <command|skill|agent>` - Only create specified type
-
-### Output
+3. Report extraction results:
 
 ```
-Evolve Analysis
-===============
+SESSION DISTILLATION
+====================
+Extracted 4 learnings:
 
-Found 3 clusters ready for evolution:
+1. [feedback] User prefers single bundled PR for refactors
+   → Suggest: /remember "Prefer single bundled PR for refactors"
 
-Cluster 1: Database Migration Workflow
-  Instincts: new-table-migration, update-schema, regenerate-types
-  Type: Command
-  Confidence: 85%
+2. [entity] PaymentService → created with: R2DBC, Saga pattern
+   → Created: MCP entity "PaymentService" with observations
 
-Cluster 2: Functional Code Style
-  Instincts: prefer-functional, use-immutable, avoid-classes
-  Type: Skill
-  Confidence: 78%
+3. [decision] chose-saga-over-2pc → for distributed transactions
+   → Created: MCP entity with rationale
 
-Run `/meta evolve --execute` to create these files.
+4. [pattern] retry-with-backoff → standard error handling pattern
+   → Created: MCP entity with code reference
 ```
 
 ---
 
-## Subcommand: /meta instinct
+## /meta learn report
 
-Manage learned instincts -- view status, export for sharing, or import from teammates.
+Weekly summary of learning activity.
 
-### /meta instinct (status)
+### Process
 
-Show all learned instincts grouped by domain with confidence scores.
+1. Read native memory files — count by type, identify recent additions
+2. Query MCP graph — count entities, relations, observations
+3. Identify trends:
+   - Most frequently queried entities (popular knowledge)
+   - Stale entities (not referenced in 30+ days)
+   - Feedback memories (user corrections — are they decreasing over time?)
 
-**Flags:**
-- `--domain <name>` - Filter by domain
-- `--low-confidence` - Show only confidence < 0.5
-- `--high-confidence` - Show only confidence >= 0.7
-
-**Process:**
-1. Read instinct files from `~/.claude/homunculus/instincts/personal/`
-2. Read inherited instincts from `~/.claude/homunculus/instincts/inherited/`
-3. Display grouped by domain
-
-**Output:**
 ```
-Instinct Status
-===============
+WEEKLY LEARNING REPORT (2026-03-18 to 2026-03-25)
+==================================================
+New memories:    +3 (1 feedback, 1 project, 1 reference)
+New entities:    +5 (2 services, 2 decisions, 1 pattern)
+New observations: +8
 
-Code Style (4 instincts)
-  prefer-functional-style
-  Trigger: when writing new functions -> Use functional patterns
-  Confidence: 80%  |  Source: session-observation
+Top entities (most referenced):
+  1. OrderService (queried 12 times)
+  2. chose-cqrs-pattern (queried 8 times)
+  3. PostgreSQL (queried 6 times)
 
-Testing (2 instincts)
-  test-first-workflow
-  Trigger: when adding new functionality -> Write test first
-  Confidence: 90%  |  Source: session-observation
+Correction trend: 2 feedback memories this week (down from 4 last week)
+  → Agent is learning from corrections ✓
 
-Total: 9 instincts (4 personal, 5 inherited)
+Stale (consider pruning):
+  - old-auth-middleware-decision (45 days, replaced by compliance rewrite)
 ```
-
-### /meta instinct export
-
-Export instincts to a shareable YAML format.
-
-**Flags:**
-- `--domain <name>` - Export only specified domain
-- `--min-confidence <n>` - Minimum confidence threshold (default: 0.3)
-- `--output <file>` - Output path
-- `--format <yaml|json|md>` - Output format (default: yaml)
-
-**Privacy:** Exports include trigger patterns, actions, confidence scores. Exports do NOT include code snippets, file paths, session transcripts, or personal identifiers.
-
-### /meta instinct import
-
-Import instincts from teammates, Skill Creator, or community collections.
-
-**Flags:**
-- `--dry-run` - Preview without importing
-- `--force` - Import even if conflicts exist
-- `--merge-strategy <higher|local|import>` - How to handle duplicates
-- `--min-confidence <n>` - Only import above threshold
-
-**Merge Strategy:**
-- Duplicates: higher confidence wins, merge observation counts
-- Conflicts: skip by default, flag for manual resolution
-- Imported instincts marked with `source: "inherited"`
 
 ---
 
-## Subcommand: /meta create-skill
+## /meta create-skill
 
 Analyze the repository's git history to extract coding patterns and generate SKILL.md files.
 
@@ -199,53 +132,11 @@ Analyze the repository's git history to extract coding patterns and generate SKI
 ```
 /meta create-skill                    # Analyze current repo
 /meta create-skill --commits 100      # Analyze last 100 commits
-/meta create-skill --output ./skills  # Custom output directory
-/meta create-skill --instincts        # Also generate instincts
 ```
 
-### Analysis Steps
+### Process
 
-1. **Gather Git Data**
-   ```bash
-   git log --oneline -n 200 --name-only --pretty=format:"%H|%s|%ad" --date=short
-   git log --oneline -n 200 --name-only | sort | uniq -c | sort -rn | head -20
-   ```
-
-2. **Detect Patterns**
-
-   | Pattern                | Detection Method                               |
-   |------------------------|------------------------------------------------|
-   | Commit conventions     | Regex on commit messages (feat:, fix:, chore:) |
-   | File co-changes        | Files that always change together               |
-   | Workflow sequences     | Repeated file change patterns                   |
-   | Architecture           | Folder structure and naming conventions          |
-   | Testing patterns       | Test file locations, naming, coverage            |
-
-3. **Generate SKILL.md**
-
-   ```markdown
-   ---
-   name: {repo-name}-patterns
-   description: Coding patterns extracted from {repo-name}
-   version: 1.0.0
-   source: local-git-analysis
-   analyzed_commits: {count}
-   ---
-
-   # {Repo Name} Patterns
-
-   ## Commit Conventions
-   ## Code Architecture
-   ## Workflows
-   ## Testing Patterns
-   ```
-
-4. **Generate Instincts** (if --instincts flag)
-
-   Creates instinct YAML files for the continuous-learning system.
-
-### GitHub App Integration
-
-For advanced features (10k+ commits, team sharing, auto-PRs), use the Skill Creator GitHub App:
-- Install: github.com/apps/skill-creator
-- Comment `/skill-creator analyze` on any issue
+1. Gather git data: `git log --oneline -n 200 --name-only`
+2. Detect patterns: commit conventions, file co-changes, architecture, testing
+3. Generate SKILL.md with extracted patterns
+4. Ask user to confirm before saving

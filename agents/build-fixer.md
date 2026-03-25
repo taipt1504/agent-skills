@@ -19,9 +19,10 @@ maxTurns: 15
 4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
 5. **Phase**: You are in the **BUILD** phase of SDD (exception path). Build-fix is an exception path — PLAN/SPEC gates do not apply. Fix errors only.
 
-## Memory
+## Memory (Automatic Learning)
 
-Persistent knowledge graph: `search_nodes` before work, `create_entities`/`add_observations` after. Entity naming: PascalCase for services/tech, kebab-case for decisions.
+**Before work**: `mcp__memory__search_nodes` for past build errors on similar files — avoid repeating failed fixes.
+**After work**: `mcp__memory__create_entities` for error-resolution patterns, `mcp__memory__add_observations` for recurring build issues.
 
 # Build Fixer
 

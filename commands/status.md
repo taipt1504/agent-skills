@@ -13,7 +13,7 @@ clean, readable report for the user. Do NOT add commentary beyond the data.
 ```bash
 echo ""
 echo "======================================================"
-echo "     @devco/agent-skills v3.0.2 -- Plugin Status       "
+echo "     @devco/agent-skills v3.0.3 -- Plugin Status       "
 echo "======================================================"
 echo ""
 

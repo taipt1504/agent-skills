@@ -17,13 +17,6 @@ PROJECT_NAME="$(basename "$(pwd)")"
 
 log "Project: $PROJECT_NAME | Root: $PROJECT_ROOT"
 
-# --- Auto-init memory ---
-MEMORY_INIT="$(dirname "$0")/../memory/init.sh"
-[ -x "$MEMORY_INIT" ] || MEMORY_INIT="${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/init.sh"
-if [ -x "$MEMORY_INIT" ]; then
-  bash "$MEMORY_INIT" "$PROJECT_ROOT" 2>/dev/null || true
-fi
-
 # --- Detect project type ---
 BUILD_TOOL="unknown"
 if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
@@ -112,16 +105,6 @@ if [ "$SUMMER_DETECTED" = true ]; then
       log "Summer core skill injected ✓"
     fi
   fi
-fi
-
-# ---------------------------------------------------------------------------
-# L2 memory context
-# ---------------------------------------------------------------------------
-READ_CONTEXT="$(dirname "$0")/../memory/read-context.sh"
-[ -x "$READ_CONTEXT" ] || READ_CONTEXT="${CLAUDE_PLUGIN_ROOT:-}/scripts/memory/read-context.sh"
-if [ -x "$READ_CONTEXT" ]; then
-  MEMORY_CONTEXT="$(bash "$READ_CONTEXT" 2>/dev/null || true)"
-  [ -n "$MEMORY_CONTEXT" ] && CONTEXT="${CONTEXT}## Memory Context\n\n${MEMORY_CONTEXT}\n\n"
 fi
 
 # ---------------------------------------------------------------------------

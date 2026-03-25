@@ -19,9 +19,10 @@ maxTurns: 15
 4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
 5. **Phase**: You are in the **REVIEW** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
 
-## Memory
+## Memory (Automatic Learning)
 
-Persistent knowledge graph: `search_nodes` before work, `create_entities`/`add_observations` after. Entity naming: PascalCase for services/tech, kebab-case for decisions.
+**Before work**: `mcp__memory__search_nodes` for known database patterns, past schema decisions.
+**After work**: `mcp__memory__create_entities` for new schema decisions, migration patterns. `mcp__memory__add_observations` for performance findings.
 
 # Database Reviewer
 

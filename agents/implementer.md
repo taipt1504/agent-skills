@@ -89,6 +89,17 @@ Load `devco-agent-skills:testing-workflow` — it contains all test code pattern
 - Random/hardcoded test data instead of factory methods
 - `@SpringBootTest` for controller-only tests (use `@WebMvcTest`/`@WebFluxTest`)
 
+## After Completing Work (MANDATORY)
+
+When all tasks from the spec are implemented and tests pass:
+
+1. Report BUILD COMPLETE with test count and coverage
+2. **IMMEDIATELY proceed to VERIFY**: Invoke `/verify full` — do NOT stop, do NOT ask
+3. After VERIFY passes, **IMMEDIATELY proceed to REVIEW**: Invoke `/review` — do NOT stop
+4. Only after REVIEW verdict is the workflow complete
+
+**Stopping after BUILD is FORBIDDEN. The SDD workflow requires ALL 5 phases.**
+
 ---
 
-**Remember**: No code without tests. Follow the spec. Implement one task at a time. RED -> GREEN -> REFACTOR.
+**Remember**: No code without tests. Follow the spec. Implement one task at a time. RED -> GREEN -> REFACTOR. After BUILD → VERIFY → REVIEW (mandatory).

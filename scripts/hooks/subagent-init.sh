@@ -48,6 +48,12 @@ CTX="${CTX}### Hard Blocks\n"
 CTX="${CTX}- .block() in src/main/ → CRITICAL — fix immediately\n"
 CTX="${CTX}- No git commit/push — only the user commits\n"
 CTX="${CTX}- No code without approved plan+spec (exception: ≤5 line trivial fixes)\n"
+CTX="${CTX}- **Stopping after BUILD without VERIFY+REVIEW is FORBIDDEN**\n\n"
+CTX="${CTX}### Workflow Completion (CRITICAL)\n"
+CTX="${CTX}After BUILD: IMMEDIATELY run /verify full, then /review. A task is NOT done until REVIEW completes.\n"
+CTX="${CTX}\n### Knowledge Graph Memory\n"
+CTX="${CTX}Use mcp__memory__search_nodes before starting work to find relevant past context.\n"
+CTX="${CTX}After completing work, use mcp__memory__create_entities for new findings.\n"
 
 # --- Summer injection ---
 if [ "$SUMMER_DETECTED" = true ]; then
