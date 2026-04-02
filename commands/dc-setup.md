@@ -1,163 +1,138 @@
 ---
 name: dc-setup
-description: Install devco-agent-skills into the current project. Copies rules, hooks, and CLAUDE.md. Includes MCP server configuration as a subcommand.
+description: Install devco-agent-skills into the current project. Interactive wizard — always asks user preferences before configuring.
 ---
 
-# /dc-setup -- One-Time Project Install
+# /dc-setup — Interactive Project Setup
 
-Everything installs under `.claude/` -- one directory for all Claude context:
+## CRITICAL RULE: Always Ask, Never Force Defaults
 
-| File/Dir | Auto-loaded by Claude |
-|----------|----------------------|
-| `.claude/CLAUDE.md` | Every session for this project |
-| `.claude/rules/` | Every session for this project |
-| `.claude/memory/` | Restored by session-init hook |
+You MUST ask the user for their preferences before configuring ANYTHING.
+Never auto-apply defaults. Never skip user choices. The user decides everything.
 
-## Run setup now
+## Setup Flow
 
-Use the Bash tool to execute the **Team Kit installer**. First, locate the plugin:
+### Phase 1: Ask User Preferences (MANDATORY — before any script runs)
+
+Use the **AskUserQuestion** tool to gather all preferences FIRST:
+
+**Question 1 — Development Mode:**
+
+```
+Which development mode do you prefer?
+- standard (Recommended): Full PLAN→SPEC→BUILD→VERIFY→REVIEW workflow, confirmations required
+- yolo: Skip plan/spec confirmations, minimal hooks, fastest iteration
+- strict: All gates enforced, all hooks active, best for production codebases
+```
+
+**Question 2 — Team Features:**
+
+```
+Enable multi-agent team features?
+- Yes: Parallel BUILD with multiple agents, concurrent reviews
+- No: Single agent mode (simpler, lower cost)
+```
+
+**Question 3 — MCP Servers:**
+After project detection, present detected stack and ask:
+
+```
+Based on your project, these MCP servers are recommended:
+[list detected MCPs based on build.gradle/pom.xml]
+Which would you like to install? (select all that apply)
+```
+
+### Phase 2: Run Project Detection
+
+Detect the project stack FIRST (before config) so you can show the user what was detected:
 
 ```bash
 PLUGIN_DIR="$(find "$HOME/.claude/plugins" -maxdepth 4 -name "setup-kit.sh" \
   -path "*/devco-agent-skills/*" 2>/dev/null | head -1 | xargs -I{} dirname {} | xargs -I{} dirname {})"
 
 if [ -z "$PLUGIN_DIR" ]; then
-  echo "Plugin not found in ~/.claude/plugins"
-  echo "Install it first: claude plugin add devco-agent-skills@devco-agent-skills"
+  echo "Plugin not found. Install: claude plugin add devco-agent-skills@devco-agent-skills"
   exit 1
 fi
-
 echo "Plugin found at: $PLUGIN_DIR"
 ```
 
-Then run the full setup from the **target project's root directory**:
+Detect stack (read-only, no writes yet):
 
 ```bash
-# Interactive (recommended for first install)
-bash "$PLUGIN_DIR/scripts/setup-kit.sh"
+# Detect build tool
+if [ -f ./gradlew ]; then BUILD_TOOL="gradle-wrapper"
+elif [ -f ./build.gradle ] || [ -f ./build.gradle.kts ]; then BUILD_TOOL="gradle"
+elif [ -f ./mvnw ]; then BUILD_TOOL="maven-wrapper"
+elif [ -f ./pom.xml ]; then BUILD_TOOL="maven"
+else BUILD_TOOL="unknown"; fi
 
-# Or non-interactive with mode preset
-bash "$PLUGIN_DIR/scripts/setup-kit.sh" --mode standard
+# Detect Spring type
+SPRING_TYPE="unknown"
+for bf in build.gradle build.gradle.kts pom.xml; do
+  [ -f "$bf" ] || continue
+  grep -q "spring-boot-starter-webflux" "$bf" 2>/dev/null && SPRING_TYPE="webflux"
+  grep -q "spring-boot-starter-web" "$bf" 2>/dev/null && [ "$SPRING_TYPE" = "unknown" ] && SPRING_TYPE="mvc"
+done
 
-# With team features enabled
-bash "$PLUGIN_DIR/scripts/setup-kit.sh" --mode standard --team
+# Detect dependencies
+for dep in postgresql mysql redis kafka rabbitmq testcontainers docker; do
+  for bf in build.gradle build.gradle.kts pom.xml; do
+    [ -f "$bf" ] && grep -qi "$dep" "$bf" 2>/dev/null && eval "HAS_$(echo $dep | tr 'a-z' 'A-Z')=true"
+  done
+done
+
+echo "Build tool: $BUILD_TOOL"
+echo "Spring type: $SPRING_TYPE"
 ```
 
-This runs all 6 setup phases: core install, plugin config, project detection, hook registration, MCP suggestions, and validation.
+**Present detection results to user** and ask if they want to adjust anything before proceeding.
 
-## Commit to version control
+### Phase 3: Run Setup with User's Choices
 
-Share with your team by committing the generated files:
+ONLY after getting ALL user preferences, run setup-kit.sh with the appropriate flags:
 
 ```bash
-git add .claude/CLAUDE.md .claude/rules/ .claude/settings.json
-git commit -m "chore: add Claude Code project context"
+# Build the command based on user choices
+CMD="bash $PLUGIN_DIR/scripts/setup-kit.sh --mode {user_chosen_mode}"
+[ "{team_enabled}" = "yes" ] && CMD="$CMD --team"
+
+# Run setup
+eval "$CMD"
 ```
 
-Once committed, every teammate who clones the repo gets the full context automatically -- no manual setup required.
+### Phase 4: MCP Server Installation
 
-## Optional: also install globally
+Based on user's MCP selections from Phase 1 Question 3:
 
-To load plugin rules in **every** project on this machine:
+- ONLY install the MCPs the user explicitly chose
+- For each selected MCP, run `claude mcp add` with the appropriate config
+- Show the user what was installed and ask if they want to adjust
 
-```bash
-bash "$PLUGIN_DIR/scripts/setup.sh" --global
+### Phase 5: Verify & Show Summary
+
+Show the user what was configured and ask if everything looks correct:
+
+```
+Setup Summary:
+- Mode: {mode}
+- Team: {enabled/disabled}
+- Spring type: {detected}
+- Dependencies: {list}
+- MCPs installed: {list}
+- Hooks: auto-registered via plugin system
+
+Does this look correct? Any changes needed?
 ```
 
-## Refresh after plugin update
+## Important Notes
 
-Safe to run multiple times -- idempotent:
+- **Hooks are auto-registered** by the Claude Code plugin system from `hooks/hooks.json`. Do NOT copy hooks into `.claude/settings.json` — the plugin system handles this.
+- **project-profile.json** and **devco-config.json** must be in sync — detected stack info should populate both files.
+- **Safe to re-run** — setup-kit.sh is idempotent, won't overwrite user customizations.
 
-```bash
-bash "$PLUGIN_DIR/scripts/setup-kit.sh" --mode standard
-```
-
-## Validate installation
+## Quick Re-run (after plugin update)
 
 ```bash
 bash "$PLUGIN_DIR/scripts/setup-kit.sh" --validate
 ```
-
-## What gets installed
-
-```
-PROJECT_ROOT/
-+-- .claude/
-    +-- CLAUDE.md              <- project conventions (~400 tokens)
-    +-- rules/                 <- 9 flat rule files, loaded every session
-    |   +-- coding-style.md
-    |   +-- security.md
-    |   +-- architecture-patterns.md
-    |   +-- testing.md
-    |   +-- ...
-    +-- memory/                <- 3-tier memory (L1/L2/L3)
-    +-- settings.json          <- team auto-install (hooks + permissions)
-```
-
-## Phase 3: MCP Server Setup
-
-After project-profile.json is written, suggest relevant MCP servers based on detected stack:
-
-| Stack Detected | Suggested MCP | Config Source |
-|----------------|---------------|---------------|
-| Any Java project | context7, sequential-thinking | `mcp-configs/core/context7.json`, `mcp-configs/core/sequential-thinking.json` |
-| PostgreSQL in deps | PostgreSQL MCP | `mcp-configs/core/postgres.json` |
-| Redis in deps | Redis MCP | `mcp-configs/optional/redis.json` |
-| Kafka in deps | Kafka MCP | `mcp-configs/optional/kafka.json` |
-| Docker/Testcontainers | Docker MCP | `mcp-configs/core/docker.json` |
-| GitHub remote | GitHub MCP | `mcp-configs/core/github.json` |
-| Memory desired | SimpleMem MCP | `mcp-configs/optional/memory.json` |
-
-**Flow:**
-
-1. Read `project-profile.json` for stack detection
-2. Match detected dependencies against MCP suggestion table
-3. Present suggestions to user (only relevant ones, not all)
-4. User selects which to install
-5. Merge selected MCP configs into `.claude/settings.json` `mcpServers` section
-6. Run health check on each installed MCP server
-
-### Audit Current State
-
-Before suggesting new servers, check what's already installed:
-
-```bash
-claude mcp list
-```
-
-Recommended: <10 servers, <80 tools total. If over budget, suggest removing unused servers before adding new ones.
-
-### Core Servers (recommended for all Java projects)
-
-| Server | Package | Description |
-|--------|---------|-------------|
-| context7 | @upstash/context7-mcp@latest | Library documentation lookup |
-| sequential-thinking | @modelcontextprotocol/server-sequential-thinking | Step-by-step reasoning |
-| docker | @modelcontextprotocol/server-docker | Container lifecycle for Testcontainers |
-| github | @modelcontextprotocol/server-github | PR/issue management (needs GITHUB_TOKEN) |
-| postgres | @modelcontextprotocol/server-postgres | Schema inspection, queries (needs DATABASE_URL) |
-
-### Optional Servers (stack-dependent)
-
-| Server | Package | When to Enable |
-|--------|---------|---------------|
-| redis | @modelcontextprotocol/server-redis | Project uses Spring Data Redis or Lettuce |
-| kafka | @modelcontextprotocol/server-kafka | Project uses Spring Kafka |
-| memory | @modelcontextprotocol/server-memory | Cross-session knowledge graph desired |
-
-### Productivity Servers
-
-| Server | Tools | Description |
-|--------|-------|-------------|
-| fetch | ~2 | URL fetch + HTML-to-Markdown |
-| exa-search | ~3 | Neural web search (needs EXA_API_KEY) |
-| filesystem | ~11 | Secure directory access outside CWD |
-| notion | ~8 | Workspace/wiki access |
-
-### Post-Install
-
-- Run `claude mcp list` to verify
-- Restart Claude Code to load new servers
-- Never hardcode credentials -- always use environment variables
-- Use read-only database users for PostgreSQL MCP
-- Dev/local instances only for Redis and Kafka

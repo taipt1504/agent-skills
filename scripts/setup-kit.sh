@@ -622,58 +622,85 @@ fi
 
 pass "project-profile.json written"
 
+# --- Sync detected values into devco-config.json project section ---
+if [ -f "$CONFIG_FILE" ] && command -v python3 &>/dev/null; then
+  python3 -c "
+import json
+
+with open('$CONFIG_FILE', 'r') as f:
+    config = json.load(f)
+
+# Map detected spring type to config project.type
+spring_map = {'webflux': 'spring-webflux', 'mvc': 'spring-mvc', 'unknown': None}
+config.setdefault('project', {})
+config['project']['type'] = spring_map.get('$SPRING_TYPE', None)
+config['project']['useSummer'] = $( [ \"$SUMMER\" = \"true\" ] && echo True || echo False )
+config['project']['stack'] = {
+    'buildTool': '$BUILD_TOOL',
+    'javaVersion': '$JAVA_VERSION',
+    'postgresql': $( $HAS_POSTGRES && echo True || echo False ),
+    'mysql': $( $HAS_MYSQL && echo True || echo False ),
+    'redis': $( $HAS_REDIS && echo True || echo False ),
+    'kafka': $( $HAS_KAFKA && echo True || echo False ),
+    'rabbitmq': $( $HAS_RABBITMQ && echo True || echo False ),
+    'docker': $( $HAS_DOCKER && echo True || echo False )
+}
+
+with open('$CONFIG_FILE', 'w') as f:
+    json.dump(config, f, indent=2)
+    f.write('\n')
+"
+  pass "devco-config.json project section synced with detected stack"
+fi
+
 # ---------------------------------------------------------------------------
-# Step 4: Hook Registration
+# Step 4: Plugin Registration
 # ---------------------------------------------------------------------------
 
-step 4 "Hook Registration"
+step 4 "Plugin Registration"
 
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
-HOOKS_SOURCE="$PLUGIN_DIR/hooks/hooks.json"
 
-# Ensure settings.json exists
+# Ensure settings.json exists with minimal structure
 if [ ! -f "$SETTINGS_FILE" ]; then
   echo '{}' > "$SETTINGS_FILE"
 fi
 
-if [ -f "$HOOKS_SOURCE" ]; then
-  if grep -q '"hooks"' "$SETTINGS_FILE" 2>/dev/null; then
-    # Merge new hooks into existing
-    added=$(json_merge_hooks "$HOOKS_SOURCE" "$SETTINGS_FILE")
-    if [ "$added" -gt 0 ] 2>/dev/null; then
-      pass "$added new hook entries merged into settings.json"
-    else
-      pass "Hooks already registered in settings.json"
-    fi
-  else
-    # No hooks section yet — merge hooks into settings
-    if command -v python3 &>/dev/null; then
-      python3 -c "
+# Hooks are auto-registered by Claude Code plugin system from hooks/hooks.json.
+# We do NOT copy hooks into settings.json — that would cause double-registration.
+# Instead, we ensure the plugin is enabled and env vars are set.
+
+if command -v python3 &>/dev/null; then
+  python3 -c "
 import json
+
 with open('$SETTINGS_FILE', 'r') as f:
     settings = json.load(f)
-with open('$HOOKS_SOURCE', 'r') as f:
-    hooks_data = json.load(f)
-settings['hooks'] = hooks_data.get('hooks', {})
+
+# Ensure enabledPlugins contains our plugin
+enabled = settings.setdefault('enabledPlugins', {})
+if 'devco-agent-skills@devco-agent-skills' not in enabled:
+    enabled['devco-agent-skills@devco-agent-skills'] = True
+
+# Ensure env vars for agent teams
+env = settings.setdefault('env', {})
+if 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' not in env:
+    env['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] = '1'
+
 with open('$SETTINGS_FILE', 'w') as f:
     json.dump(settings, f, indent=2)
     f.write('\n')
-hook_count = sum(len(v) for v in hooks_data.get('hooks', {}).values())
-print(hook_count)
 "
-      hook_count=$(python3 -c "
-import json
-with open('$HOOKS_SOURCE') as f:
-    d = json.load(f)
-print(sum(len(v) for v in d.get('hooks', {}).values()))
-" 2>/dev/null || echo "?")
-      pass "$hook_count hooks registered in settings.json"
-    else
-      warn "python3 not available — copy hooks/hooks.json manually"
-    fi
-  fi
+  pass "Plugin enabled in settings.json"
+  pass "Hooks auto-registered via plugin system (hooks/hooks.json)"
+  pass "Agent teams env var set"
 else
-  warn "hooks/hooks.json not found in plugin directory"
+  # Fallback: minimal JSON manipulation
+  if ! grep -q "enabledPlugins" "$SETTINGS_FILE" 2>/dev/null; then
+    warn "python3 not available — manually add enabledPlugins to settings.json"
+  else
+    pass "Plugin already registered in settings.json"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
