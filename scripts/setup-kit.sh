@@ -94,7 +94,7 @@ fail() {
 banner() {
   echo ""
   echo -e "${CYAN}╔══════════════════════════════════════════════╗${NC}"
-  echo -e "${CYAN}║${NC}  ${BOLD}devco-agent-skills Team Kit Installer v3.1${NC}  ${CYAN}║${NC}"
+  echo -e "${CYAN}║${NC}  ${BOLD}devco-agent-skills Team Kit Installer v3.2${NC}  ${CYAN}║${NC}"
   echo -e "${CYAN}╚══════════════════════════════════════════════╝${NC}"
 }
 
@@ -253,7 +253,7 @@ detect_java_version() {
 }
 
 detect_summer_framework() {
-  if has_dependency "io.github.summer-framework" || has_dependency "summer-framework"; then
+  if has_dependency "io.f8a.summer" || has_dependency "summer-platform" || has_dependency "summer-framework"; then
     echo "true"
   else
     echo "false"
@@ -385,47 +385,147 @@ else
   pass "devco-config.json created from defaults"
 fi
 
-# Apply mode if specified
+# ---------------------------------------------------------------------------
+# Mode selection (interactive or from --mode flag)
+# ---------------------------------------------------------------------------
+
+apply_mode_presets() {
+  local mode="$1"
+  json_set "$CONFIG_FILE" "mode" "$mode" "string"
+
+  case "$mode" in
+    yolo)
+      json_set "$CONFIG_FILE" "workflow.skipPlanConfirm" "true" "bool"
+      json_set "$CONFIG_FILE" "workflow.skipSpecConfirm" "true" "bool"
+      json_set "$CONFIG_FILE" "hooks.profile" "minimal" "string"
+      pass "Mode: yolo — skip confirmations, minimal hooks"
+      ;;
+    standard)
+      json_set "$CONFIG_FILE" "workflow.skipPlanConfirm" "false" "bool"
+      json_set "$CONFIG_FILE" "workflow.skipSpecConfirm" "false" "bool"
+      json_set "$CONFIG_FILE" "workflow.autoVerify" "true" "bool"
+      json_set "$CONFIG_FILE" "workflow.autoReview" "true" "bool"
+      json_set "$CONFIG_FILE" "hooks.profile" "standard" "string"
+      pass "Mode: standard — balanced workflow with auto-verify"
+      ;;
+    strict)
+      json_set "$CONFIG_FILE" "workflow.skipPlanConfirm" "false" "bool"
+      json_set "$CONFIG_FILE" "workflow.skipSpecConfirm" "false" "bool"
+      json_set "$CONFIG_FILE" "workflow.autoReview" "true" "bool"
+      json_set "$CONFIG_FILE" "workflow.autoVerify" "true" "bool"
+      json_set "$CONFIG_FILE" "hooks.profile" "strict" "string"
+      pass "Mode: strict — all gates enforced, all hooks active"
+      ;;
+  esac
+}
+
 EFFECTIVE_MODE="standard"
+
 if [ -n "$MODE" ]; then
+  # Non-interactive: apply the specified mode
   case "$MODE" in
     yolo|standard|strict)
-      json_set "$CONFIG_FILE" "mode" "$MODE" "string"
+      apply_mode_presets "$MODE"
       EFFECTIVE_MODE="$MODE"
-      pass "Mode set to: $MODE"
-
-      # Apply mode-specific presets
-      case "$MODE" in
-        yolo)
-          json_set "$CONFIG_FILE" "workflow.skipPlanConfirm" "true" "bool"
-          json_set "$CONFIG_FILE" "workflow.skipSpecConfirm" "true" "bool"
-          pass "Yolo presets applied (skip confirmations)"
-          ;;
-        strict)
-          json_set "$CONFIG_FILE" "workflow.skipPlanConfirm" "false" "bool"
-          json_set "$CONFIG_FILE" "workflow.skipSpecConfirm" "false" "bool"
-          json_set "$CONFIG_FILE" "workflow.autoReview" "true" "bool"
-          json_set "$CONFIG_FILE" "workflow.autoVerify" "true" "bool"
-          pass "Strict presets applied (all gates enforced)"
-          ;;
-      esac
       ;;
     *)
       warn "Unknown mode '$MODE' — using standard"
+      apply_mode_presets "standard"
+      ;;
+  esac
+elif [ "$NON_INTERACTIVE" = false ]; then
+  # Interactive: ask user to choose mode
+  echo ""
+  echo -e "  ${BOLD}Choose development mode:${NC}"
+  echo ""
+  echo -e "    ${GREEN}1. standard${NC} (recommended)"
+  echo -e "       PLAN→SPEC→BUILD→VERIFY→REVIEW workflow"
+  echo -e "       Auto-verify after build, auto-review after verify"
+  echo -e "       Standard hooks (skill-router, quality-gate, verify-fix-loop)"
+  echo ""
+  echo -e "    ${YELLOW}2. yolo${NC}"
+  echo -e "       Skip plan/spec confirmations for faster iteration"
+  echo -e "       Minimal hooks (session-init, session-save only)"
+  echo -e "       Best for experienced devs who want speed"
+  echo ""
+  echo -e "    ${RED}3. strict${NC}"
+  echo -e "       All confirmations required, all hooks active"
+  echo -e "       Git-guard, pre/post-compact, subagent-init"
+  echo -e "       Best for production codebases and teams"
+  echo ""
+  echo -n "  Select mode [1/2/3] (default: 1): "
+  read -r mode_choice
+
+  case "$mode_choice" in
+    2|yolo)
+      apply_mode_presets "yolo"
+      EFFECTIVE_MODE="yolo"
+      ;;
+    3|strict)
+      apply_mode_presets "strict"
+      EFFECTIVE_MODE="strict"
+      ;;
+    *)
+      apply_mode_presets "standard"
+      EFFECTIVE_MODE="standard"
+      ;;
+  esac
+
+  # --- Workflow options ---
+  echo ""
+  echo -e "  ${BOLD}Workflow options:${NC}"
+  echo ""
+
+  echo -n "  Auto-run /verify after BUILD? [Y/n]: "
+  read -r auto_verify
+  case "$auto_verify" in
+    n|N|no) json_set "$CONFIG_FILE" "workflow.autoVerify" "false" "bool" ;;
+    *)      json_set "$CONFIG_FILE" "workflow.autoVerify" "true" "bool" ;;
+  esac
+
+  echo -n "  Auto-run /dc-review after VERIFY? [Y/n]: "
+  read -r auto_review
+  case "$auto_review" in
+    n|N|no) json_set "$CONFIG_FILE" "workflow.autoReview" "false" "bool" ;;
+    *)      json_set "$CONFIG_FILE" "workflow.autoReview" "true" "bool" ;;
+  esac
+
+  echo -n "  Max verify retries before escalating to user [3]: "
+  read -r max_retries
+  if [[ "$max_retries" =~ ^[0-9]+$ ]] && [ "$max_retries" -ge 1 ] && [ "$max_retries" -le 10 ]; then
+    json_set "$CONFIG_FILE" "workflow.maxRetryOnFail" "$max_retries" "number"
+  else
+    json_set "$CONFIG_FILE" "workflow.maxRetryOnFail" "3" "number"
+  fi
+
+  pass "Workflow options configured"
+
+  # --- Team features ---
+  echo ""
+  echo -n "  Enable multi-agent team features? [y/N]: "
+  read -r team_choice
+  case "$team_choice" in
+    y|Y|yes)
+      TEAM_ENABLED=true
+      json_set "$CONFIG_FILE" "team.enabled" "true" "bool"
+      pass "Team features enabled"
+      ;;
+    *)
+      json_set "$CONFIG_FILE" "team.enabled" "false" "bool"
+      pass "Team features disabled"
       ;;
   esac
 else
-  # Read current mode from config
+  # NON_INTERACTIVE but no MODE specified — read existing
   if command -v python3 &>/dev/null; then
     EFFECTIVE_MODE=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('mode','standard'))" 2>/dev/null || echo "standard")
   fi
   pass "Using existing mode: $EFFECTIVE_MODE"
 fi
 
-# Apply team setting
+# Apply team setting from flag (overrides interactive choice)
 if [ "$TEAM_ENABLED" = true ]; then
   json_set "$CONFIG_FILE" "team.enabled" "true" "bool"
-  pass "Team features enabled"
 fi
 
 # ---------------------------------------------------------------------------
@@ -459,12 +559,12 @@ HAS_KAFKA=false
 HAS_RABBITMQ=false
 HAS_DOCKER=false
 
-has_dependency "postgresql" || has_dependency "r2dbc-postgresql" && HAS_POSTGRES=true || true
-has_dependency "mysql" || has_dependency "r2dbc-mysql" && HAS_MYSQL=true || true
-has_dependency "redis" || has_dependency "lettuce" && HAS_REDIS=true || true
+{ has_dependency "postgresql" || has_dependency "r2dbc-postgresql"; } && HAS_POSTGRES=true || true
+{ has_dependency "mysql" || has_dependency "r2dbc-mysql"; } && HAS_MYSQL=true || true
+{ has_dependency "redis" || has_dependency "lettuce"; } && HAS_REDIS=true || true
 has_dependency "kafka" && HAS_KAFKA=true || true
-has_dependency "rabbitmq" || has_dependency "amqp" && HAS_RABBITMQ=true || true
-has_dependency "testcontainers" || has_dependency "docker" && HAS_DOCKER=true || true
+{ has_dependency "rabbitmq" || has_dependency "amqp"; } && HAS_RABBITMQ=true || true
+{ has_dependency "testcontainers" || has_dependency "docker"; } && HAS_DOCKER=true || true
 
 # Check for GitHub remote
 HAS_GITHUB=false
@@ -479,20 +579,20 @@ if command -v python3 &>/dev/null; then
 import json
 
 profile = {
-    'version': '3.1.0',
+    'version': '3.2.0',
     'buildTool': '$BUILD_TOOL',
     'springType': '$SPRING_TYPE',
-    'summerFramework': $( [ \"$SUMMER\" = \"true\" ] && echo true || echo false ),
+    'summerFramework': $( [ \"$SUMMER\" = \"true\" ] && echo True || echo False ),
     'javaVersion': '$JAVA_VERSION',
     'dependencies': {
-        'postgresql': $( $HAS_POSTGRES && echo true || echo false ),
-        'mysql': $( $HAS_MYSQL && echo true || echo false ),
-        'redis': $( $HAS_REDIS && echo true || echo false ),
-        'kafka': $( $HAS_KAFKA && echo true || echo false ),
-        'rabbitmq': $( $HAS_RABBITMQ && echo true || echo false ),
-        'docker': $( $HAS_DOCKER && echo true || echo false )
+        'postgresql': $( $HAS_POSTGRES && echo True || echo False ),
+        'mysql': $( $HAS_MYSQL && echo True || echo False ),
+        'redis': $( $HAS_REDIS && echo True || echo False ),
+        'kafka': $( $HAS_KAFKA && echo True || echo False ),
+        'rabbitmq': $( $HAS_RABBITMQ && echo True || echo False ),
+        'docker': $( $HAS_DOCKER && echo True || echo False )
     },
-    'github': $( $HAS_GITHUB && echo true || echo false )
+    'github': $( $HAS_GITHUB && echo True || echo False )
 }
 
 with open('$PROFILE_FILE', 'w') as f:

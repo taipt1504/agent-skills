@@ -1,4 +1,4 @@
-# Agent Skills v3.2
+# Agent Skills v3.1.0
 
 A lightweight, context-efficient [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin for **Java Spring** backend development.
 
@@ -18,6 +18,8 @@ Built on **Harness Engineering** principles: Agent = Model + Harness. The plugin
 ```
 /setup
 ```
+
+Interactive setup walks you through mode selection (standard/yolo/strict), workflow options (auto-verify, auto-review, max retries), and team features. Or use `--mode standard` to skip prompts.
 
 ### Step 3 — Commit and share
 
@@ -41,14 +43,14 @@ Teammates clone → run `claude` → auto-prompted to install plugin. Zero setup
 
 The plugin treats the agent as `Model + Harness`. CLAUDE.md is passive (project conventions, ~800 tokens). The **harness** — hooks, skills, agents, and state files — does the heavy lifting:
 
-| Harness Component | Implementation |
-|---|---|
-| **Tool Orchestration** | 13 hooks across 7 lifecycle events, skill-router auto-matching |
-| **Knowledge Curation** | 18 domain skills, 3-tier lazy loading, ≤800 tokens each |
-| **Context Management** | Token budget estimation, progressive unload warnings at 70/85/95% |
-| **State Persistence** | workflow-state.json, verify-fix-state.json, build-checkpoint.json — all on disk |
+| Harness Component      | Implementation                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| **Tool Orchestration** | 13 hooks across 7 lifecycle events, skill-router auto-matching                        |
+| **Knowledge Curation** | 19 domain skills, 3-tier lazy loading, ≤800 tokens each                               |
+| **Context Management** | Token budget estimation, progressive unload warnings at 70/85/95%                     |
+| **State Persistence**  | workflow-state.json, verify-fix-state.json, build-checkpoint.json — all on disk       |
 | **Verification Loops** | Ralph Pattern: detect failure → extract error signature → retry with circuit breakers |
-| **Observability** | execution-trace.jsonl (per-call), session-metrics.json (aggregated) |
+| **Observability**      | execution-trace.jsonl (per-call), session-metrics.json (aggregated)                   |
 
 ### Hook-Bootstrapped Enforcement
 
@@ -61,14 +63,14 @@ SessionStart hook → injects bootstrap/SKILL.md
 
 ### Context Budget
 
-| Scope | Token Limit |
-|-------|-------------|
-| Bootstrap skill | ≤ 1,700 |
-| CLAUDE.md | ≤ 1,000 |
-| Each domain skill | ≤ 800 |
-| Each rule | ≤ 500 |
-| Auto-loaded per session | ≤ 5,000 |
-| Max with lazy-loaded skills | ≤ 15,000 |
+| Scope                       | Token Limit |
+| --------------------------- | ----------- |
+| Bootstrap skill             | ≤ 1,700     |
+| CLAUDE.md                   | ≤ 1,000     |
+| Each domain skill           | ≤ 800       |
+| Each rule                   | ≤ 500       |
+| Auto-loaded per session     | ≤ 5,000     |
+| Max with lazy-loaded skills | ≤ 15,000    |
 
 ### 5-Phase Workflow
 
@@ -76,13 +78,13 @@ SessionStart hook → injects bootstrap/SKILL.md
 PLAN → SPEC → BUILD (TDD) → VERIFY → REVIEW
 ```
 
-| Phase | Command | Agent | Auto-Transition |
-|-------|---------|-------|-----------------|
-| PLAN | `/plan` | planner (opus) | → remind `/spec` |
-| SPEC | `/spec` | spec-writer (opus) | → remind `/build` |
-| BUILD | `/build` | implementer (sonnet) | → AUTO `/verify` |
-| VERIFY | `/verify` | pipeline | → AUTO `/dc-review` |
-| REVIEW | `/dc-review` | reviewer (opus) | → TASK COMPLETE |
+| Phase  | Command      | Agent                | Auto-Transition     |
+| ------ | ------------ | -------------------- | ------------------- |
+| PLAN   | `/plan`      | planner (opus)       | → remind `/spec`    |
+| SPEC   | `/spec`      | spec-writer (opus)   | → remind `/build`   |
+| BUILD  | `/build`     | implementer (sonnet) | → AUTO `/verify`    |
+| VERIFY | `/verify`    | pipeline             | → AUTO `/dc-review` |
+| REVIEW | `/dc-review` | reviewer (opus)      | → TASK COMPLETE     |
 
 **Skip condition**: ≤5 lines, 1 file, no new behavior → BUILD directly.
 
@@ -151,7 +153,7 @@ agent-skills/
 │   ├── meta.md                      # learn, evolve, instinct, create-skill
 │   ├── pentest-scan.md             # Security penetration testing
 │   └── threat-model.md            # Threat modeling
-├── rules/                            # 10 flat rules (≤500 tokens each)
+├── rules/                            # 10 production-grounded rules
 │   ├── development-workflow.md
 │   ├── spec-driven.md
 │   ├── coding-style.md
@@ -190,63 +192,63 @@ agent-skills/
 
 ### Bootstrap (auto-loaded every session)
 
-| Skill | Description |
-|---|---|
+| Skill       | Description                                                                                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------- |
 | `bootstrap` | Enforcement engine — skill discovery, workflow compliance, verify/fix loops, project detection, harness awareness |
 
 ### Generic (lazy-loaded for Java/Spring projects)
 
-| Skill | Triggers |
-|---|---|
-| `spring-patterns` | Controllers, handlers, WebClient, filters, Boot config |
-| `spring-security` | JWT, CORS, @PreAuthorize, secrets, OWASP |
-| `database-patterns` | Repository, Entity, SQL, migrations, R2DBC |
-| `messaging-patterns` | @KafkaListener, @RabbitListener, DLT/DLQ |
-| `testing-workflow` | Test files, coverage, verification pipeline |
-| `coding-standards` | Any Java file |
-| `architecture` | Package structure, CQRS, domain events |
-| `api-design` | REST endpoints, pagination, error format (RFC 7807) |
-| `redis-patterns` | Redis, caching, locking, rate limiting |
-| `observability-patterns` | Logging, metrics, tracing, health checks |
+| Skill                    | Triggers                                               |
+| ------------------------ | ------------------------------------------------------ |
+| `spring-patterns`        | Controllers, handlers, WebClient, filters, Boot config |
+| `spring-security`        | JWT, CORS, @PreAuthorize, secrets, OWASP               |
+| `database-patterns`      | Repository, Entity, SQL, migrations, R2DBC             |
+| `messaging-patterns`     | @KafkaListener, @RabbitListener, DLT/DLQ               |
+| `testing-workflow`       | Test files, coverage, verification pipeline            |
+| `coding-standards`       | Any Java file                                          |
+| `architecture`           | Package structure, CQRS, domain events                 |
+| `api-design`             | REST endpoints, pagination, error format (RFC 7807)    |
+| `redis-patterns`         | Redis, caching, locking, rate limiting                 |
+| `observability-patterns` | Logging, metrics, tracing, health checks               |
 
 ### Summer Framework (hard gate: `io.f8a.summer:summer-platform` required)
 
-| Skill | Triggers |
-|---|---|
-| `summer-core` | Always load when summer detected |
-| `summer-rest` | BaseController, RequestHandler, @Handler |
-| `summer-data` | AuditService, OutboxService |
-| `summer-security` | @AuthRoles, ReactiveKeycloakClient |
-| `summer-ratelimit` | RateLimiterService (v0.2.2+ only) |
-| `summer-test` | src/test/ + summer-test dependency |
+| Skill              | Triggers                                 |
+| ------------------ | ---------------------------------------- |
+| `summer-core`      | Always load when summer detected         |
+| `summer-rest`      | BaseController, RequestHandler, @Handler |
+| `summer-data`      | AuditService, OutboxService              |
+| `summer-security`  | @AuthRoles, ReactiveKeycloakClient       |
+| `summer-ratelimit` | RateLimiterService (v0.2.2+ only)        |
+| `summer-test`      | src/test/ + summer-test dependency       |
 
 ### Security (on-demand)
 
-| Skill | Triggers |
-|---|---|
+| Skill     | Triggers                                         |
+| --------- | ------------------------------------------------ |
 | `pentest` | `/pentest-scan`, `/threat-model`, security audit |
 
 ### Meta (on-demand)
 
-| Skill | Triggers |
-|---|---|
+| Skill                 | Triggers                      |
+| --------------------- | ----------------------------- |
 | `continuous-learning` | `/meta learn`, `/meta evolve` |
 
 ---
 
 ## Agents (9)
 
-| Agent | Model | Role |
-|---|---|---|
-| `planner` | opus | Architecture design, task decomposition, risk assessment |
-| `spec-writer` | opus | Behavioral specs, test mapping, observable contracts |
-| `implementer` | sonnet | TDD cycle: RED → GREEN → REFACTOR |
-| `reviewer` | opus | Unified review with 7 conditional checklists |
-| `build-fixer` | sonnet | Fix build/compilation errors, minimal diffs |
-| `test-runner` | sonnet | E2E + blackbox test generation & execution |
-| `database-reviewer` | sonnet | DB schema, query optimization, migration review |
-| `refactorer` | sonnet | Dead code cleanup, consolidation |
-| `pentest` | sonnet | Security penetration testing, vulnerability scanning |
+| Agent               | Model  | Role                                                     |
+| ------------------- | ------ | -------------------------------------------------------- |
+| `planner`           | opus   | Architecture design, task decomposition, risk assessment |
+| `spec-writer`       | opus   | Behavioral specs, test mapping, observable contracts     |
+| `implementer`       | sonnet | TDD cycle: RED → GREEN → REFACTOR                        |
+| `reviewer`          | opus   | Unified review with 7 conditional checklists             |
+| `build-fixer`       | sonnet | Fix build/compilation errors, minimal diffs              |
+| `test-runner`       | sonnet | E2E + blackbox test generation & execution               |
+| `database-reviewer` | sonnet | DB schema, query optimization, migration review          |
+| `refactorer`        | sonnet | Dead code cleanup, consolidation                         |
+| `pentest`           | sonnet | Security penetration testing, vulnerability scanning     |
 
 ---
 
@@ -254,28 +256,28 @@ agent-skills/
 
 4 profiles controlled by `HOOK_PROFILE` env var or `devco-config.json`:
 
-| Profile | Active Hooks |
-|---------|-------------|
-| `minimal` | session-init, session-save |
+| Profile              | Active Hooks                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `minimal`            | session-init, session-save                                                                                              |
 | `standard` (default) | + skill-router, quality-gate, compact-advisor, workflow-tracker, verify-fix-loop, build-checkpoint, observability-trace |
-| `strict` | + pre-compact, post-compact, git-guard, subagent-init |
-| `off` | None (not recommended) |
+| `strict`             | + pre-compact, post-compact, git-guard, subagent-init                                                                   |
+| `off`                | None (not recommended)                                                                                                  |
 
-| Hook | Event | Type | Description |
-|---|---|---|---|
-| `session-init` | SessionStart | sync | Bootstrap injection + project detection + memory restore |
-| `subagent-init` | SubagentStart | sync | Teammate context injection |
-| `skill-router` | PreToolUse | sync | File→skill matching before edits |
-| `compact-advisor` | PreToolUse | sync | Token budget estimation, progressive warnings at 70/85/95% |
-| `workflow-tracker` | PreToolUse | async | Phase transition tracking |
-| `quality-gate` | PostToolUse | sync | Compile check + debug audit + format enforcement |
-| `verify-fix-loop` | PostToolUse | sync | Ralph Pattern: error detection → retry → circuit breaker |
-| `build-checkpoint` | PostToolUse | async | Track file edits during BUILD for recovery |
-| `observability-trace` | PostToolUse | async | JSONL traces + aggregated session metrics |
-| `git-guard` | PostToolUse | sync | Git operation guardrails |
-| `pre-compact` | PreCompact | sync | State checkpoint before compaction |
-| `post-compact` | PostCompact | sync | State restoration after compaction |
-| `session-save` | Stop | sync | Session summary + auto-extract learning signal |
+| Hook                  | Event         | Type  | Description                                                |
+| --------------------- | ------------- | ----- | ---------------------------------------------------------- |
+| `session-init`        | SessionStart  | sync  | Bootstrap injection + project detection + memory restore   |
+| `subagent-init`       | SubagentStart | sync  | Teammate context injection                                 |
+| `skill-router`        | PreToolUse    | sync  | File→skill matching before edits                           |
+| `compact-advisor`     | PreToolUse    | sync  | Token budget estimation, progressive warnings at 70/85/95% |
+| `workflow-tracker`    | PreToolUse    | async | Phase transition tracking                                  |
+| `quality-gate`        | PostToolUse   | sync  | Compile check + debug audit + format enforcement           |
+| `verify-fix-loop`     | PostToolUse   | sync  | Ralph Pattern: error detection → retry → circuit breaker   |
+| `build-checkpoint`    | PostToolUse   | async | Track file edits during BUILD for recovery                 |
+| `observability-trace` | PostToolUse   | async | JSONL traces + aggregated session metrics                  |
+| `git-guard`           | PostToolUse   | sync  | Git operation guardrails                                   |
+| `pre-compact`         | PreCompact    | sync  | State checkpoint before compaction                         |
+| `post-compact`        | PostCompact   | sync  | State restoration after compaction                         |
+| `session-save`        | Stop          | sync  | Session summary + auto-extract learning signal             |
 
 Granular disabling: `DISABLED_HOOKS="hook1,hook2"` env var or `devco-config.json → hooks.disabled[]`.
 
@@ -283,15 +285,15 @@ Granular disabling: `DISABLED_HOOKS="hook1,hook2"` env var or `devco-config.json
 
 ## State Files (on disk, not in context)
 
-| File | Purpose | Written By |
-|---|---|---|
-| `.claude/project-profile.json` | Detected stack, framework type | session-init |
-| `.claude/workflow-state.json` | Current phase, history, decisions | workflow-tracker |
-| `.claude/verify-fix-state.json` | Error signatures, retry counts | verify-fix-loop |
-| `.claude/sessions/build-checkpoint.json` | Modified files during BUILD | build-checkpoint |
-| `.claude/sessions/execution-trace.jsonl` | Per-tool-call JSONL traces | observability-trace |
-| `.claude/sessions/session-metrics.json` | Aggregated session telemetry | observability-trace |
-| `.claude/devco-config.json` | User/project configuration | user / dc-setup |
+| File                                     | Purpose                           | Written By          |
+| ---------------------------------------- | --------------------------------- | ------------------- |
+| `.claude/project-profile.json`           | Detected stack, framework type    | session-init        |
+| `.claude/workflow-state.json`            | Current phase, history, decisions | workflow-tracker    |
+| `.claude/verify-fix-state.json`          | Error signatures, retry counts    | verify-fix-loop     |
+| `.claude/sessions/build-checkpoint.json` | Modified files during BUILD       | build-checkpoint    |
+| `.claude/sessions/execution-trace.jsonl` | Per-tool-call JSONL traces        | observability-trace |
+| `.claude/sessions/session-metrics.json`  | Aggregated session telemetry      | observability-trace |
+| `.claude/devco-config.json`              | User/project configuration        | user / dc-setup     |
 
 ---
 
@@ -301,17 +303,17 @@ Settings in `.claude/devco-config.json`. Default mode: `standard`.
 
 Key settings:
 
-| Setting | Default | Effect |
-|---------|---------|--------|
-| `workflow.autoVerify` | `true` | Auto-invoke `/verify full` after BUILD |
-| `workflow.autoReview` | `true` | Auto-invoke `/dc-review` after VERIFY |
-| `workflow.maxRetryOnFail` | `3` | Max verify retries before force-accept |
-| `workflow.noProgressThreshold` | `3` | Same error N times → escalate |
-| `workflow.maxIterationsPerPhase` | `10` | Absolute ceiling per phase |
-| `team.enabled` | `false` | Enable multi-agent team |
-| `team.maxTeammates` | `3` | Max parallel subagents |
-| `hooks.profile` | `standard` | Hook activation profile |
-| `hooks.disabled` | `[]` | Granular hook disabling |
+| Setting                          | Default    | Effect                                 |
+| -------------------------------- | ---------- | -------------------------------------- |
+| `workflow.autoVerify`            | `true`     | Auto-invoke `/verify full` after BUILD |
+| `workflow.autoReview`            | `true`     | Auto-invoke `/dc-review` after VERIFY  |
+| `workflow.maxRetryOnFail`        | `3`        | Max verify retries before force-accept |
+| `workflow.noProgressThreshold`   | `3`        | Same error N times → escalate          |
+| `workflow.maxIterationsPerPhase` | `10`       | Absolute ceiling per phase             |
+| `team.enabled`                   | `false`    | Enable multi-agent team                |
+| `team.maxTeammates`              | `3`        | Max parallel subagents                 |
+| `hooks.profile`                  | `standard` | Hook activation profile                |
+| `hooks.disabled`                 | `[]`       | Granular hook disabling                |
 
 See `config/devco-config.schema.json` for full schema and `config/defaults.json` for all defaults.
 
@@ -326,7 +328,7 @@ See `config/devco-config.schema.json` for full schema and `config/defaults.json`
 ```bash
 /plugin marketplace add taipt1504/agent-skills
 /plugin install devco-agent-skills
-/setup
+/setup                  # interactive: choose mode, workflow options, team features
 git add .claude/ && git commit -m "chore: add Claude Code project context"
 # Optional: cp templates/PROJECT_GUIDELINES_TEMPLATE.md ./PROJECT_GUIDELINES.md
 ```
@@ -349,9 +351,11 @@ Java 17+ · Spring Boot 3.x · Spring WebFlux · Spring MVC · R2DBC · JPA/Hibe
 
 ## Changelog
 
-### v3.2.0 (2026-04-02)
+### v3.1.0 (2026-04-02)
 
-**Harness Engineering upgrade** — 3 new hooks, 4 upgraded scripts, bootstrap rewrite.
+**Harness Engineering upgrade** — 3 new hooks, 4 upgraded scripts, bootstrap rewrite, rules deep upgrade, skill cross-references, interactive setup.
+
+#### Hooks & Harness
 
 - **Verify/Fix Loop** (`verify-fix-loop.sh`): Ralph Pattern — auto-detects gradle failures, extracts normalized error signatures, retries with circuit breakers (same-error escalation + max-retry force-accept)
 - **Observability Traces** (`observability-trace.sh`): Every tool call traced to JSONL, session metrics aggregated (tool distribution, skill usage, phase timing, quality gate violations)
@@ -362,9 +366,35 @@ Java 17+ · Spring Boot 3.x · Spring WebFlux · Spring MVC · R2DBC · JPA/Hibe
 - **Bootstrap SKILL.md**: Added Ralph Loop, Checkpoint-Resume, Operational Awareness sections (1,700 tokens)
 - **13 hooks** across 7 lifecycle events (up from 6 hooks in v3.0)
 
-### v3.0.3
+#### Rules Deep Upgrade (8 of 10 rules rewritten)
 
-- Initial public release with 19 skills, 9 agents, 6 hooks, 14 commands
+Research-backed rewrite grounded in 5 core philosophies: _Explain the Why_, _Hard Blocks vs Guidance_, _Technology-Current_, _Production-Grounded_, _Cross-Referenced_.
+
+- **security**: Hard Blocks table with WHY + Fix columns, Spring Security 6.x `SecurityWebFilterChain` patterns, supply chain security (SBOM, dependency scanning), component security by layer
+- **observability**: Structured logging (JSON/ECS, Spring Boot 3.4+ config), Micrometer Observation API, cardinality management, SLO-based alerting, reactive context propagation
+- **architecture-patterns**: Hexagonal layers with WHY, DDD tactical patterns (Vaughn Vernon's 5 aggregate rules), value objects, ArchUnit enforcement with code examples
+- **testing**: Test pyramid ratios (70/20/10), TDD cycle, BlockHound setup, Testcontainers over H2, contract testing with Spring Cloud Contract
+- **coding-style**: Immutability philosophy, value object patterns, error handling in reactive chains (flatMap + Mono.error), `@ConfigurationProperties` over `@Value`
+- **api-design**: Async operations (202 Accepted + polling), idempotency keys, bulk operations (cap 100, 207 Multi-Status), enhanced 12-item checklist
+- **skill-enforcement**: Expanded registry (10 patterns with WHY column), Summer override precedence table, multi-skill loading examples
+- **git-workflow**: Conventional commits table, branch naming, 7-item PR checklist (added ArchUnit, migration expand-contract)
+
+#### Skills Improvement
+
+- **Related Skills** sections added to all 18 domain skills (cross-referencing for navigation)
+- **Rules sections** added to all 6 Summer skills (5 rules each with NEVER/WHY format)
+- **2 new reference files**: `event-architecture.md` (saga, outbox, event sourcing), `event-sourcing.md` (event store, aggregates, snapshots, projections)
+- **Token budget compliance**: All 19 skills verified within budget (bootstrap ≤1,700, domain ≤800)
+
+#### Setup & Onboarding
+
+- **Interactive config** (`setup-kit.sh`): Mode selection (standard/yolo/strict), workflow options, team features — no longer silently applies defaults
+- **Bug fixes**: Python boolean casing (`True`/`False`), Summer framework detection (`io.f8a.summer`), bash operator precedence in dependency checks
+- **`--mode` flag**: Skip interactive prompts with `--mode standard|yolo|strict`
+
+### v3.0.3 (initial release)
+
+- 19 skills, 9 agents, 6 hooks, 14 commands, 10 rules
 
 ---
 
