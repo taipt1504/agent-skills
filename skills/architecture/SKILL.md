@@ -2,26 +2,16 @@
 name: architecture
 description: >
   Hexagonal architecture and solution design patterns for Java Spring WebFlux applications.
-  Covers ports and adapters, dependency rules, CQRS integration, domain modeling, mapping
-  strategies, testing by layer, ArchUnit enforcement, and solution/service design templates.
+  Use when designing package structure, hexagonal layers, CQRS/event sourcing patterns,
+  domain-driven design, solution architecture documents, architecture decision records (ADR),
+  or C4 diagrams. Covers ports and adapters, dependency rules, CQRS integration, domain modeling,
+  mapping strategies, testing by layer, ArchUnit enforcement, and solution/service design templates.
 triggers:
-  - package structure
-  - hexagonal layers
-  - CQRS
-  - domain events
-  - aggregate root
-  - value objects
-  - ArchUnit
+  natural: ["hexagonal", "cqrs", "domain event", "package structure", "ports and adapters"]
+  code: ["UseCase", "Port", "Adapter", "DomainEvent"]
 ---
 
 # Architecture — Hexagonal + Solution Design
-
-## When to Activate
-
-- Creating new modules, services, or bounded contexts
-- Reviewing package structure and dependency direction
-- Designing system architecture or writing design documents
-- Planning domain model isolation from infrastructure
 
 ## Hexagonal Layers
 
@@ -91,6 +81,14 @@ Enforce dependency rules with `@ArchTest`: domain must not depend on Spring/JPA,
 
 ## References
 
-- **[references/hexagonal-patterns.md](references/hexagonal-patterns.md)** — Full examples: typed IDs, value objects, aggregate root, domain events, application service, adapters (Kafka, HTTP, DB), Spring wiring, MapStruct mappers, testing by layer
+- **[references/hexagonal-patterns.md](references/hexagonal-patterns.md)** — Full examples: typed IDs, value objects, aggregate root, domain events, application service, adapters (Kafka, HTTP, DB), MapStruct persistence mapper, testing by layer, ArchUnit
 - **[references/cqrs-patterns.md](references/cqrs-patterns.md)** — CQRS: command/query separation, read model design, query adapter, anti-patterns
 - **[references/solution-design.md](references/solution-design.md)** — Solution Design template + Service Design template (Mermaid diagrams, C4, NFRs, deployment)
+- **[references/event-sourcing.md](references/event-sourcing.md)** — Event store design, aggregate root, snapshots, projections, decision matrix
+
+## Related Skills
+
+- **coding-standards** — Package naming, method/class size limits that align with hexagonal layers
+- **messaging-patterns** — Event-driven communication between bounded contexts
+- **database-patterns** — Repository adapters for persistence layer
+- **api-design** — REST interface design for infrastructure adapters

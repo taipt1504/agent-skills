@@ -156,26 +156,6 @@ public class UpdateUserRequestHandler extends RequestHandler<UpdateUserRequest, 
 }
 ```
 
-## Handler Registry Internals
-
-`Registry` scans all `RequestHandler` beans at startup, maps each handler's request type:
-
-```java
-@Component
-public class Registry {
-    private static final Map<Class<?>, RequestHandler> COMMAND_HANDLER_MAP = new HashMap<>();
-
-    private void initCommandHandlerBeans() {
-        String[] handlerBeanNames = applicationContext.getBeanNamesForType(RequestHandler.class);
-        for (String beanName : handlerBeanNames) {
-            initCommandHandlerBean(beanName);
-        }
-    }
-}
-```
-
-`SpringBus.dispatch(request)` looks up handler by request class. `BaseController.execute(request)` calls `SpringBus`.
-
 ## External Service Integration with WebClient
 
 ```java
@@ -284,35 +264,3 @@ f8a:
         log-response-body: false
 ```
 
-## Service Layer Error Handling Pattern
-
-```java
-@Service
-@Slf4j
-@RequiredArgsConstructor
-public class UserService {
-
-    public Mono<User> processUser(String userId) {
-        return findUser(userId)
-            .flatMap(this::enrichWithExternalData)
-            .doOnSuccess(user -> log.info("User processed: {}", user.getId()))
-            .doOnError(ex -> log.error("Failed to process user: {}", userId, ex));
-    }
-
-    private Mono<User> findUser(String id) {
-        return userRepository.findById(id)
-            .switchIfEmpty(Mono.error(
-                CommonExceptions.RESOURCE_NOT_FOUND.toException()
-                    .detailValue("userId", id)));
-    }
-
-    private Mono<User> enrichWithExternalData(User user) {
-        return externalApiService.getUserDetails(user.getId())
-            .map(details -> user.toBuilder().externalData(details).build())
-            .onErrorResume(ex -> {
-                log.warn("Failed to enrich user data, continuing without", ex);
-                return Mono.just(user); // Graceful degradation
-            });
-    }
-}
-```

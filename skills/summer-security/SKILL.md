@@ -1,34 +1,22 @@
 ---
 name: summer-security
-description: >
-  Summer Framework security — APISIX auth integration with X-Userinfo header,
-  @AuthRoles annotation for role definitions, SecurityWebFilterChain config,
-  ReactiveKeycloakClient for Keycloak resource API, KeycloakRoleSynchronizer,
-  KeycloakException error mapping, and group-role authorization (0.2.4+).
+description: Summer Framework security — APISIX auth integration with X-Userinfo header, @AuthRoles annotation for role definitions, SecurityWebFilterChain config, ReactiveKeycloakClient for Keycloak resource API, KeycloakRoleSynchronizer, KeycloakException error mapping, and group-role authorization (0.2.4+).
 triggers:
-  - APISIX
-  - "@AuthRoles"
-  - "@ResourceDef"
-  - ReactiveKeycloakClient
-  - KeycloakException
-  - SecurityWebFilterChain
-  - f8a.security
-  - sync-role
-  - summer security
-  - summer keycloak
-  - keycloak client
-  - X-Userinfo
-  - GroupRoleResolver
-  - group-role-authorization
+  natural: ["auth roles", "keycloak client", "summer security"]
+  code: ["@AuthRoles", "ReactiveKeycloakClient", "f8a.security"]
 ---
 
 # Summer Security — APISIX, Keycloak & Roles
+
+**Gate:** Verify summer-core is loaded and io.f8a.summer:summer-platform is in build.gradle before proceeding.
 
 **Modules:** `summer-security-autoconfigure` | `summer-keycloak`
 
 ## APISIX Auth Integration
 
 APISIX gateway validates JWT, forwards `X-Userinfo` header (Base64 JSON). Summer decodes it into `Member`.
+
+**Version note:** `UserInfoAuthenticationConverter` return type changed from a synchronous value to `Mono` in 0.2.4 (BREAKING). Ensure any custom converter implementations return `Mono`.
 
 ```java
 @Configuration
@@ -53,6 +41,8 @@ public class SecurityConfig {
 Enforce with `@PreAuthorize("hasAnyRole(@roles.USER_VIEW)")`.
 
 ## @AuthRoles — Role Definitions
+
+Role string format: `service-name:resource:action` (e.g., `my-svc:user:view`).
 
 ```java
 @AuthRoles(resources = {
@@ -84,10 +74,7 @@ var keycloak = new ReactiveKeycloakClient(config);
 
 **Navigation:** `keycloak.users()` / `.clients()` / `.groups()` / `.realm()` / `.tokenResource()` / `.tokenProvider()`
 
-Key operations: `users().create()` -> `Mono<String>`, `.get(id).toRepresentation()` -> `Mono<UserRepresentation>`, `.get(id).resetPassword()`, `clients().findByClientId()`, `tokenResource().grantToken()` / `.refreshToken()` / `.clientCredentials()` / `.introspect()`.
-
-**0.2.4+ APIs:** `realm().groupByPath(path)`, `groups().get(id).roles().realmLevel()` / `.clientLevel(uuid)`,
-`realm().clientScopes()`, `clients().get(uuid).getDefaultClientScopes()` / `.addDefaultClientScope()`.
+For complete ReactiveKeycloakClient API, see `references/keycloak-error-map.md`.
 
 ## KeycloakRoleSynchronizer
 
@@ -130,28 +117,36 @@ f8a:
       resource-server:
         enabled: true
         role-hierarchy: "ROLE_ADMIN > ROLE_USER"
-        keycloak:                  # shared block (0.2.4+ — was under sync-role)
-          server-url: https://keycloak.example.com
+        keycloak:                  # shared block (0.2.4+)
+          server-url: ${KEYCLOAK_URL}
           realm: master
           client-id: admin-cli
-          client-secret: secret
-          client-defaults:
-            service-accounts-enabled: true
-            public-client: false
-            protocol: openid-connect
+          client-secret: ${KEYCLOAK_SECRET}
         sync-role:
-          enabled: true            # only flag (0.2.4+) — keycloak config moved to parent
-        group-role-authorization:  # 0.2.4+ — alternative to resource_access claim
-          enabled: false
+          enabled: true
+        group-role-authorization:
+          enabled: false           # 0.2.4+ alternative to resource_access
 ```
 
 ## Version Notes
 
-- **0.2.1:** `summer-security-core` renamed to `summer-jwt-resource-server`; new `summer-apikey-resource-server` module; `ReactiveApisixCustomizer` now takes `ObjectMapper` constructor param; `SecurityErrorResponseWriter` added
-- **0.2.3:** `sync-role.enable` renamed to `sync-role.enabled`; `matchIfMissing=true` — activates when `server-url` non-blank; `hasText()` check prevents empty server-url from triggering sync; `RoleDefinitionScanner` registered as Spring bean; `KeycloakException` expanded from ~5 to ~58 error mappings
-- **0.2.4:** Keycloak config moved from `sync-role` to shared `keycloak` block (BREAKING);
-  `UserInfoAuthenticationConverter` now returns `Mono` (BREAKING); group-role authorization added; new Keycloak APIs:
-  group-by-path, group role-mappings, client scopes, client default/optional scopes;
-  `ReactiveGroupRoleAutoConfiguration` added
+- **0.2.1:** Renamed to `summer-jwt-resource-server`; added `summer-apikey-resource-server`
+- **0.2.3:** `sync-role.enable` → `sync-role.enabled`; `KeycloakException` expanded to ~58 mappings
+- **0.2.4:** Keycloak config moved to shared `keycloak` block (BREAKING); `UserInfoAuthenticationConverter` returns `Mono` (BREAKING); group-role authorization added
 
 See `references/keycloak-error-map.md` for the full KeycloakException error mapping table and Keycloak resource API.
+
+## Rules
+
+- Always use `summerCustomizer.customize(http)` + `apisixCustomizer.customize(http)` in SecurityWebFilterChain — never manually configure CORS/CSRF/session for Summer projects.
+- Always define roles using `@AuthRoles` + `@ResourceDef` — never hardcode role strings outside the Roles class.
+- Always use `@PreAuthorize("hasAnyRole(@roles.XXX)")` for endpoint authorization — never rely solely on path matchers.
+- Never expose Keycloak client secrets in application.yml — use environment variables or Vault.
+- Always check Summer version before using group-role authorization — requires 0.2.4+.
+
+## Related Skills
+
+- **summer-core** — Shared types (Member, CallerAware) decoded from X-Userinfo
+- **summer-test** — Mock X-Userinfo header for testing @AuthRoles-protected endpoints
+- **spring-security** — General Spring Security patterns, JWT, CORS
+- **summer-rest** — BaseController + RequestHandler secured by @PreAuthorize

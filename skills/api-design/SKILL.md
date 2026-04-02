@@ -4,13 +4,8 @@ description: >
   REST API design patterns for Spring Boot WebFlux — HTTP methods, status codes, URL conventions,
   RFC 7807 errors, pagination, versioning, validation, rate limiting, and OpenAPI documentation.
 triggers:
-  - REST endpoints
-  - DTO design
-  - pagination
-  - error format
-  - API versioning
-  - OpenAPI
-  - rate limiting headers
+  natural: ["api design", "error format", "pagination design", "openapi", "rest conventions"]
+  code: ["RFC 7807", "ProblemDetail", "OpenAPI", "Pageable"]
 ---
 
 # REST API Design Patterns
@@ -96,5 +91,12 @@ URI path: `/api/v1/...`. v1 is forever — backward compatible. Add optional fie
 
 ## References
 
-- **[references/design-patterns.md](references/design-patterns.md)** — Cursor/keyset pagination code, filtering/sorting, field selection, content negotiation, HATEOAS, OpenAPI config
-- **[references/operations-docs.md](references/operations-docs.md)** — File upload/download, idempotency, bulk operations, long-running operations, contract testing (Spring Cloud Contract + Pact)
+- **[references/design-patterns.md](references/design-patterns.md)** — Cursor/keyset pagination code, filtering/sorting, field selection, OpenAPI config
+- **[references/operations-docs.md](references/operations-docs.md)** — File upload/download, idempotency, bulk operations, long-running operations
+
+## Related Skills
+
+- **summer-rest** — Summer Framework handler pattern, ResponseFactory, exception handling
+- **spring-patterns** — Controller implementation patterns (MVC + WebFlux)
+- **spring-security** — Rate limiting headers, CORS, authentication for APIs
+- **architecture** — Hexagonal interface layer design for REST endpoints

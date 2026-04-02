@@ -7,15 +7,33 @@ description: >
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 model: sonnet
 maxTurns: 15
+requiredSkills:
+  always: ["bootstrap", "coding-standards", "architecture"]
+  conditional:
+    spring: ["spring-patterns"]
+    testing: ["testing-workflow"]
+requiredCommands:
+  always: ["/verify"]
+  afterRemoval: ["/verify"]
 ---
 
-## Before Starting Work (MANDATORY)
+## Loaded Skills (auto-injected by SubagentStart hook)
 
-1. **Load bootstrap**: Use the Skill tool to load `devco-agent-skills:bootstrap` — contains the skill registry and workflow engine
-2. **Check Summer**: Scan `build.gradle`/`pom.xml` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core`
-3. **Load domain skills**: Match files you'll touch against the bootstrap skill registry → load each matching skill via Skill tool. Start with `devco-agent-skills:coding-standards` for code quality patterns
-4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
-5. **Phase**: You are in the **REFACTOR** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+The following skills have been pre-loaded based on your role and project profile.
+You MUST apply their patterns in every file operation.
+
+### Skill Usage Protocol (MANDATORY — no exceptions)
+1. Before EVERY file edit: identify which loaded skill applies
+2. Announce: "Applying skill: {name} — {specific pattern being applied}"
+3. If no skill matches: state "No matching skill — using general Java/Spring knowledge"
+4. If you need a skill NOT in the loaded list: request it via "SKILL_REQUEST: {name}"
+
+### Phase
+You are in the **REFACTOR** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+
+## Skill Usage Report (output at task end)
+| Skill | Times Applied | Key Patterns Used |
+|-------|--------------|-------------------|
 
 # Refactorer
 

@@ -12,7 +12,14 @@ Explicit BUILD phase trigger. Invokes the implementer agent to follow the RED-GR
 - `/plan` must have been run and approved — check `.claude/docs/plans/` for an approved plan file
 - `/spec` must have been run and approved — check `.claude/docs/specs/` for an approved spec file with `status: approved`
 - If no approved spec file exists: **STOP** -- output: `"No approved spec found in .claude/docs/specs/. Run /spec first."`
+- Read `.claude/workflow-state.json` — verify SPEC phase completed (check `phaseHistory` contains a SPEC entry or `phase` is `SPEC_APPROVED`)
 - Read the spec file to get task decomposition and scenarios
+
+### Workflow State on Entry
+
+Update `.claude/workflow-state.json`:
+- Set `phase` to `"BUILD"`
+- Add `{"phase": "SPEC", "completedAt": "{ISO timestamp}"}` to `phaseHistory` (if not already present)
 
 ## Usage
 
@@ -130,24 +137,37 @@ Tests: 6 passed, 0 failed
 Coverage: 78% (target: 80%)
 ```
 
-## When a Task Fails
+## Build Failure Handling
 
-If a test cannot be made to pass after 3 attempts:
+If a task fails during BUILD:
 
-1. Log the failure with context
-2. Ask the user whether to:
-   - Debug further
-   - Skip and move to next task
-   - Return to `/spec` to revise the scenario
-   - Run `/build-fix` for compilation issues
+1. **Auto-fix**: Invoke `/build-fix` to attempt automatic resolution
+2. **Re-run**: Re-run the failing task's test(s)
+3. **Retry limit**: If the same error persists **3 consecutive times** → escalate to user with full error details
+4. **Track retries**: Increment `retryCount` in `.claude/workflow-state.json` after each failed attempt
+
+```
+On task failure:
+  1. Capture error output
+  2. Run /build-fix with error context
+  3. Re-run failing test
+  4. If PASS → continue to next task
+  5. If FAIL with same error (3x) → ESCALATE:
+     "Task {N} failed 3 times with: {error summary}. Options:
+      - Debug further
+      - Skip and move to next task
+      - Return to /spec to revise the scenario"
+  6. Update workflow-state.json retryCount
+```
 
 ## Completion — MANDATORY: Continue to VERIFY + REVIEW
 
-When all tasks are complete:
+When ALL tasks complete and tests pass:
 
 1. Run full test suite: `./gradlew test`
 2. Check coverage: `./gradlew jacocoTestReport`
-3. Report BUILD status
+3. Update `.claude/workflow-state.json` — add `{"phase": "BUILD", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
+4. Report BUILD status
 
 ```
 BUILD COMPLETE
@@ -159,16 +179,25 @@ Coverage: 84% (target: 80% -- PASS)
 Proceeding to VERIFY phase...
 ```
 
-4. **IMMEDIATELY invoke `/verify full`** — do NOT stop, do NOT ask the user, do NOT wait. This is MANDATORY.
-5. After VERIFY passes, **IMMEDIATELY invoke `/review`** — do NOT stop. This is MANDATORY.
-6. Only after REVIEW produces a verdict (APPROVE/BLOCK) is the workflow complete.
+## Auto-Invoke Chain (after BUILD success)
 
-**CRITICAL: Stopping after BUILD without running VERIFY and REVIEW is a workflow violation. The task is NOT done until REVIEW completes.**
+When ALL tasks complete and tests pass:
+
+1. **Read config**: Check `.claude/devco-config.json` for `workflow.autoVerify` (default: `true`)
+2. **If autoVerify = true**: IMMEDIATELY invoke `/verify full`
+   - Do NOT ask the user
+   - Do NOT wait
+   - Just run it
+3. **If autoVerify = false**: Remind user `"BUILD complete. Run /verify full to continue."`
+4. After VERIFY passes, **AUTO-INVOKE `/dc-review`** — if `workflow.autoReview` is `true` (default), IMMEDIATELY invoke `/dc-review`. Do NOT stop. This is MANDATORY.
+5. Only after REVIEW produces a verdict (APPROVE/BLOCK) is the workflow complete.
+
+**CRITICAL: Stopping after BUILD without running VERIFY and REVIEW is a workflow violation. The task is NOT done until REVIEW completes. After all tasks complete, IMMEDIATELY run /verify full — no asking, no waiting.**
 
 ## Integration with Workflow
 
 ```
-/plan -> /spec -> /build -> /verify -> /review
+/plan -> /spec -> /build -> /verify -> /dc-review
                               ↑ YOU ARE HERE    ↑ MUST REACH HERE
 ```
 

@@ -11,22 +11,30 @@ source "$(dirname "$0")/run-with-flags.sh" "subagent-init" || exit 0
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 cd "$PROJECT_ROOT" 2>/dev/null || true
 
-# --- Detect project type ---
+# --- Read project profile (or fallback to detection) ---
+PROFILE_FILE="${PROJECT_ROOT}/.claude/project-profile.json"
 SPRING_TYPE=""
-BUILD_FILE=""
-[ -f "build.gradle" ] && BUILD_FILE="build.gradle"
-[ -f "build.gradle.kts" ] && BUILD_FILE="build.gradle.kts"
-[ -f "pom.xml" ] && BUILD_FILE="pom.xml"
-
-if [ -n "$BUILD_FILE" ]; then
-  grep -q "spring-boot-starter-webflux" "$BUILD_FILE" 2>/dev/null && SPRING_TYPE="WebFlux"
-  [ -z "$SPRING_TYPE" ] && grep -q "spring-boot-starter-web" "$BUILD_FILE" 2>/dev/null && SPRING_TYPE="MVC"
-fi
-
-# --- Detect Summer ---
 SUMMER_DETECTED=false
-if [ -n "$BUILD_FILE" ] && grep -q "io.f8a.summer" "$BUILD_FILE" 2>/dev/null; then
-  SUMMER_DETECTED=true
+
+if [ -f "$PROFILE_FILE" ]; then
+  SPRING_TYPE=$(grep -o '"springType"[[:space:]]*:[[:space:]]*"[^"]*"' "$PROFILE_FILE" | head -1 | sed 's/.*: *"//' | sed 's/".*//')
+  SUMMER_VAL=$(grep -o '"summer"[[:space:]]*:[[:space:]]*[a-z]*' "$PROFILE_FILE" | head -1 | sed 's/.*: *//')
+  [ "$SUMMER_VAL" = "true" ] && SUMMER_DETECTED=true
+else
+  # Fallback: detect from build files
+  BUILD_FILE=""
+  [ -f "build.gradle" ] && BUILD_FILE="build.gradle"
+  [ -f "build.gradle.kts" ] && BUILD_FILE="build.gradle.kts"
+  [ -f "pom.xml" ] && BUILD_FILE="pom.xml"
+
+  if [ -n "$BUILD_FILE" ]; then
+    grep -q "spring-boot-starter-webflux" "$BUILD_FILE" 2>/dev/null && SPRING_TYPE="WebFlux"
+    [ -z "$SPRING_TYPE" ] && grep -q "spring-boot-starter-web" "$BUILD_FILE" 2>/dev/null && SPRING_TYPE="MVC"
+  fi
+
+  if [ -n "$BUILD_FILE" ] && grep -q "io.f8a.summer" "$BUILD_FILE" 2>/dev/null; then
+    SUMMER_DETECTED=true
+  fi
 fi
 
 # --- Build context ---
@@ -50,7 +58,7 @@ CTX="${CTX}- No git commit/push — only the user commits\n"
 CTX="${CTX}- No code without approved plan+spec (exception: ≤5 line trivial fixes)\n"
 CTX="${CTX}- **Stopping after BUILD without VERIFY+REVIEW is FORBIDDEN**\n\n"
 CTX="${CTX}### Workflow Completion (CRITICAL)\n"
-CTX="${CTX}After BUILD: IMMEDIATELY run /verify full, then /review. A task is NOT done until REVIEW completes.\n"
+CTX="${CTX}After BUILD: IMMEDIATELY run /verify full, then /dc-review. A task is NOT done until REVIEW completes.\n"
 CTX="${CTX}\n### Knowledge Graph Memory\n"
 CTX="${CTX}Use mcp__memory__search_nodes before starting work to find relevant past context.\n"
 CTX="${CTX}After completing work, use mcp__memory__create_entities for new findings.\n"
@@ -71,6 +79,51 @@ if [ "$SUMMER_DETECTED" = true ]; then
 fi
 
 [ -n "$SPRING_TYPE" ] && CTX="${CTX}\n\n**Stack**: Spring ${SPRING_TYPE}"
+
+# --- Agent skill manifest resolution ---
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-}"
+[ -z "$PLUGIN_ROOT" ] && PLUGIN_ROOT="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)"
+
+if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/agents" ]; then
+  for AGENT_FILE in "$PLUGIN_ROOT/agents"/*.md; do
+    [ -f "$AGENT_FILE" ] || continue
+    AGENT_NAME="$(basename "$AGENT_FILE" .md)"
+
+    # Extract always-required skills from frontmatter
+    ALWAYS_SKILLS=$(sed -n '/^requiredSkills:/,/^requiredCommands:/p' "$AGENT_FILE" 2>/dev/null \
+      | sed -n '/always:/,/conditional:/p' \
+      | grep -oE '"[^"]*"' | tr -d '"' | tr '\n' ' ')
+
+    if [ -n "$ALWAYS_SKILLS" ]; then
+      # Inject skill summaries for this agent's required skills
+      for SKILL_NAME in $ALWAYS_SKILLS; do
+        SKILL_FILE="${PLUGIN_ROOT}/skills/${SKILL_NAME}/SKILL.md"
+        if [ -f "$SKILL_FILE" ]; then
+          # Extract first 30 lines as summary (skip frontmatter)
+          SKILL_SUMMARY=$(sed -n '/^---$/,/^---$/d; 1,30p' "$SKILL_FILE" 2>/dev/null | head -30 | tr '\n' ' ' | sed 's/"/\\"/g')
+          CTX="${CTX}\n### Loaded Skill: ${SKILL_NAME}\n${SKILL_SUMMARY}\n"
+        fi
+      done
+
+      # Resolve conditional skills based on project profile
+      if [ -f "$PROFILE_FILE" ]; then
+        # Check each conditional category
+        if echo "$ALWAYS_SKILLS" | grep -q "spring-patterns" 2>/dev/null || [ -n "$SPRING_TYPE" ]; then
+          COND_SKILLS=$(sed -n '/^requiredSkills:/,/^requiredCommands:/p' "$AGENT_FILE" 2>/dev/null \
+            | sed -n '/conditional:/,/^[a-z]/p' \
+            | grep -oE '"[^"]*"' | tr -d '"' | tr '\n' ' ')
+          for COND_SKILL in $COND_SKILLS; do
+            COND_FILE="${PLUGIN_ROOT}/skills/${COND_SKILL}/SKILL.md"
+            if [ -f "$COND_FILE" ] && ! echo "$ALWAYS_SKILLS" | grep -q "$COND_SKILL"; then
+              CTX="${CTX}\n### Conditional Skill Available: ${COND_SKILL}\n"
+            fi
+          done
+        fi
+      fi
+      break  # Only match one agent per subagent invocation
+    fi
+  done
+fi
 
 # --- Output structured JSON ---
 # Escape for JSON

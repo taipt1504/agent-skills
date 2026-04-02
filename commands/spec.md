@@ -11,6 +11,7 @@ Generate a behavioral specification from the approved plan. Defines observable c
 
 - `/plan` must have been run and approved
 - If no plan exists: **STOP** -- output: `"No approved plan found. Run /plan first."`
+- Read `.claude/workflow-state.json` — verify PLAN phase completed (check `phaseHistory` contains a PLAN entry or `phase` is `PLAN_APPROVED`)
 
 ## Subagent Context (pass to spawned agent)
 
@@ -110,6 +111,17 @@ The spec MUST be written to a file — not just presented in conversation:
 - **On approval**: `status: approved` updated in frontmatter
 
 The build command will READ this file. If no file exists, BUILD cannot proceed.
+
+## Workflow State Tracking
+
+When this command runs, **update** `.claude/workflow-state.json`:
+- Set `phase` to `"SPEC"`
+- Add `{"phase": "PLAN", "completedAt": "{ISO timestamp}"}` to `phaseHistory` (if not already present)
+
+When the user **approves** the spec:
+1. Update `workflow-state.json` — add `{"phase": "SPEC", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
+2. Update `phase` to `"SPEC_APPROVED"`
+3. Remind the user: **"Spec approved. Run `/build` to start TDD implementation."**
 
 ## Approval Protocol
 

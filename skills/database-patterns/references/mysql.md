@@ -252,25 +252,14 @@ public Mono<Long> insert(CreateOrderCommand cmd) {
 
 ## Pool Sizing
 
-Same formula as PostgreSQL:
+For HikariCP connection pool configuration, see jpa-hibernate.md.
 
-```
-pool_size = (vCPU * 2) + effective_spindle_count
-```
-
-HikariCP with MySQL-specific optimizations:
+Use the MySQL-specific `data-source-properties` when configuring HikariCP:
 
 ```yaml
 spring:
   datasource:
     hikari:
-      pool-name: HikariPool-Main
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      keepalive-time: 60000
       data-source-properties:
         cachePrepStmts: true
         prepStmtCacheSize: 250

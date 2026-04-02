@@ -9,7 +9,7 @@ Full patterns for Java 17+ / Spring Boot 3.x servlet stack.
 - [Request Validation](#request-validation)
 - [Filters](#filters)
 - [Interceptors](#interceptors)
-- [Security Configuration](#security-configuration)
+- [Security Configuration](#security-configuration) (see spring-security skill for full config)
 - [Pagination](#pagination)
 - [Testing with MockMvc](#testing-with-mockmvc)
 
@@ -251,35 +251,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
 ## Security Configuration
 
-```java
-@Configuration
-@EnableMethodSecurity
-@RequiredArgsConstructor
-public class SecurityConfig {
-
-    private final JwtAuthenticationFilter jwtFilter;
-
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        return http
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/public/**").permitAll()
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                .anyRequest().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter())))
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-            .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-                .accessDeniedHandler(new CustomAccessDeniedHandler()))
-            .build();
-    }
-}
-```
+For Spring Security configuration (SecurityFilterChain, CORS, CSRF), see the spring-security skill.
 
 ---
 

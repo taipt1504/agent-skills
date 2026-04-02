@@ -20,7 +20,7 @@ Full reactive patterns for Java 17+ / Spring Boot 3.x with Project Reactor.
 - [WebClient Configuration](#webclient-configuration)
 - [WebClient Usage](#webclient-usage)
 - [SSE with Sinks](#sse-with-sinks)
-- [Reactive Spring Security](#reactive-spring-security)
+- [Reactive Spring Security](#reactive-spring-security) (see spring-security skill for full config)
 - [StepVerifier Testing](#stepverifier-testing)
 - [WebTestClient Testing](#webtestclient-testing)
 - [PublisherProbe](#publisherprobe)
@@ -61,24 +61,19 @@ Full reactive patterns for Java 17+ / Spring Boot 3.x with Project Reactor.
 
 ## Mono/Flux Creation
 
+Use `Mono.defer()` (not `Mono.just()`) when the value is computed eagerly. Use `Mono.fromCallable()` to wrap blocking calls.
+
 ```java
-// Mono
-Mono<String> empty = Mono.empty();
-Mono<String> just = Mono.just("hello");
+// Deferred execution — only runs on subscribe
 Mono<String> deferred = Mono.defer(() -> Mono.just(expensiveCall()));
+
+// Wrap blocking call — pair with subscribeOn(boundedElastic())
 Mono<String> fromCallable = Mono.fromCallable(() -> blockingCall());
+
+// Async future bridge
 Mono<String> fromFuture = Mono.fromFuture(() -> asyncService.call());
-Mono<Void> fromRunnable = Mono.fromRunnable(() -> sideEffect());
-Mono<String> error = Mono.error(new RuntimeException("failed"));
 
-// Flux
-Flux<String> just = Flux.just("a", "b", "c");
-Flux<Integer> range = Flux.range(1, 10);
-Flux<Long> interval = Flux.interval(Duration.ofSeconds(1));
-Flux<String> fromIterable = Flux.fromIterable(list);
-Flux<String> fromStream = Flux.fromStream(() -> stream);  // always use Supplier
-
-// Generate (synchronous, 1 element per callback)
+// Generate (synchronous, 1 element per callback — stateful source)
 Flux<Integer> generated = Flux.generate(
     () -> 0,
     (state, sink) -> {
@@ -88,7 +83,7 @@ Flux<Integer> generated = Flux.generate(
     }
 );
 
-// Create (async, multi-element sink)
+// Create (async, multi-element sink — bridge to imperative API)
 Flux<String> created = Flux.create(sink -> {
     eventSource.onData(sink::next);
     eventSource.onComplete(sink::complete);
@@ -715,60 +710,7 @@ public class NotificationController {
 
 ## Reactive Spring Security
 
-```java
-@EnableWebFluxSecurity
-@EnableReactiveMethodSecurity
-@Configuration
-public class SecurityConfig {
-
-    @Bean
-    public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http,
-            ReactiveJwtDecoder jwtDecoder) {
-        return http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-            .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.jwtDecoder(jwtDecoder)))
-            .authorizeExchange(exchange -> exchange
-                .pathMatchers(HttpMethod.GET, "/api/public/**").permitAll()
-                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
-                .pathMatchers("/api/admin/**").hasRole("ADMIN")
-                .anyExchange().authenticated())
-            .build();
-    }
-}
-
-// JWT authentication filter (custom, when not using oauth2ResourceServer)
-@Component
-@RequiredArgsConstructor
-public class JwtAuthenticationWebFilter implements WebFilter {
-    private final JwtTokenValidator tokenValidator;
-
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        return Mono.justOrEmpty(exchange.getRequest().getHeaders()
-                .getFirst(HttpHeaders.AUTHORIZATION))
-            .filter(header -> header.startsWith("Bearer "))
-            .map(header -> header.substring(7))
-            .flatMap(tokenValidator::validate)
-            .flatMap(auth -> chain.filter(exchange)
-                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth)))
-            .switchIfEmpty(chain.filter(exchange));
-    }
-}
-
-// Method security
-@PreAuthorize("hasRole('ADMIN')")
-public Mono<List<UserResponse>> getAllUsers() { ... }
-
-@PreAuthorize("hasRole('USER') and #userId == authentication.principal.subject")
-public Mono<UserResponse> getUser(String userId) { ... }
-
-// Custom permission evaluator
-@PreAuthorize("@orderPermissionEvaluator.canAccess(authentication, #orderId)")
-public Mono<Order> getOrder(Long orderId) { ... }
-```
+For Spring Security configuration (SecurityWebFilterChain, CORS, CSRF), see the spring-security skill.
 
 ---
 

@@ -6,17 +6,8 @@ description: >
   or Entity classes, configuring SQL queries, planning migrations, tuning pool/connection
   settings, or reviewing database-related code.
 triggers:
-  - Repository
-  - Entity
-  - SQL
-  - migration
-  - schema
-  - pool config
-  - JPA
-  - R2DBC
-  - Flyway
-  - HikariCP
-  - database
+  natural: ["db migration", "jpa entity", "connection pool", "query optimization", "r2dbc"]
+  code: ["*Repository.java", "*Entity.java", "*.sql", "@Query"]
 ---
 
 # Database Patterns
@@ -87,3 +78,10 @@ Production-ready database patterns for Java 17+ / Spring Boot 3.x.
 | [jpa-hibernate.md](references/jpa-hibernate.md) | Entity design, N+1 prevention (EntityGraph/JOIN FETCH/DTO projections), HikariCP config, pagination (offset + cursor), batch writes, specifications |
 | [r2dbc.md](references/r2dbc.md) | ReactiveCrudRepository, R2dbcEntityTemplate, DatabaseClient, reactive transactions, pool config, Testcontainers testing |
 | [migrations.md](references/migrations.md) | Flyway naming, expand-contract, safety rules, large table strategies (PG vs MySQL), Testcontainers validation |
+
+## Related Skills
+
+- **summer-data** — R2DBC converters, audit_log/outbox_events DDL, AuditTableValidator
+- **spring-patterns** — JPA (MVC) or R2DBC (WebFlux) stack selection
+- **redis-patterns** — Cache-aside to reduce DB load
+- **testing-workflow** — Testcontainers for DB integration tests, @DataR2dbcTest/@DataJpaTest

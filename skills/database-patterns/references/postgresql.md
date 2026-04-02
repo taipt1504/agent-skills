@@ -250,23 +250,9 @@ pool_size = (vCPU * 2) + effective_spindle_count
 | 4-vCPU SSD | 4 | 9 |
 | 8-vCPU SSD | 8 | 17 |
 
-HikariCP config:
+Add `reWriteBatchedInserts=true` to the JDBC URL to enable PG-side INSERT batching.
 
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require&reWriteBatchedInserts=true
-    hikari:
-      pool-name: HikariPool-Main
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      keepalive-time: 60000
-```
-
-`reWriteBatchedInserts=true` enables PG-side INSERT batching.
+For HikariCP connection pool configuration, see jpa-hibernate.md.
 
 ### PgBouncer (Multi-Instance)
 
@@ -294,21 +280,26 @@ CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
 ## Flyway Config (PostgreSQL)
 
-```yaml
-spring:
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: false
-    default-schema: public
-    validate-on-migrate: true
-    out-of-order: false
-```
+For Flyway configuration and migration patterns, see migrations.md.
 
-Migration header -- set search path (no charset needed):
+---
 
-```sql
-SET search_path TO public;
+## Isolation Levels (PostgreSQL-Specific)
+
+PostgreSQL defaults to `READ_COMMITTED`, which prevents dirty reads but allows non-repeatable reads and phantom reads.
+
+| Level | Dirty Read | Non-Repeatable Read | Phantom Read | Gap Locks |
+|-------|-----------|-------------------|-------------|-----------|
+| `READ_COMMITTED` (default) | Prevented | Possible | Possible | No |
+| `REPEATABLE_READ` | Prevented | Prevented | Prevented (PG uses snapshots) | No |
+| `SERIALIZABLE` | Prevented | Prevented | Prevented | No (predicate locks) |
+
+PostgreSQL implements `REPEATABLE_READ` using MVCC snapshots (no gap locks, unlike MySQL). `SERIALIZABLE` uses Serializable Snapshot Isolation (SSI) — lower overhead than MySQL's full locking.
+
+```java
+@Transactional  // Default READ_COMMITTED -- safe for most operations
+@Transactional(isolation = Isolation.REPEATABLE_READ)  // For financial reads
+@Transactional(isolation = Isolation.SERIALIZABLE)     // For strict consistency
 ```
 
 ---

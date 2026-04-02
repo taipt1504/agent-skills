@@ -7,8 +7,7 @@ Complete domain, application, and infrastructure layer examples.
 - [Application Layer — Full Use Case](#application-layer--full-use-case)
 - [Infrastructure — Kafka Publisher](#infrastructure--kafka-publisher)
 - [Infrastructure — External HTTP Adapter](#infrastructure--external-http-adapter)
-- [Spring Wiring](#spring-wiring)
-- [MapStruct Mappers](#mapstruct-mappers)
+- [MapStruct Persistence Mapper](#mapstruct-persistence-mapper)
 - [Reconstitution Pattern](#reconstitution-pattern)
 - [Testing by Layer](#testing-by-layer)
 - [ArchUnit Enforcement](#archunit-enforcement)
@@ -188,40 +187,9 @@ public class PaymentApiAdapter implements PaymentPort {
 
 ---
 
-## Spring Wiring
+## MapStruct Persistence Mapper
 
-```java
-@Configuration
-public class BeanConfig {
-    @Bean
-    public WebClient paymentWebClient() {
-        return WebClient.builder()
-            .baseUrl("http://payment-service:8080")
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .build();
-    }
-}
-// Input adapter wiring: Port -> @Service is automatically injected via constructor injection
-```
-
----
-
-## MapStruct Mappers
-
-### REST Mapper
-
-```java
-@Mapper(componentModel = "spring")
-public interface OrderRestMapper {
-    @Mapping(target = "orderId", source = "id.value")
-    @Mapping(target = "totalAmount", source = "totalAmount.amount")
-    OrderResponse toResponse(Order order);
-
-    CreateOrderCommand toCommand(CreateOrderRequest request);
-}
-```
-
-### Persistence Mapper
+The persistence mapper requires a `default toDomain()` method because MapStruct cannot call the `reconstitute` factory directly — use a `default` method to wire typed IDs and call `reconstitute`:
 
 ```java
 @Mapper(componentModel = "spring")
@@ -240,6 +208,19 @@ public interface OrderPersistenceMapper {
             new Money(entity.getTotalAmount(), entity.getCurrency()),
             entity.getCreatedAt(), entity.getUpdatedAt());
     }
+}
+```
+
+REST mapper (straightforward field mapping):
+
+```java
+@Mapper(componentModel = "spring")
+public interface OrderRestMapper {
+    @Mapping(target = "orderId", source = "id.value")
+    @Mapping(target = "totalAmount", source = "totalAmount.amount")
+    OrderResponse toResponse(Order order);
+
+    CreateOrderCommand toCommand(CreateOrderRequest request);
 }
 ```
 

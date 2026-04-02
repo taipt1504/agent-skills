@@ -4,16 +4,12 @@ description: >
   Unified testing workflow: TDD (RED/GREEN/REFACTOR), blackbox integration testing
   with F8A Summer Test (JSON-driven test cases, WireMock, Testcontainers), and
   7-phase verification pipeline (compile, unit, integration, coverage, security,
-  static analysis, diff review). Covers JUnit 5, Mockito, StepVerifier, MockMvc,
-  WebTestClient, JaCoCo 80%+ coverage gate, and OWASP dependency checks.
+  static analysis, diff review). Use when writing or modifying tests, configuring
+  JaCoCo coverage, running verification pipelines, using StepVerifier, MockMvc,
+  WebTestClient, or setting up Testcontainers.
 triggers:
-  - Writing or modifying test files (*Test.java, *IT.java)
-  - Test commands (./gradlew test, ./mvnw test)
-  - Coverage reports or JaCoCo configuration
-  - Verification requests (/verify, pre-PR checks)
-  - Blackbox test JSON files or WireMock stubs
-  - StepVerifier, MockMvc, WebTestClient usage
-  - Testcontainers configuration
+  natural: ["write test", "tdd", "coverage", "testcontainers", "step verifier"]
+  code: ["*Test.java", "StepVerifier", "@SpringBootTest", "Testcontainers"]
 ---
 
 # Testing Workflow
@@ -49,15 +45,17 @@ triggers:
 
 ## Verification Pipeline (7 Phases)
 
-| Phase | What | Command (Gradle) | Gate |
-|-------|------|-------------------|------|
-| 1. Compile | Build sources + tests | `./gradlew compileJava compileTestJava` | STOP on fail |
-| 2. Unit Tests | Fast tests | `./gradlew test --tests "*Test"` | STOP on fail |
-| 3. Integration | Testcontainers tests | `./gradlew test --tests "*IT"` | STOP on fail |
-| 4. Coverage | JaCoCo check | `./gradlew jacocoTestCoverageVerification` | BLOCK < 60% |
-| 5. Security | OWASP + secrets scan | `./gradlew dependencyCheckAnalyze` | BLOCK CRITICAL |
-| 6. Static Analysis | .block(), @Autowired, debug stmts | grep-based checks | CRITICAL: .block() |
-| 7. Diff Review | Changed files review | `git diff --stat` | Manual |
+| Phase | What | Gate |
+|-------|------|------|
+| 1. Compile | Build sources + tests | STOP on fail |
+| 2. Unit Tests | Fast tests | STOP on fail |
+| 3. Integration | Testcontainers tests | STOP on fail |
+| 4. Coverage | JaCoCo check | BLOCK < 60% |
+| 5. Security | OWASP + secrets scan | BLOCK CRITICAL |
+| 6. Static Analysis | .block(), @Autowired, debug stmts | CRITICAL: .block() |
+| 7. Diff Review | Changed files review | Manual |
+
+For full commands per phase, see references/verification-pipeline.md.
 
 ## Quick Verification Modes
 
@@ -91,3 +89,10 @@ Load as needed for full patterns and code examples:
 - **[references/tdd-patterns.md](references/tdd-patterns.md)** -- Unit tests (JUnit 5 + Mockito + StepVerifier), WebFlux/MVC integration tests, R2DBC/JPA repository tests, Kafka tests, mocking patterns, JaCoCo config, common mistakes
 - **[references/blackbox-test.md](references/blackbox-test.md)** -- JSON-driven test cases (F8A Summer Test), test case structure, JSON path assertions, WireMock stub patterns, test class template, file organization
 - **[references/verification-pipeline.md](references/verification-pipeline.md)** -- Full 7-phase pipeline detail, commands per phase, static analysis checks, diff review process
+
+## Related Skills
+
+- **summer-test** — Summer-specific Testcontainers, WireMock, blackbox test JSON format
+- **spring-patterns** — StepVerifier (WebFlux) and MockMvc (MVC) test patterns
+- **database-patterns** — @DataR2dbcTest, @DataJpaTest, Flyway migration testing
+- **coding-standards** — Test naming conventions (shouldDoXWhenY)

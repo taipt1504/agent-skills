@@ -109,66 +109,7 @@ management:
 
 ## Caching with Redis
 
-### @Cacheable / @CacheEvict / @CachePut
-
-```java
-@Service
-@RequiredArgsConstructor
-public class ProductQueryService {
-
-    private final ProductRepository productRepository;
-
-    @Cacheable(value = "products", key = "#id", unless = "#result == null")
-    public ProductDto findById(Long id) {
-        return productRepository.findById(id)
-            .map(this::toDto)
-            .orElse(null);
-    }
-
-    @CacheEvict(value = "products", key = "#id")
-    public void evict(Long id) {
-        // Cache eviction only
-    }
-
-    @CachePut(value = "products", key = "#result.id")
-    public ProductDto update(UpdateProductCommand command) {
-        return toDto(productRepository.save(toEntity(command)));
-    }
-}
-```
-
-### Redis TTL Configuration
-
-```java
-@Configuration
-@EnableCaching
-public class CacheConfig {
-
-    @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory factory) {
-        var defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
-            .entryTtl(Duration.ofMinutes(30))
-            .serializeValuesWith(SerializationPair.fromSerializer(
-                new GenericJackson2JsonRedisSerializer()));
-
-        var cacheConfigs = Map.of(
-            "products", defaultConfig.entryTtl(Duration.ofHours(1)),
-            "user-sessions", defaultConfig.entryTtl(Duration.ofMinutes(15))
-        );
-
-        return RedisCacheManager.builder(factory)
-            .cacheDefaults(defaultConfig)
-            .withInitialCacheConfigurations(cacheConfigs)
-            .build();
-    }
-}
-```
-
-**Rules:**
-- Always set TTL -- never cache indefinitely
-- Use `unless = "#result == null"` to avoid caching null values
-- `@CacheEvict` on write operations to prevent stale data
-- Serialize with JSON (not Java serialization) for debuggability
+For Redis caching configuration (RedisCacheManager, @Cacheable with Redis), see the redis-patterns skill.
 
 ---
 
@@ -247,42 +188,7 @@ resilience4j:
         timeout-duration: 0s        # Don't queue -- fail immediately
 ```
 
-### Redis-based Rate Limiting (MVC Interceptor)
-
-```java
-@Component
-@RequiredArgsConstructor
-public class RateLimitInterceptor implements HandlerInterceptor {
-
-    private final RedisTemplate<String, Integer> redisTemplate;
-    private static final int MAX_REQUESTS_PER_MINUTE = 60;
-
-    @Override
-    public boolean preHandle(HttpServletRequest request,
-                              HttpServletResponse response,
-                              Object handler) throws Exception {
-        String clientId = extractClientId(request);
-        String key = "rate-limit:" + clientId + ":" + getCurrentMinuteBucket();
-
-        Long count = redisTemplate.opsForValue().increment(key);
-        if (count == 1) {
-            redisTemplate.expire(key, Duration.ofMinutes(2));
-        }
-
-        if (count > MAX_REQUESTS_PER_MINUTE) {
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.setHeader("X-RateLimit-Limit", String.valueOf(MAX_REQUESTS_PER_MINUTE));
-            response.setHeader("X-RateLimit-Remaining", "0");
-            response.setHeader("Retry-After", "60");
-            return false;
-        }
-
-        response.setHeader("X-RateLimit-Remaining",
-            String.valueOf(MAX_REQUESTS_PER_MINUTE - count));
-        return true;
-    }
-}
-```
+For Redis-based MVC rate limiting (RateLimitInterceptor), see references/spring-mvc.md.
 
 ---
 

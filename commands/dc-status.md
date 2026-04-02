@@ -1,11 +1,11 @@
 ---
-name: status
+name: dc-status
 description: >
   Show full plugin state: detected project type, Summer Framework status, loaded skills,
   loaded rules, context usage estimate, hook profile, installation status, and git info.
 ---
 
-# /status -- Plugin State & Health Check (v3.0)
+# /dc-status -- Plugin State & Health Check (v3.0)
 
 Run the diagnostic script below using the Bash tool. Then format the raw output into a
 clean, readable report for the user. Do NOT add commentary beyond the data.
@@ -268,7 +268,7 @@ echo ""
 # =====================================================================
 echo "======================================================"
 if [ "$ALL_OK" = false ]; then
-  echo "  Some components missing. Run /setup to install."
+  echo "  Some components missing. Run /dc-setup to install."
 else
   echo "  All components installed. Plugin is fully operational."
 fi

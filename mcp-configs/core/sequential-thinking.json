@@ -1,0 +1,14 @@
+{
+  "_comment": "Sequential Thinking MCP — step-by-step reasoning for complex problem solving, architecture decisions, and debugging.",
+  "_install": "claude mcp add sequential-thinking -s user -- npx -y @modelcontextprotocol/server-sequential-thinking",
+  "_env_required": [],
+  "_env_example": {},
+  "_security": "Local computation only. No external network calls. Safe for all environments.",
+  "_tools_added": 1,
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}

@@ -213,47 +213,14 @@ public class SetService {
 
 ## List — Queue / Stack
 
-```java
-@Service @RequiredArgsConstructor
-public class ListService {
-    private final ReactiveRedisTemplate<String, String> redisTemplate;
+Redis List operations via `opsForList()`:
 
-    // Queue (FIFO) — lpush + rpop
-    public Mono<Long> enqueue(String queueName, String item) {
-        return redisTemplate.opsForList().leftPush(queueName, item);
-    }
+- **Queue (FIFO):** `leftPush(queue, item)` + `rightPop(queue)`
+- **Stack (LIFO):** `leftPush(stack, item)` + `leftPop(stack)`
+- **Blocking dequeue:** `rightPop(queue, timeout)` — waits for an item
+- **Capped activity log:** `leftPush(key, item)` then `trim(key, 0, maxSize - 1)`
 
-    public Mono<String> dequeue(String queueName) {
-        return redisTemplate.opsForList().rightPop(queueName);
-    }
-
-    // Stack (LIFO) — lpush + lpop
-    public Mono<Long> push(String stackName, String item) {
-        return redisTemplate.opsForList().leftPush(stackName, item);
-    }
-
-    public Mono<String> pop(String stackName) {
-        return redisTemplate.opsForList().leftPop(stackName);
-    }
-
-    // Blocking pop with timeout (for job queues)
-    public Mono<String> blockingDequeue(String queueName, Duration timeout) {
-        return redisTemplate.opsForList().rightPop(queueName, timeout);
-    }
-
-    // Recent activity log (capped list)
-    public Mono<Void> addActivity(String userId, String activity, int maxSize) {
-        String key = "activity:" + userId;
-        return redisTemplate.opsForList().leftPush(key, activity)
-            .then(redisTemplate.opsForList().trim(key, 0, maxSize - 1))
-            .then();
-    }
-
-    public Flux<String> getRecentActivity(String userId) {
-        return redisTemplate.opsForList().range("activity:" + userId, 0, -1);
-    }
-}
-```
+Prefer Redis Streams (see advanced-patterns.md) for durable job queues in Spring Boot — they support consumer groups, acknowledgements, and replay.
 
 ---
 

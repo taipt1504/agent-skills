@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
-# compact-advisor.sh — Context Monitor & Compact Advisor (v3.0)
+# compact-advisor.sh — Context Monitor & Token Budget Advisor (v3.2)
 # =============================================================================
-# Monitors tool call count, suggests compact at workflow boundaries.
-# Replaces: suggest-compact.sh
-# Fires on: PreToolUse
+# Monitors tool call count AND estimates token usage for context budget.
+# Progressive unloading + real-time token estimation.
+# Fires on: PreToolUse (all tools)
+#
+# Harness Engineering principle: Context is first-class citizen.
+# Real measurement > proxy metrics.
 # =============================================================================
 
 source "$(dirname "$0")/run-with-flags.sh" "compact-advisor" || exit 0
+
+trap 'exit 0' ERR
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 cd "$PROJECT_ROOT" 2>/dev/null || true
@@ -28,11 +33,47 @@ fi
 echo "$COUNT" > "$COUNTER_FILE"
 
 # ---------------------------------------------------------------------------
-# Progressive unloading strategy (Section 3.3 — Anti-Context-Rot)
+# Token Budget Estimation (v3.2 — replaces pure proxy metric)
 #
-# Stage 1 (50 calls):  Suggest unloading meta skills (learning, evolve)
-# Stage 2 (75 calls):  Suggest unloading unused domain skills
-# Stage 3 (100 calls): Suggest full /compact at workflow boundary
+# Estimates context token usage from known sources:
+#   - Bootstrap skill: ~1500 tokens (always loaded)
+#   - CLAUDE.md: ~400 tokens
+#   - Rules: ~500 tokens each × loaded count
+#   - Domain skills: ~800 tokens each × loaded count
+#   - Conversation history: ~50 tokens per tool call (rough estimate)
+#
+# Warning thresholds (of ~200K context budget):
+#   70% (~140K): ADVISORY — suggest unloading meta skills
+#   85% (~170K): WARNING — unload unused domain skills
+#   95% (~190K): CRITICAL — force /compact at next boundary
+# ---------------------------------------------------------------------------
+
+# Count loaded skills (approximate from skill-router activity)
+SKILLS_LOADED=1  # bootstrap always
+RULES_DIR="$PROJECT_ROOT/.claude/rules"
+RULES_COUNT=0
+[ -d "$RULES_DIR" ] && RULES_COUNT=$(find "$RULES_DIR" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+
+# Estimate from tool calls + known baseline
+BASELINE_TOKENS=2600  # bootstrap(1700) + CLAUDE.md(400) + memory(500)
+RULES_TOKENS=$((RULES_COUNT * 500))
+SKILLS_ESTIMATE=$((COUNT / 8))  # rough: 1 new skill per 8 tool calls
+[ "$SKILLS_ESTIMATE" -gt 10 ] && SKILLS_ESTIMATE=10
+SKILLS_TOKENS=$((SKILLS_ESTIMATE * 800))
+CONVERSATION_TOKENS=$((COUNT * 50))
+
+TOTAL_ESTIMATED=$((BASELINE_TOKENS + RULES_TOKENS + SKILLS_TOKENS + CONVERSATION_TOKENS))
+
+# Percentage of 200K budget
+BUDGET=200000
+PERCENT=$((TOTAL_ESTIMATED * 100 / BUDGET))
+
+# ---------------------------------------------------------------------------
+# Progressive unloading strategy (v3.2)
+#
+# Stage 1 (50 calls OR 70%):  Suggest unloading meta skills
+# Stage 2 (75 calls OR 85%):  Suggest unloading unused domain skills
+# Stage 3 (100 calls OR 95%): Force /compact at workflow boundary
 # ---------------------------------------------------------------------------
 
 STAGE2=$((THRESHOLD + 25))
@@ -42,24 +83,41 @@ STAGE1_FLAG="$TEMP_DIR/claude-compact-stage1-$SESSION_ID"
 STAGE2_FLAG="$TEMP_DIR/claude-compact-stage2-$SESSION_ID"
 STAGE3_FLAG="$TEMP_DIR/claude-compact-stage3-$SESSION_ID"
 
-if [ "$COUNT" -ge "$THRESHOLD" ] && [ ! -f "$STAGE1_FLAG" ]; then
-  echo "[CompactAdvisor] ${THRESHOLD} tool calls — Stage 1: Unload meta skills if not in use (continuous-learning). Consider /compact if transitioning phases." >&2
+if { [ "$COUNT" -ge "$THRESHOLD" ] || [ "$PERCENT" -ge 70 ]; } && [ ! -f "$STAGE1_FLAG" ]; then
+  echo "[CompactAdvisor] Stage 1 (${COUNT} calls, ~${PERCENT}% budget): Unload meta skills if not in use (continuous-learning). Consider /compact if transitioning phases." >&2
   touch "$STAGE1_FLAG"
 fi
 
-if [ "$COUNT" -ge "$STAGE2" ] && [ ! -f "$STAGE2_FLAG" ]; then
-  echo "[CompactAdvisor] ${STAGE2} tool calls — Stage 2: Unload unused domain skills (skills not referenced in last 20 tool calls). Keep only actively-used skills loaded." >&2
+if { [ "$COUNT" -ge "$STAGE2" ] || [ "$PERCENT" -ge 85 ]; } && [ ! -f "$STAGE2_FLAG" ]; then
+  echo "[CompactAdvisor] Stage 2 (${COUNT} calls, ~${PERCENT}% budget): Unload unused domain skills. Keep only actively-used skills loaded." >&2
   touch "$STAGE2_FLAG"
 fi
 
-if [ "$COUNT" -ge "$STAGE3" ] && [ ! -f "$STAGE3_FLAG" ]; then
-  echo "[CompactAdvisor] ${STAGE3} tool calls — Stage 3: Context likely >70%. Run /compact NOW at next workflow boundary (after VERIFY or REVIEW). Preserve: current phase, plan summary, spec summary, failing tests." >&2
+if { [ "$COUNT" -ge "$STAGE3" ] || [ "$PERCENT" -ge 95 ]; } && [ ! -f "$STAGE3_FLAG" ]; then
+  echo "[CompactAdvisor] CRITICAL Stage 3 (${COUNT} calls, ~${PERCENT}% budget): Run /compact NOW at next workflow boundary (after VERIFY or REVIEW). Preserve: current phase, plan summary, spec summary." >&2
   touch "$STAGE3_FLAG"
 fi
 
 # Recurring reminder every 25 calls after stage 3
 if [ "$COUNT" -gt "$STAGE3" ] && [ $((COUNT % 25)) -eq 0 ]; then
-  echo "[CompactAdvisor] ${COUNT} tool calls — context is stale. Run /compact to free context window." >&2
+  echo "[CompactAdvisor] ${COUNT} calls (~${PERCENT}% budget) — context is stale. Run /compact to free context window." >&2
+fi
+
+# Persist token estimate for /dc-status --metrics
+METRICS_FILE="$PROJECT_ROOT/.claude/sessions/session-metrics.json"
+if [ -f "$METRICS_FILE" ]; then
+  TOTAL_ESTIMATED="$TOTAL_ESTIMATED" PERCENT="$PERCENT" python3 -c "
+import json, os
+try:
+    with open('$METRICS_FILE') as f:
+        m = json.load(f)
+    m['estimatedTokens'] = int(os.environ['TOTAL_ESTIMATED'])
+    m['budgetPercent'] = int(os.environ['PERCENT'])
+    with open('$METRICS_FILE', 'w') as f:
+        json.dump(m, f, indent=2)
+except:
+    pass
+" 2>/dev/null || true
 fi
 
 exit 0

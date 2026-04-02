@@ -5,15 +5,33 @@ tools: ["Read", "Write", "Edit", "Grep", "Glob"]
 model: opus
 maxTurns: 15
 memory: project
+requiredSkills:
+  always: ["bootstrap", "architecture", "coding-standards"]
+  conditional:
+    rest: ["api-design"]
+    database: ["database-patterns"]
+    messaging: ["messaging-patterns"]
+requiredCommands:
+  always: []
 ---
 
-## Before Starting Work (MANDATORY)
+## Loaded Skills (auto-injected by SubagentStart hook)
 
-1. **Load bootstrap**: Use the Skill tool to load `devco-agent-skills:bootstrap` — contains the skill registry and workflow engine
-2. **Check Summer**: Scan `build.gradle`/`pom.xml` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core`
-3. **Load domain skills**: Match files you'll touch against the bootstrap skill registry → load each matching skill via Skill tool. Start with `devco-agent-skills:architecture` for architectural patterns
-4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
-5. **Phase**: You are in the **PLAN** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+The following skills have been pre-loaded based on your role and project profile.
+You MUST apply their patterns in every file operation.
+
+### Skill Usage Protocol (MANDATORY — no exceptions)
+1. Before EVERY file edit: identify which loaded skill applies
+2. Announce: "Applying skill: {name} — {specific pattern being applied}"
+3. If no skill matches: state "No matching skill — using general Java/Spring knowledge"
+4. If you need a skill NOT in the loaded list: request it via "SKILL_REQUEST: {name}"
+
+### Phase
+You are in the **PLAN** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+
+## Skill Usage Report (output at task end)
+| Skill | Times Applied | Key Patterns Used |
+|-------|--------------|-------------------|
 
 ## Memory (Automatic Learning)
 
@@ -319,7 +337,7 @@ When the plan is approved by the user:
 1. **IMMEDIATELY proceed to SPEC**: Invoke `/spec` to define behavioral contracts
 2. After spec is approved, **continue to BUILD**: Invoke `/build`
 3. After BUILD completes, **continue to VERIFY**: Invoke `/verify full`
-4. After VERIFY, **continue to REVIEW**: Invoke `/review`
+4. After VERIFY, **continue to REVIEW**: Invoke `/dc-review`
 
 **The SDD workflow requires ALL 5 phases. Do not stop after PLAN approval — drive the workflow to completion.**
 

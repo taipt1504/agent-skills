@@ -1,6 +1,6 @@
 # Java Patterns Reference
 
-Immutability, null safety, concurrency, collections, streams, and memory optimization.
+Immutability, null safety, concurrency, collections, and streams.
 
 ## Table of Contents
 - [Immutability](#immutability)
@@ -8,7 +8,6 @@ Immutability, null safety, concurrency, collections, streams, and memory optimiz
 - [Concurrency](#concurrency)
 - [Collections](#collections)
 - [Streams & Functional](#streams--functional)
-- [Memory Optimization & GC](#memory-optimization--gc)
 
 ---
 
@@ -164,47 +163,6 @@ sender.send(notification);  // always safe
 
 ## Concurrency
 
-### CompletableFuture
-
-```java
-// Async + chaining
-CompletableFuture<OrderSummary> summary = CompletableFuture
-    .supplyAsync(() -> userRepository.findById(id), executor)
-    .thenCompose(user -> orderService.getOrdersFor(user.id()))
-    .thenApply(OrderSummary::new);
-
-// Combining
-CompletableFuture.allOf(future1, future2, future3);
-
-// Error handling
-result.exceptionally(ex -> { log.error("Failed", ex); return fallback; });
-result.exceptionallyCompose(ex -> fetchFromBackup(id));
-
-// Timeout (Java 9+)
-result.orTimeout(5, TimeUnit.SECONDS);
-result.completeOnTimeout(defaultValue, 5, TimeUnit.SECONDS);
-```
-
-### Virtual Threads (Java 21+)
-
-```java
-try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-    List<Future<Result>> futures = requests.stream()
-        .map(req -> executor.submit(() -> process(req)))
-        .toList();
-}
-
-// Structured concurrency (preview)
-try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
-    Future<User> userFuture = scope.fork(() -> fetchUser(id));
-    Future<List<Order>> ordersFuture = scope.fork(() -> fetchOrders(id));
-    scope.join(); scope.throwIfFailed();
-    return new UserWithOrders(userFuture.resultNow(), ordersFuture.resultNow());
-}
-```
-
-Use virtual threads for I/O-bound ops. Avoid for CPU-bound, thread-local caching, long-held synchronized blocks.
-
 ### Atomic Variables
 
 ```java
@@ -225,16 +183,11 @@ cache.merge(id, 1, Integer::sum);              // counting
 BlockingQueue<Task> queue = new ArrayBlockingQueue<>(100);
 ```
 
-### Executor Configuration
+### Non-obvious Caveats
 
-```java
-// CPU-bound
-ExecutorService cpuPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-
-// Custom with rejection policy
-new ThreadPoolExecutor(10, 50, 60, TimeUnit.SECONDS,
-    new LinkedBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-```
+- Virtual threads (Java 21+): avoid for CPU-bound work, thread-local caching, or long-held `synchronized` blocks — they re-pin the carrier thread.
+- `CompletableFuture.allOf` returns `CompletableFuture<Void>` — extract results individually from the original futures after joining.
+- `orTimeout` cancels downstream; `completeOnTimeout` completes with a value — choose based on whether a fallback is acceptable.
 
 ---
 
@@ -311,48 +264,3 @@ users.forEach(this::process);  // simpler than stream().forEach()
 
 Use when: >10K elements, CPU-intensive, independent ops, order doesn't matter.
 Avoid when: small data, I/O-bound, side effects, inside reactive code.
-
----
-
-## Memory Optimization & GC
-
-### Avoid Unnecessary Object Creation
-
-```java
-// Use primitives over wrappers
-int value = 1000;  // not Integer.valueOf(1000)
-
-// StringBuilder in loops
-StringBuilder sb = new StringBuilder(expectedLength);
-for (String s : strings) sb.append(s);
-
-// String.join for simple cases
-String result = String.join(", ", strings);
-```
-
-### Caching Patterns
-
-```java
-// Caffeine (recommended)
-LoadingCache<String, User> cache = Caffeine.newBuilder()
-    .maximumSize(10_000)
-    .expireAfterWrite(Duration.ofMinutes(10))
-    .refreshAfterWrite(Duration.ofMinutes(5))
-    .build(key -> userRepository.findById(key));
-```
-
-### Memory Leak Prevention
-
-- Close resources with try-with-resources.
-- Use static inner classes or lambdas (not anonymous inner classes holding outer reference).
-- Use WeakReference for listener registrations.
-- Never let static collections grow unbounded.
-
-### GC Tuning
-
-```bash
--XX:+UseG1GC                   # Default Java 9+ (good general purpose)
--XX:+UseZGC                    # Java 15+ (ultra-low latency <1ms)
--Xms4g -Xmx4g                 # Set min=max (avoid resize pauses)
--Xlog:gc*:file=gc.log:time    # GC logging
-```

@@ -2,26 +2,16 @@
 name: observability-patterns
 description: >
   Observability patterns for Spring Boot — structured logging, distributed tracing,
-  custom metrics, health indicators, Kubernetes probes, and alerting strategies.
+  custom metrics, health checks, alerting, and Prometheus monitoring. Use when adding
+  logging to services, configuring log formats, setting up distributed tracing, creating
+  custom Micrometer metrics, configuring health endpoints, writing Prometheus alert rules,
+  or setting up Grafana dashboards.
 triggers:
-  - logging config
-  - Logback
-  - Micrometer
-  - tracing
-  - metrics
-  - health checks
-  - alerting
-  - Prometheus
+  natural: ["structured logging", "metrics", "distributed tracing", "health check", "alerting"]
+  code: ["Micrometer", "@Timed", "MeterRegistry", "logback", "MDC"]
 ---
 
 # Observability Patterns for Spring Boot
-
-## When to Activate
-
-- Setting up logging, metrics, or tracing for a service
-- Debugging production issues
-- Reviewing logging code or monitoring configuration
-- Designing alerting and health checks
 
 ## Structured Logging
 
@@ -139,6 +129,21 @@ Liveness = app alive (restart if fails). Readiness = can accept traffic (include
 | DB pool saturation > 90% | Instant | CRITICAL |
 | Health endpoint DOWN | Instant | CRITICAL |
 
+## Rules
+
+- Never log PII — mask emails, never log passwords/tokens/credentials.
+- Always use SLF4J placeholders (`log.info("x={}", x)`) — never string concatenation.
+- Always clear MDC in reactive `doFinally` blocks to prevent context leakage.
+- Always set timeouts on health check external calls (2-5s) to prevent probe hangs.
+
 ## References
 
-- **[references/detailed-patterns.md](references/detailed-patterns.md)** — Full code: dependencies, WebFilter correlation, WebClient tracing, custom spans, Logback config (local + JSON), reactive MDC propagation, Micrometer auto-instrumentation, distribution summaries, Prometheus alert rules, reactive health indicators, scrape config, sensitive data rules
+- **[references/logging.md](references/logging.md)** — Full Logback config (local + JSON), reactive MDC propagation, WebFilter correlation, sensitive data rules
+- **[references/tracing-metrics.md](references/tracing-metrics.md)** — Dependencies, custom spans, Observation API, Micrometer auto-instrumentation, Prometheus alerts, reactive health indicators
+- **[references/detailed-patterns.md](references/detailed-patterns.md)** — Legacy combined reference (all patterns in one file)
+
+## Related Skills
+
+- **spring-patterns** — WebFilter setup, production actuator defaults
+- **pentest** — PII logging detection (OWASP A09)
+- **testing-workflow** — Verification pipeline includes observability checks

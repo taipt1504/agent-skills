@@ -50,6 +50,8 @@ class OrderServiceTest {
 
 ## WebFlux Integration Test
 
+Use `@DynamicPropertySource` to wire Testcontainers properties into Spring context:
+
 ```java
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
@@ -58,9 +60,6 @@ class OrderControllerIntegrationTest {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
-        .withDatabaseName("testdb")
-        .withUsername("test")
-        .withPassword("test")
         .withReuse(true);
 
     @DynamicPropertySource
@@ -80,37 +79,18 @@ class OrderControllerIntegrationTest {
 
     @Test
     void shouldCreateOrder() {
-        var request = new CreateOrderRequest(1L, List.of(new OrderItemRequest(100L, 2)), "123 Main St", null);
-
         webTestClient.post().uri("/api/v1/orders")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
+            .bodyValue(new CreateOrderRequest(1L, List.of(new OrderItemRequest(100L, 2)), "123 Main St", null))
             .exchange()
             .expectStatus().isCreated()
             .expectBody()
-            .jsonPath("$.status").isEqualTo("PENDING")
-            .jsonPath("$.id").isNotEmpty();
-    }
-
-    @Test
-    void shouldReturn404ForUnknownOrder() {
-        webTestClient.get().uri("/api/v1/orders/99999")
-            .exchange()
-            .expectStatus().isNotFound();
-    }
-
-    @Test
-    void shouldReturn400ForInvalidRequest() {
-        webTestClient.post().uri("/api/v1/orders")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new CreateOrderRequest(null, List.of(), "", null))
-            .exchange()
-            .expectStatus().isBadRequest()
-            .expectBody()
-            .jsonPath("$.errors").isArray();
+            .jsonPath("$.status").isEqualTo("PENDING");
     }
 }
 ```
+
+For the full PostgresTestContainer setup with Flyway + R2DBC dual connection, see references/blackbox-test.md.
 
 ---
 
@@ -179,13 +159,10 @@ class OrderRepositoryTest {
 
     @Test
     void shouldSaveAndRetrieve() {
-        var order = Order.builder().userId(1L).status(OrderStatus.PENDING).build();
-
-        StepVerifier.create(repository.save(order).flatMap(saved -> repository.findById(saved.getId())))
-            .assertNext(found -> {
-                assertThat(found.getUserId()).isEqualTo(1L);
-                assertThat(found.getStatus()).isEqualTo(OrderStatus.PENDING);
-            })
+        StepVerifier.create(
+                repository.save(Order.builder().userId(1L).status(OrderStatus.PENDING).build())
+                    .flatMap(saved -> repository.findById(saved.getId())))
+            .assertNext(found -> assertThat(found.getStatus()).isEqualTo(OrderStatus.PENDING))
             .verifyComplete();
     }
 }
@@ -233,34 +210,7 @@ class OrderRepositoryJpaTest {
 
 ---
 
-## Kafka Integration Test
-
-```java
-@SpringBootTest
-@EmbeddedKafka(partitions = 1, topics = {"order-events"})
-class OrderEventPublisherTest {
-
-    @Autowired private OrderEventPublisher publisher;
-
-    @Autowired
-    @Qualifier("testKafkaConsumer")
-    private Consumer<String, String> consumer;
-
-    @Test
-    void shouldPublishOrderCreatedEvent() throws Exception {
-        var event = new OrderCreatedEvent(1L, 1L, BigDecimal.TEN);
-
-        publisher.publish(event);
-
-        ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(5));
-        assertThat(records.count()).isEqualTo(1);
-
-        var record = records.iterator().next();
-        assertThat(record.topic()).isEqualTo("order-events");
-        assertThat(record.value()).contains("\"orderId\":1");
-    }
-}
-```
+For Kafka integration testing patterns, see the messaging-patterns skill.
 
 ---
 
@@ -334,24 +284,10 @@ void setupRedisMock() {
 
 ## Test Coverage Configuration
 
-### Gradle (build.gradle.kts)
+Set the minimum line coverage threshold (80%) in your build config:
 
 ```kotlin
-plugins { id("jacoco") }
-
-tasks.test {
-    useJUnitPlatform()
-    finalizedBy(tasks.jacocoTestReport)
-}
-
-tasks.jacocoTestReport {
-    dependsOn(tasks.test)
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-    }
-}
-
+// Gradle (build.gradle.kts) — minimum threshold setting
 tasks.jacocoTestCoverageVerification {
     violationRules {
         rule {
@@ -361,40 +297,13 @@ tasks.jacocoTestCoverageVerification {
 }
 ```
 
-### Maven (pom.xml)
-
 ```xml
-<plugin>
-    <groupId>org.jacoco</groupId>
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <executions>
-        <execution>
-            <goals><goal>prepare-agent</goal></goals>
-        </execution>
-        <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals><goal>report</goal></goals>
-        </execution>
-        <execution>
-            <id>check</id>
-            <goals><goal>check</goal></goals>
-            <configuration>
-                <rules>
-                    <rule>
-                        <limits>
-                            <limit>
-                                <counter>LINE</counter>
-                                <value>COVEREDRATIO</value>
-                                <minimum>0.80</minimum>
-                            </limit>
-                        </limits>
-                    </rule>
-                </rules>
-            </configuration>
-        </execution>
-    </executions>
-</plugin>
+<!-- Maven (pom.xml) — minimum threshold setting -->
+<limit>
+    <counter>LINE</counter>
+    <value>COVEREDRATIO</value>
+    <minimum>0.80</minimum>
+</limit>
 ```
 
 ---

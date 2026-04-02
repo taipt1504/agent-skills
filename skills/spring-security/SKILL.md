@@ -1,18 +1,12 @@
 ---
 name: spring-security
-description: Spring Security patterns — authentication, authorization, JWT, CORS, secrets management, OWASP scanning, security review for MVC and WebFlux applications
+description: Spring Security patterns — authentication, authorization, JWT, CORS, secrets management, OWASP scanning, security review for MVC and WebFlux applications. Use when configuring SecurityFilterChain or SecurityWebFilterChain, implementing JWT authentication, setting up CORS, applying method-level security, managing secrets, or reviewing OWASP compliance.
 triggers:
-  - Security config (SecurityFilterChain, SecurityWebFilterChain)
-  - JWT authentication or token handling
-  - CORS configuration
-  - "@PreAuthorize or method-level security"
-  - Secrets management, hardcoded credentials
-  - OWASP dependency scanning or vulnerability review
+  natural: ["jwt auth", "cors config", "security filter", "oauth", "authentication"]
+  code: ["SecurityConfig", "@PreAuthorize", "JWT", "@AuthRoles"]
 ---
 
 # Spring Security
-
-Activate when touching: authentication, authorization, JWT, CORS, secrets, file uploads, API endpoints, payments, PII, or OWASP scanning.
 
 ## OWASP Top 10 Quick Rules
 
@@ -83,4 +77,15 @@ return new ErrorResponse(ex.getMessage(), ex.getStackTrace());
 
 Load as needed:
 
-- **[references/security-patterns.md](references/security-patterns.md)** -- Full code examples: JWT filter (MVC), SecurityFilterChain (MVC), SecurityWebFilterChain (WebFlux), method security, CORS config, file upload validation, path traversal prevention, JWT token provider, rate limiting (Caffeine + Resilience4j), sensitive data logging, security headers filter, security testing (MockMvc + WebTestClient), OWASP dependency scanning
+- **[references/jwt-auth.md](references/jwt-auth.md)** — JWT filter (MVC), SecurityFilterChain, SecurityWebFilterChain, JWT token provider, method security
+- **[references/oauth2-oidc.md](references/oauth2-oidc.md)** — OAuth2 resource server, client credentials, custom principal extraction, Spring Security 6.x migration notes, testing with mockJwt()
+- **[references/cors-headers.md](references/cors-headers.md)** — CORS configuration (MVC + WebFlux), security headers filter
+- **[references/security-testing.md](references/security-testing.md)** — Security testing (MockMvc + WebTestClient), OWASP dependency scanning
+- **[references/file-upload-secrets.md](references/file-upload-secrets.md)** — File upload validation, path traversal prevention, secrets management
+
+## Related Skills
+
+- **redis-patterns** — Redis-based rate limiting
+- **spring-patterns** — Resilience4j rate limiting, WebFilter setup
+- **pentest** — Security scanning, OWASP Top 10 assessment
+- **summer-security** — APISIX auth, Keycloak integration (Summer projects)

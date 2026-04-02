@@ -8,9 +8,15 @@ description: Observable learning commands — view what agents have learned, ext
 ## Usage
 
 ```
-/meta learn status       -> show learning dashboard (memories + knowledge graph)
-/meta learn extract      -> distill current session into learnings
-/meta learn report       -> weekly learning summary
+/meta learn status       -> show learning dashboard (memories + knowledge graph + instincts)
+/meta learn extract      -> distill current session into learnings + instinct files
+/meta learn report       -> weekly learning summary + instinct trends
+/meta evolve             -> cluster instincts and suggest promotions
+/meta evolve --generate  -> write evolved skills from clusters
+/meta evolve --promote   -> promote instincts to global scope
+/meta prune              -> remove stale instincts
+/meta prune --dry-run    -> preview what would be pruned
+/meta prune --archive    -> archive instead of delete
 /meta create-skill       -> create new skill from repo patterns
 ```
 
@@ -40,6 +46,11 @@ Knowledge Graph:
   Relations:    8
   Observations: 24
 
+Instincts:
+  personal:  12 (8 active, 3 stale, 1 fading)
+  promoted:  2 (cross-project patterns)
+  learned:   1 skill generated from instincts
+
 Recent Learnings:
   [feedback] Don't mock DB in integration tests (2026-03-24)
   [project]  Auth middleware rewrite for compliance (2026-03-23)
@@ -53,7 +64,7 @@ Stale (>30 days, consider pruning):
 
 ## /meta learn extract
 
-Distill the current session into reusable knowledge.
+Distill the current session into reusable knowledge and instinct files.
 
 ### Process
 
@@ -87,6 +98,31 @@ Extracted 4 learnings:
    → Created: MCP entity with code reference
 ```
 
+4. Identify non-obvious patterns worth preserving as instincts:
+   - Corrections made (user said "no, do X instead")
+   - Approaches that worked well (user confirmed or accepted)
+   - Repeated patterns (same type of change done 3+ times)
+5. For each pattern, create an instinct file at `.claude/instincts/personal/`:
+
+```yaml
+---
+trigger: "normalized trigger phrase"
+action: "what to do when triggered"
+confidence: 0.5
+source: "session"
+createdAt: "2026-04-01T10:00:00Z"
+lastApplied: null
+applyCount: 0
+project: "my-service"
+---
+
+Detailed explanation of the pattern, when to apply it, and why.
+Example: When creating a new endpoint in this project, always add @Valid 
+on the request body and use ResponseEntity with RFC 7807 error format.
+```
+
+6. Log extracted instincts count
+
 ---
 
 ## /meta learn report
@@ -117,9 +153,113 @@ Top entities (most referenced):
 Correction trend: 2 feedback memories this week (down from 4 last week)
   → Agent is learning from corrections ✓
 
+Instinct Trends (last 7 days):
+  New: 4 instincts extracted
+  Applied: 8 times across 3 instincts
+  Confidence changes: 2 increased, 1 decreased
+  Ready for evolution: 1 cluster ("error-handling", 4 instincts)
+
 Stale (consider pruning):
   - old-auth-middleware-decision (45 days, replaced by compliance rewrite)
 ```
+
+---
+
+## /meta evolve
+
+Analyze instincts and suggest promotions to skills/agents.
+
+### Process
+
+1. Read all instinct files from `.claude/instincts/personal/`
+2. Normalize triggers (lowercase, remove articles, stem verbs)
+3. Cluster instincts by normalized trigger similarity
+4. Apply promotion rules:
+
+| Cluster Size | Avg Confidence | Action |
+|-------------|---------------|--------|
+| 2+ instincts | ≥0.8 | Suggest new skill |
+| 3+ instincts | ≥0.75 | Suggest new agent |
+| 1 instinct | ≥0.9 | Mark as "established" |
+| Any | <0.3 | Mark as "fading" |
+
+5. Output evolution report:
+```
+EVOLUTION REPORT
+================
+Clusters found: 3
+  "error-handling" (4 instincts, avg confidence: 0.85)
+    → SUGGEST: Create skill "error-handling-patterns"
+  "testing-setup" (2 instincts, avg confidence: 0.72)
+    → No action (confidence below threshold)
+  "api-conventions" (3 instincts, avg confidence: 0.80)
+    → SUGGEST: Create agent "api-enforcer"
+
+Actions available:
+  /meta evolve --generate   # Write suggested skills to .claude/skills/learned/
+  /meta evolve --promote    # Promote to ~/.claude/instincts/promoted/
+```
+
+---
+
+## /meta evolve --generate
+
+Write evolved skills from instinct clusters.
+
+### Process
+
+1. Read cluster suggestions from the most recent `/meta evolve` output
+2. For each suggested skill: create `.claude/skills/learned/{skill-name}/SKILL.md`
+3. SKILL.md generated from cluster's instinct content with:
+   - Merged triggers from cluster's normalized triggers
+   - Combined pattern descriptions from all instincts in cluster
+   - Source attribution to originating instinct files
+4. Report created skills
+
+---
+
+## /meta evolve --promote
+
+Promote high-confidence instincts to global scope.
+
+### Process
+
+1. Identify instincts appearing in ≥2 projects with avg confidence ≥0.8
+2. Copy qualifying instincts to `~/.claude/instincts/promoted/`
+3. Update source field to "promoted"
+4. Report promoted instincts
+
+---
+
+## /meta prune
+
+Remove stale instincts.
+
+### Process
+
+1. Read all instinct files from `.claude/instincts/personal/`
+2. Apply TTL rules:
+   - `lastApplied` > 30 days ago → STALE
+   - `confidence` < 0.3 → FADING
+   - `applyCount` = 0 and `createdAt` > 14 days ago → UNUSED
+3. Output prune report:
+```
+PRUNE REPORT
+============
+Total instincts: 15
+  Active: 10
+  Stale (>30d): 3 → will remove
+  Fading (<0.3 confidence): 1 → will remove
+  Unused (0 applies, >14d): 1 → will remove
+
+Removing 5 instincts. Run `/meta prune --dry-run` to preview.
+```
+4. Delete stale files (or move to `.claude/instincts/archived/` if --archive flag)
+
+### Flags
+
+- `--dry-run`: Preview what would be pruned without deleting
+- `--archive`: Move to `.claude/instincts/archived/` instead of deleting
 
 ---
 

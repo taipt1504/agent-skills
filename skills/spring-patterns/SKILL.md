@@ -1,21 +1,9 @@
 ---
 name: spring-patterns
-description: >
-  Unified Spring MVC and WebFlux patterns for Java 17+ / Spring Boot 3.x.
-  Covers controllers, handlers, WebClient, filters, interceptors, pagination,
-  caching, async processing, rate limiting, and production defaults.
-  Activates for both servlet (MVC) and reactive (WebFlux) stacks.
+description: Use when building REST APIs with Spring MVC or reactive WebFlux handlers, configuring web filters, writing reactive operator chains, or setting up Spring Boot production configuration. Covers controllers, handlers, WebClient, filters, interceptors, pagination, async processing, rate limiting, and production defaults for both servlet (MVC) and reactive (WebFlux) stacks.
 triggers:
-  - Spring MVC controllers or RestController annotations
-  - Spring WebFlux handlers or router functions
-  - WebClient configuration or usage
-  - Servlet filters or WebFlux WebFilter
-  - HandlerInterceptor implementations
-  - Pagination (Page, Slice, cursor-based)
-  - Spring caching (@Cacheable, @CacheEvict)
-  - R2DBC repositories or DatabaseClient
-  - SSE endpoints or Sinks
-  - StepVerifier or WebTestClient usage
+  natural: ["rest endpoint", "api handler", "pagination", "web filter", "webclient"]
+  code: ["*Controller.java", "*Handler.java", "WebClient", "Mono.", "Flux."]
 ---
 
 # Spring Patterns
@@ -108,6 +96,14 @@ public class OrderController {
 
 Load as needed for full patterns and code examples:
 
-- **[references/spring-mvc.md](references/spring-mvc.md)** -- Controllers, MockMvc testing, filters, interceptors, pagination, security config
-- **[references/spring-webflux.md](references/spring-webflux.md)** -- Reactive chains, operators, R2DBC, WebClient, SSE, StepVerifier, WebTestClient
-- **[references/springboot-production.md](references/springboot-production.md)** -- Caching, async, rate limiting, Jackson, HikariCP, graceful shutdown, actuator
+- **[references/spring-mvc.md](references/spring-mvc.md)** — Controllers, MockMvc testing, filters, interceptors, pagination
+- **[references/spring-webflux.md](references/spring-webflux.md)** — Reactive chains, operators, R2DBC, WebClient, SSE, StepVerifier, WebTestClient
+- **[references/springboot-production.md](references/springboot-production.md)** — Caching, async, rate limiting, Jackson, HikariCP, graceful shutdown, actuator
+- **[references/springboot-3x-features.md](references/springboot-3x-features.md)** — Virtual threads (3.2+), GraalVM native image, @HttpExchange declarative client, Observation API
+
+## Related Skills
+
+- **spring-security** — SecurityFilterChain, JWT, OAuth2, CORS
+- **database-patterns** — JPA (MVC) or R2DBC (WebFlux) repository patterns
+- **api-design** — REST conventions, RFC 7807, pagination design
+- **testing-workflow** — MockMvc (MVC) or WebTestClient/StepVerifier (WebFlux) tests

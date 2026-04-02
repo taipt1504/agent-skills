@@ -1,0 +1,14 @@
+{
+  "_comment": "Context7 MCP — library documentation lookup. Use for API syntax, config, version migration, setup instructions.",
+  "_install": "claude mcp add context7 -s user -- npx -y @upstash/context7-mcp@latest",
+  "_env_required": [],
+  "_env_example": {},
+  "_security": "Read-only documentation fetcher. No credentials required. Safe for all environments.",
+  "_tools_added": 2,
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    }
+  }
+}

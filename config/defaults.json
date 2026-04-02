@@ -1,0 +1,40 @@
+{
+  "$schema": "./devco-config.schema.json",
+  "version": "3.1.0",
+  "mode": "standard",
+  "workflow": {
+    "skipPlanConfirm": false,
+    "skipSpecConfirm": false,
+    "autoVerify": true,
+    "autoReview": true,
+    "maxRetryOnFail": 3,
+    "maxIterationsPerPhase": 10,
+    "noProgressThreshold": 3
+  },
+  "skills": {
+    "autoLoad": true,
+    "profile": "standard"
+  },
+  "hooks": {
+    "profile": "standard"
+  },
+  "team": {
+    "enabled": false,
+    "maxTeammates": 4,
+    "spawnStrategy": "smart",
+    "roles": {
+      "implementer": { "model": "sonnet", "maxConcurrent": 3 },
+      "reviewer": { "model": "sonnet", "maxConcurrent": 2 },
+      "tester": { "model": "sonnet", "maxConcurrent": 2 }
+    },
+    "costControl": {
+      "preferFastModel": true,
+      "useOpusOnlyFor": ["plan", "spec", "architecture"]
+    }
+  },
+  "project": {
+    "type": null,
+    "useSummer": false,
+    "stack": {}
+  }
+}

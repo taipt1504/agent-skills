@@ -397,13 +397,3 @@ src/test/
 | `DatabaseTestUtils.tableExists(container, table)` | Check table existence |
 | `DatabaseTestUtils.getTableRowCount(container, table)` | Count rows |
 
-## Key Rules
-
-1. **No `@MockBean`** -- stub external HTTP via WireMock only
-2. **No H2** -- always PostgreSQL Testcontainers
-3. **`@BeforeEach`** must call `StubConfigurationUtils.resetAllStubs(serviceManager)`
-4. **`@Order(1)`** for DB verification, `@Order(2+)` for `@TestFactory`
-5. **App on `DEFINED_PORT`** (8080), stubs on 8081+
-6. **Dual DB connection**: JDBC for Flyway, R2DBC for reactive app
-7. **`X-Trace-ID`** header routes requests to scenario-specific stubs
-8. Each test class starts its own container -- no cross-contamination

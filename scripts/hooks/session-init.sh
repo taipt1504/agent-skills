@@ -57,10 +57,39 @@ if [ -n "$BUILD_SRC" ] && [ -f "$BUILD_SRC" ]; then
 fi
 
 # --- Git context ---
+BRANCH=""
 if git rev-parse --is-inside-work-tree &>/dev/null; then
   BRANCH="$(git branch --show-current 2>/dev/null || echo "detached")"
   log "Git branch: $BRANCH"
 fi
+
+# --- Java version ---
+JAVA_VERSION="$(java -version 2>&1 | head -1 | cut -d'"' -f2 2>/dev/null || echo "")"
+
+# --- Write project profile (single source of truth for downstream hooks) ---
+PROFILE_DIR="${PROJECT_ROOT}/.claude"
+PROFILE_FILE="${PROFILE_DIR}/project-profile.json"
+mkdir -p "$PROFILE_DIR" 2>/dev/null || true
+
+SPRING_TYPE_SHORT=""
+case "$SPRING_TYPE" in
+  *WebFlux*) SPRING_TYPE_SHORT="WebFlux" ;;
+  *MVC*|*Servlet*) SPRING_TYPE_SHORT="MVC" ;;
+esac
+
+cat > "$PROFILE_FILE" <<PROFILE_EOF
+{
+  "detectedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "projectName": "$PROJECT_NAME",
+  "buildTool": "$BUILD_TOOL",
+  "springType": $([ -n "$SPRING_TYPE_SHORT" ] && echo "\"$SPRING_TYPE_SHORT\"" || echo "null"),
+  "summer": $SUMMER_DETECTED,
+  "summerVersion": $([ -n "$SUMMER_VERSION" ] && echo "\"$SUMMER_VERSION\"" || echo "null"),
+  "javaVersion": $([ -n "$JAVA_VERSION" ] && echo "\"$JAVA_VERSION\"" || echo "null"),
+  "branch": "$(printf '%s' "$BRANCH" | sed 's/"/\\"/g')"
+}
+PROFILE_EOF
+log "Project profile written → $PROFILE_FILE"
 
 # --- Build context output ---
 CONTEXT=""
@@ -111,7 +140,7 @@ fi
 # Project detection summary (compact, after bootstrap)
 # ---------------------------------------------------------------------------
 if [ -n "$SPRING_TYPE" ]; then
-  JAVA_VERSION="$(java -version 2>&1 | head -1 | cut -d'"' -f2 2>/dev/null || echo "17+")"
+  [ -z "$JAVA_VERSION" ] && JAVA_VERSION="17+"
   CONTEXT="${CONTEXT}**Detected Stack**: Java ${JAVA_VERSION} · Spring Boot 3.x · $SPRING_TYPE"
   [ "$SUMMER_DETECTED" = true ] && CONTEXT="${CONTEXT} · Summer Framework${SUMMER_VERSION:+ v$SUMMER_VERSION}"
   CONTEXT="${CONTEXT}\n\n"

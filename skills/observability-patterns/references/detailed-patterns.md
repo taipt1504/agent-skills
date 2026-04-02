@@ -1,5 +1,43 @@
 # Observability Patterns — Detailed Reference
 
+## Prometheus Alert Rules
+
+```yaml
+groups:
+  - name: service-alerts
+    rules:
+      - alert: HighLatency
+        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "P99 latency > 500ms for {{ $labels.uri }}"
+
+      - alert: CriticalLatency
+        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[2m])) > 2
+        for: 2m
+        labels: { severity: critical }
+
+      - alert: HighErrorRate
+        expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) / rate(http_server_requests_seconds_count[5m]) > 0.01
+        for: 5m
+        labels: { severity: warning }
+
+      - alert: CriticalErrorRate
+        expr: rate(http_server_requests_seconds_count{status=~"5.."}[1m]) / rate(http_server_requests_seconds_count[1m]) > 0.05
+        for: 1m
+        labels: { severity: critical }
+
+      - alert: JvmHeapHigh
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 10m
+        labels: { severity: warning }
+
+      - alert: DbPoolSaturated
+        expr: hikaricp_connections_active / hikaricp_connections_max > 0.9
+        labels: { severity: critical }
+```
+
 ## Dependencies
 
 ```groovy
@@ -36,19 +74,6 @@ public class CorrelationWebFilter implements WebFilter {
         return chain.filter(exchange)
             .contextWrite(ctx -> ctx.put("traceId", finalTraceId));
     }
-}
-```
-
-## WebClient Trace Propagation
-
-```java
-@Bean
-public WebClient tracedWebClient(WebClient.Builder builder,
-                                  ObservationRegistry registry) {
-    return builder
-        .baseUrl("https://api.example.com")
-        .observationRegistry(registry)
-        .build();
 }
 ```
 
@@ -120,14 +145,7 @@ spring:
     context-propagation: auto
 ```
 
-```java
-// Manual approach for custom keys
-@Component
-public class MdcContextLifter implements CoreSubscriber<Object> {
-    // Spring Boot 3.x handles this automatically with context-propagation: auto
-    // Only needed for pre-3.x or custom MDC keys not covered by auto-propagation
-}
-```
+Spring Boot 3.x handles MDC propagation automatically with `context-propagation: auto`. Use `Mono.deferContextual` only for custom MDC keys not covered by auto-propagation.
 
 ## Micrometer Auto-Instrumentation Decorators
 
@@ -160,44 +178,6 @@ DistributionSummary summary = DistributionSummary.builder("order.amount")
     .register(meterRegistry);
 
 summary.record(order.amount().doubleValue());
-```
-
-## Prometheus Alert Rules
-
-```yaml
-groups:
-  - name: service-alerts
-    rules:
-      - alert: HighLatency
-        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[5m])) > 0.5
-        for: 5m
-        labels: { severity: warning }
-        annotations:
-          summary: "P99 latency > 500ms for {{ $labels.uri }}"
-
-      - alert: CriticalLatency
-        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[2m])) > 2
-        for: 2m
-        labels: { severity: critical }
-
-      - alert: HighErrorRate
-        expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) / rate(http_server_requests_seconds_count[5m]) > 0.01
-        for: 5m
-        labels: { severity: warning }
-
-      - alert: CriticalErrorRate
-        expr: rate(http_server_requests_seconds_count{status=~"5.."}[1m]) / rate(http_server_requests_seconds_count[1m]) > 0.05
-        for: 1m
-        labels: { severity: critical }
-
-      - alert: JvmHeapHigh
-        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.85
-        for: 10m
-        labels: { severity: warning }
-
-      - alert: DbPoolSaturated
-        expr: hikaricp_connections_active / hikaricp_connections_max > 0.9
-        labels: { severity: critical }
 ```
 
 ## Custom Health Indicator (Reactive)

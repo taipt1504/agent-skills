@@ -1,26 +1,14 @@
 ---
 name: summer-data
-description: >
-  Summer Framework data layer — AuditService (builder, annotation, convenience
-  methods), OutboxService (transactional outbox with scheduler and circuit breaker),
-  R2DBC converters, table validators, and DDL scripts for audit_log + outbox_events.
+description: Summer Framework data layer — AuditService (builder, annotation, convenience methods), OutboxService (transactional outbox with scheduler and circuit breaker), R2DBC converters, table validators, and DDL scripts for audit_log and outbox_events.
 triggers:
-  - AuditService
-  - OutboxService
-  - audit_log
-  - outbox_events
-  - f8a.audit
-  - f8a.outbox
-  - "@Audit"
-  - "@AuditField"
-  - summer audit
-  - summer outbox
-  - summer data
-  - OutboxEventPublisher
-  - AuditTableValidator
+  natural: ["audit service", "outbox pattern", "summer audit"]
+  code: ["AuditService", "OutboxService", "f8a.audit"]
 ---
 
 # Summer Data — Audit, Outbox & R2DBC
+
+**Gate:** Verify summer-core is loaded and io.f8a.summer:summer-platform is in build.gradle before proceeding.
 
 **Modules:** `summer-data-autoconfigure` | `summer-data-audit-autoconfigure` | `summer-data-outbox-autoconfigure`
 
@@ -60,8 +48,16 @@ auditService.auditNonEntity("LOGIN", "USER_REQUEST", "User logged in");
 
 ### Annotation-based (Mono/Flux return types only)
 
+`@Audit` defaults:
+
+| Field | Default |
+|---|---|
+| `action` | `"TRACE"` |
+| `intent` | `"USER_REQUEST"` |
+| `comment` | `""` |
+
 ```java
-@Audit(action = "UPDATE", comment = "Updated config") // defaults: action="TRACE", intent="USER_REQUEST"
+@Audit(action = "UPDATE", comment = "Updated config")
 public Mono<Void> updateConfig(ConfigRequest req) { ... }
 
 @AuditField String name;  // marks field for diff tracking in diffValues
@@ -93,36 +89,43 @@ outboxService.saveEvent("ORDER_CREATED", orderId, payloadJson);
 
 ### Config
 
+Non-obvious keys (scheduler cron expressions use sensible defaults):
+
 ```yaml
 f8a:
   outbox:
-    enabled: true
-    validate-on-startup: true
+    enabled: true                        # default: true
     publisher:
-      enabled: true
-      batch-size: 100
+      batch-size: 100                    # events per scheduler run
     scheduler:
-      publisher:
-        cron: "*/5 * * * * *"
-        initial-delay: 10s
       cleanup:
-        cron: "0 0 2 * * ?"
-        retention-days: 30
+        retention-days: 30               # days to keep published events
       failed-events:
-        cron: "0 0 * * * ?"
-        max-retry-threshold: 5
+        max-retry-threshold: 5           # stop retrying after N failures
     circuit-breaker:
-      enabled: true
-      failure-rate-threshold: 50
-      wait-duration-seconds: 60
+      failure-rate-threshold: 50         # % failures to open circuit
+      wait-duration-seconds: 60          # open→half-open wait
 ```
 
 ## R2DBC Converters
 
-Auto-configured (`SummerR2dbcAutoConfiguration`). Registers converters for `Password` and `PhoneNumber` value objects.
+Auto-configured (`SummerR2dbcAutoConfiguration`). Registers R2DBC converters for `Password` and `PhoneNumber` value objects defined in summer-core (see summer-core Shared Types).
 
 ## Version Notes
 
 - **0.2.1:** `auditNonEntity` param order changed: `(intent, action, comment)` -> `(action, intent, comment)`; `auditCustom()` deprecated in favor of `audit(AuditLog)` builder; `@Audit` on Flux now audits once after completion (bug fix); `@Audit` on Mono fixed double-subscribe; `AbstractTableValidator` base class added; embedded Flyway scripts deleted; `BusinessChange` model deleted; `f8a.outbox.validate-schema` / `f8a.audit.validate-schema` removed (auto-detected)
 
 See `references/ddl-scripts.md` for `audit_log` and `outbox_events` table DDL.
+
+## Rules
+
+- Always audit entity changes with `AuditService` — use builder pattern for complex audits, convenience methods for simple CRUD.
+- Always include `intent` field in audit entries — distinguishes USER_REQUEST from SYSTEM_SYNC/SCHEDULED_JOB.
+- Always configure OutboxService scheduler and circuit breaker for production — defaults may be too aggressive.
+- Never skip `audit_log` DDL migration — `AuditTableValidator` will fail on startup.
+
+## Related Skills
+
+- **summer-core** — Shared types used in audit entries (Member for actor)
+- **database-patterns** — R2DBC repository patterns, Flyway migrations
+- **messaging-patterns** — OutboxService publishes to Kafka/RabbitMQ

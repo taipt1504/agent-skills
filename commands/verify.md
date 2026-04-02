@@ -22,6 +22,14 @@ Run verification on current Java/Spring codebase. Supports multiple modes.
 - BUILD phase should be complete before running verification
 - If no recent test runs exist, consider running `/build` first
 - For `gate` mode, ensure all implementation tasks from the spec are complete
+- Read `.claude/workflow-state.json` — verify BUILD phase completed (check `phaseHistory` contains a BUILD entry)
+
+### Workflow State on Entry
+
+Update `.claude/workflow-state.json`:
+- Set `phase` to `"VERIFY"`
+- Add `{"phase": "BUILD", "completedAt": "{ISO timestamp}"}` to `phaseHistory` (if not already present)
+- Reset `retryCount` to `0`
 
 ## Instructions
 
@@ -153,3 +161,53 @@ Issues to Address:
 1. [BLOCK] ...
 2. [WARN] ...
 ```
+
+## Verify/Fix Loop
+
+### On PASS (all checks green)
+
+1. Update `.claude/workflow-state.json`:
+   - Add `{"phase": "VERIFY", "completedAt": "{ISO timestamp}", "verdict": "PASS"}` to `phaseHistory`
+   - Reset `retryCount` to `0`
+2. **Read config**: Check `.claude/devco-config.json` for `workflow.autoReview` (default: `true`)
+3. **If autoReview = true**: IMMEDIATELY invoke `/dc-review`
+   - Do NOT ask the user
+   - Do NOT wait
+4. **If autoReview = false**: Remind user `"VERIFY passed. Run /dc-review to complete."`
+
+### On FAIL
+
+1. Increment `retryCount` in `workflow-state.json`
+2. Capture the specific error(s)
+3. Invoke **build-fixer agent** with the error details
+4. After fix applied → re-run `/verify`
+
+### Circuit Breakers
+
+| Breaker | Trigger | Action |
+|---------|---------|--------|
+| No-progress | Same normalized error 3 consecutive times | ESCALATE to user |
+| Max retries | retryCount > `config.workflow.maxRetryOnFail` (default: 3) | FORCE-ACCEPT with warning |
+| Context budget | >95% context utilization | Force exit with summary |
+
+### Error Normalization
+
+To detect "same error" across consecutive runs:
+- Strip line numbers and timestamps from error output
+- Compare first 100 characters of the error message
+- If 3 consecutive verify runs produce the same normalized error → **no-progress breaker fires**
+
+### Force-Accept Protocol
+
+When max retries exceeded:
+
+1. Log all failed attempts to `workflow-state.json`
+2. Output warning:
+   ```
+   ⚠️ FORCE-ACCEPTED after {N} failed verify attempts. Issues:
+   - {issue 1}
+   - {issue 2}
+   Proceeding to /dc-review with known issues flagged.
+   ```
+3. Set `forceAccepted: true` and `unresolvedIssues: [...]` in `workflow-state.json`
+4. Continue to `/dc-review` with WARNING flag — reviewer will see the unresolved issues

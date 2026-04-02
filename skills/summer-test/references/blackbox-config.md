@@ -243,29 +243,13 @@
 
 ## PostgresTestContainer — Advanced Usage
 
+See SKILL.md for the full `@DynamicPropertySource` setup. Additional usage: load extra test data after migrations.
+
 ```java
-@SpringBootTest
-@Testcontainers
-class DatabaseIntegrationTest {
-
-    @Container
-    static PostgresTestContainer postgres = PostgresTestContainer.create();
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.r2dbc.url", postgres::getR2dbcUrl);
-        registry.add("spring.r2dbc.username", postgres::getUsername);
-        registry.add("spring.r2dbc.password", postgres::getPassword);
-        registry.add("spring.flyway.url", postgres::getJdbcUrl);
-        registry.add("spring.flyway.user", postgres::getUsername);
-        registry.add("spring.flyway.password", postgres::getPassword);
-    }
-
-    @BeforeAll
-    static void initDatabase() {
-        postgres.runFlywayMigrations("classpath:db/migration");
-        postgres.executeSqlScript("classpath:test-data.sql");
-    }
+@BeforeAll
+static void initDatabase() {
+    postgres.runFlywayMigrations("classpath:db/migration");
+    postgres.executeSqlScript("classpath:test-data.sql");
 }
 ```
 
@@ -301,8 +285,8 @@ task blackboxTest(type: Test) {
     include '**/blackbox/**'
     systemProperty 'spring.profiles.active', 'blackbox-test'
     reports {
-        html.destination = file("$buildDir/reports/blackbox-tests")
-        junitXml.destination = file("$buildDir/test-results/blackbox-tests")
+        html.outputLocation = layout.buildDirectory.dir("reports/blackbox-tests")
+        junitXml.outputLocation = layout.buildDirectory.dir("test-results/blackbox-tests")
     }
 }
 

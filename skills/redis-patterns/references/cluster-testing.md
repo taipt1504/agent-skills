@@ -232,6 +232,9 @@ class RedisIntegrationTest {
 }
 
 // Cluster test
+// WARNING: grokzen/redis-cluster is a community image that may be unreliable in CI.
+// It is not officially maintained and can have startup timing issues. For more stable
+// CI cluster testing, consider using a local Redis Cluster setup or mocking cluster behavior.
 @SpringBootTest
 @Testcontainers
 class RedisClusterTest {

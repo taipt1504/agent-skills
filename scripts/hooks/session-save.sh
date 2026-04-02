@@ -22,7 +22,36 @@ HAS_UNCOMMITTED=false
 ACTIVE_WORK_FILE="$PROJECT_ROOT/.claude/memory/context/active-work.json"
 if [ -d "$PROJECT_ROOT/.claude/memory/context" ]; then
   RECENT_COMMIT="$(git log -1 --oneline 2>/dev/null || echo "none")"
-  cat > "$ACTIVE_WORK_FILE" <<EOF
+
+  # Read workflow state if available
+  LAST_PHASE=""
+  LAST_TASK=""
+  WORKFLOW_FILE="$PROJECT_ROOT/.claude/workflow-state.json"
+  if [ -f "$WORKFLOW_FILE" ]; then
+    LAST_PHASE=$(python3 -c "import json; print(json.load(open('$WORKFLOW_FILE')).get('phase',''))" 2>/dev/null) || true
+    LAST_TASK=$(python3 -c "import json; print(json.load(open('$WORKFLOW_FILE')).get('task',''))" 2>/dev/null) || true
+  fi
+
+  LAST_PHASE="${LAST_PHASE:-}" LAST_TASK="${LAST_TASK:-}" BRANCH="$BRANCH" \
+    RECENT_COMMIT="$RECENT_COMMIT" ACTIVE_WORK_FILE="$ACTIVE_WORK_FILE" python3 -c "
+import json, os, datetime
+
+data = {
+    'current_task': os.environ['BRANCH'],
+    'started_at': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+    'notes': ['Last commit: ' + os.environ['RECENT_COMMIT']]
+}
+phase = os.environ.get('LAST_PHASE', '')
+task = os.environ.get('LAST_TASK', '')
+if phase:
+    data['lastPhase'] = phase
+if task:
+    data['lastTask'] = task
+
+with open(os.environ['ACTIVE_WORK_FILE'], 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+" 2>/dev/null || cat > "$ACTIVE_WORK_FILE" <<EOF
 {"current_task":"$BRANCH","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","notes":["Last commit: $RECENT_COMMIT"]}
 EOF
 fi
@@ -31,6 +60,80 @@ fi
 if [ "$HAS_UNCOMMITTED" = true ]; then
   UNCOMMITTED_COUNT="$(echo "$UNCOMMITTED_FILES" | grep -c . 2>/dev/null || echo 0)"
   warn "Uncommitted changes: ${UNCOMMITTED_COUNT} files"
+fi
+
+# --- Instinct candidate extraction (v3.2 — auto-extract) ---
+INSTINCTS_DIR="${PROJECT_ROOT}/.claude/instincts/personal"
+
+# Count session tool calls
+SESSION_ID="${CLAUDE_SESSION_ID:-unknown}"
+TOOL_COUNT_FILE="${TMPDIR:-/tmp}/claude-tool-count-${SESSION_ID}"
+TOOL_COUNT=0
+if [ -f "$TOOL_COUNT_FILE" ]; then
+  TOOL_COUNT=$(cat "$TOOL_COUNT_FILE" 2>/dev/null || echo 0)
+fi
+
+# Only extract if instincts dir exists (created by /dc-setup or /meta)
+if [ -d "$INSTINCTS_DIR" ]; then
+  # Log session activity metadata
+  INSTINCT_META="${INSTINCTS_DIR}/.session-meta-$(date +%s).json"
+
+  # Count modified files in this session
+  MODIFIED_COUNT=0
+  BUILD_CHECKPOINT="${PROJECT_ROOT}/.claude/sessions/build-checkpoint.json"
+  if [ -f "$BUILD_CHECKPOINT" ]; then
+    MODIFIED_COUNT=$(python3 -c "import json; print(len(json.load(open('$BUILD_CHECKPOINT')).get('modifiedFiles',[])))" 2>/dev/null || echo 0)
+  fi
+
+  cat > "$INSTINCT_META" << INSTINCT_EOF
+{
+  "sessionEnd": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "branch": "${BRANCH}",
+  "toolCalls": ${TOOL_COUNT},
+  "modifiedFiles": ${MODIFIED_COUNT},
+  "uncommittedFiles": ${UNCOMMITTED_COUNT:-0},
+  "project": "$(basename "$PROJECT_ROOT")",
+  "autoExtract": true
+}
+INSTINCT_EOF
+
+  # --- AUTO-EXTRACT TRIGGER (v3.2) ---
+  # Harness Engineering principle: Learning system must be autonomous.
+  # Trigger auto-extraction when session had significant activity:
+  #   - >20 tool calls AND >3 file changes
+  # Emit additionalContext prompting agent to extract patterns before exit
+  if [ "$TOOL_COUNT" -gt 20 ] && [ "$MODIFIED_COUNT" -gt 3 ]; then
+    log "Auto-extract triggered: ${TOOL_COUNT} calls, ${MODIFIED_COUNT} files modified"
+    # Write signal file for next session to detect and offer extraction
+    cat > "${INSTINCTS_DIR}/.auto-extract-pending.json" << EXTRACT_EOF
+{
+  "triggeredAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "branch": "${BRANCH}",
+  "toolCalls": ${TOOL_COUNT},
+  "modifiedFiles": ${MODIFIED_COUNT},
+  "reason": "High activity session — patterns may be worth extracting",
+  "action": "Run /meta learn extract on next session start to capture patterns"
+}
+EXTRACT_EOF
+  fi
+
+  log "Instinct session metadata saved (autoExtract: toolCalls=${TOOL_COUNT}, files=${MODIFIED_COUNT})"
+fi
+
+# --- Reset build checkpoint (mark inactive) ---
+if [ -f "${PROJECT_ROOT}/.claude/sessions/build-checkpoint.json" ]; then
+  python3 -c "
+import json
+try:
+    with open('${PROJECT_ROOT}/.claude/sessions/build-checkpoint.json') as f:
+        cp = json.load(f)
+    cp['active'] = False
+    cp['sessionEndedAt'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+    with open('${PROJECT_ROOT}/.claude/sessions/build-checkpoint.json', 'w') as f:
+        json.dump(cp, f, indent=2)
+except:
+    pass
+" 2>/dev/null || true
 fi
 
 log "Done. Branch=${BRANCH}"

@@ -5,22 +5,11 @@ description: >
   pattern matching, naming conventions, immutability rules, Optional/Stream best practices,
   error handling with domain exceptions, and code smells.
 triggers:
-  - Java coding patterns
-  - records
-  - sealed classes
-  - naming conventions
-  - immutability
-  - Optional
-  - Stream
+  natural: ["naming convention", "java pattern", "code style", "immutability", "records"]
+  code: ["*.java"]
 ---
 
 # Java Coding Standards & Patterns
-
-## When to Activate
-
-- Writing or reviewing any Java code
-- Refactoring for readability or maintainability
-- Designing exception hierarchies, domain models, or reactive chains
 
 ## Core Principles
 
@@ -52,12 +41,32 @@ triggers:
 | Boolean | is/has/can prefix | `isActive()` |
 | Exception | Descriptive + suffix | `OrderNotFoundException` |
 
+## Lombok Usage
+
+| Annotation | When to Use | Avoid When |
+|-----------|-------------|------------|
+| `@RequiredArgsConstructor` | Spring beans (services, controllers) | DTOs (use records) |
+| `@Value` | Immutable non-record classes (JPA entities) | When record works |
+| `@Builder(toBuilder=true)` | Complex construction (≥3 fields) | Simple 1-2 field objects |
+| `@Slf4j` | Any class that logs | — |
+
+**Prefer records over Lombok for DTOs/value objects.**
+
+```java
+// GOOD: record DTO + Lombok service
+public record CreateOrderRequest(@NotBlank String productId, @Positive int quantity) {}
+
+@Service @RequiredArgsConstructor @Slf4j
+public class OrderService {
+    private final OrderRepository orderRepository;
+}
+```
+
 ## Immutability (Critical)
 
 - Records with `@Builder(toBuilder = true)` and `@With` for updates via new instances.
 - Never mutate inside reactive chains — transform with `.map()`.
 - Defensive copies: `List.copyOf(items)` in constructors, `List.copyOf()` on getters.
-- Use `import` statements — never inline fully-qualified class names.
 
 ## Optional & Stream Rules
 
@@ -83,5 +92,10 @@ triggers:
 
 ## References
 
-- **[references/java-patterns.md](references/java-patterns.md)** — Immutability (records, @Value, builders, defensive copies), null safety (Optional patterns, @NonNull), concurrency (CompletableFuture, virtual threads, atomic), collections optimization, streams/functional, memory optimization/GC tuning
-- **[references/project-structure.md](references/project-structure.md)** — CQRS + Hexagonal package layout, command/query side, shared domain, infrastructure
+- **[references/java-patterns.md](references/java-patterns.md)** — Immutability (records, @Value, builders, defensive copies), null safety (Optional patterns, @NonNull), concurrency (atomic variables, thread-safe collections), collections optimization, streams/functional
+
+## Related Skills
+
+- **spring-patterns** — Controller/handler patterns using these conventions
+- **architecture** — Hexagonal layer rules complement coding standards
+- **testing-workflow** — Test naming conventions, TDD cycle

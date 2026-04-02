@@ -1,26 +1,12 @@
 ---
 name: redis-patterns
-description: >
-  Redis patterns for Java Spring WebFlux — reactive caching, distributed locking, rate limiting,
-  data structure selection, key design, TTL strategies, and anti-patterns.
+description: Redis patterns for Java Spring Boot (MVC and WebFlux) — reactive caching, distributed locking, rate limiting with Redis, Lua scripts, pub/sub, and cluster configuration. Use when implementing Redis-based caching, distributed locks, rate limiting, session storage, or any Redis data structure operations in Spring Boot applications.
 triggers:
-  - Redis
-  - ReactiveRedisTemplate
-  - cache
-  - Redisson
-  - rate limiting
-  - Pub/Sub
-  - Redis Streams
+  natural: ["redis cache", "distributed lock", "rate limit with redis", "cache eviction"]
+  code: ["ReactiveRedisTemplate", "@Cacheable", "RedisTemplate", "Redisson"]
 ---
 
-# Redis Patterns for Spring WebFlux
-
-## When to Activate
-
-- Implementing caching with `ReactiveRedisTemplate`
-- Building distributed locks or rate limiters
-- Configuring Redis connections and TTL policies
-- Reviewing cache consistency and invalidation
+# Redis Patterns for Spring Boot
 
 ## Cache Consistency Checklist
 
@@ -120,3 +106,10 @@ lock:{entity}:{id}           → lock:order:ORD-001
 - **[references/advanced-patterns.md](references/advanced-patterns.md)** — Rate limiter (Lua), Pub/Sub + SSE, Redis Streams, consumer groups
 - **[references/data-structures.md](references/data-structures.md)** — Hash/Set/SortedSet/HyperLogLog patterns, leaderboard, serialization
 - **[references/cluster-testing.md](references/cluster-testing.md)** — Sentinel/Cluster config, hash tags, session management, Testcontainers
+
+## Related Skills
+
+- **summer-ratelimit** — Summer Framework rate limiting backed by Redis
+- **spring-patterns** — WebFlux reactive chains that consume Redis caching
+- **database-patterns** — Cache-aside pattern complements DB queries
+- **testing-workflow** — Testcontainers for Redis integration tests

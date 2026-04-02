@@ -3,7 +3,6 @@
 Command/query separation, read models, CQRS package structure, and hexagonal anti-patterns.
 
 ## Table of Contents
-- [CQRS Overview](#cqrs-overview)
 - [Command Port & Use Case](#command-port--use-case)
 - [Query Port & Use Case](#query-port--use-case)
 - [Read Model](#read-model)
@@ -11,19 +10,6 @@ Command/query separation, read models, CQRS package structure, and hexagonal ant
 - [CQRS Package Structure](#cqrs-package-structure)
 - [Anti-Patterns](#anti-patterns)
 - [Key Design Decisions](#key-design-decisions)
-
----
-
-## CQRS Overview
-
-Separate **command** (state changes, uses domain) from **query** (reads, can bypass domain).
-
-```
-Commands -> Application Service -> Domain Aggregate -> Write DB
-Queries  -> Query Service        -> Read Model DAO   -> Read DB (or same DB)
-```
-
-Benefits: queries optimized for reading, commands enforce invariants, independent scaling.
 
 ---
 

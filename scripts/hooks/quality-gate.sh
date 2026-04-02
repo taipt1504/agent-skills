@@ -99,6 +99,38 @@ if [ -f "$FILE_PATH" ]; then
   fi
 fi
 
+# --- 4. Workflow phase enforcement (standard/strict mode) ---
+WORKFLOW_STATE="${PROJECT_ROOT}/.claude/workflow-state.json"
+if [ -f "$WORKFLOW_STATE" ]; then
+  CURRENT_PHASE=$(grep -o '"phase"[[:space:]]*:[[:space:]]*"[^"]*"' "$WORKFLOW_STATE" | head -1 | sed 's/.*: *"//' | sed 's/".*//')
+  if [ -n "$CURRENT_PHASE" ] && [ "$CURRENT_PHASE" != "BUILD" ] && [ "$CURRENT_PHASE" != "COMPLETE" ]; then
+    # Only warn for src/main/ files (not test files)
+    if [[ "$FILE_PATH" =~ src/main/ ]]; then
+      HIGH_VIOLATIONS="${HIGH_VIOLATIONS}Writing production code while workflow phase is '$CURRENT_PHASE' (expected BUILD). "
+    fi
+  fi
+fi
+
+# --- 5. Skill-aligned pattern checks ---
+PROFILE_FILE="${PROJECT_ROOT}/.claude/project-profile.json"
+if [ -f "$PROFILE_FILE" ] && [ -f "$FILE_PATH" ]; then
+  # WebFlux: extra-aggressive .block() check (also catches blockFirst/blockLast/blockOptional)
+  PROFILE_SPRING=$(grep -o '"springType"[[:space:]]*:[[:space:]]*"[^"]*"' "$PROFILE_FILE" | head -1 | sed 's/.*: *"//' | sed 's/".*//')
+  if [ "$PROFILE_SPRING" = "WebFlux" ] && [[ ! "$FILE_PATH" =~ [Tt]est ]]; then
+    if grep -qnE '\.block(First|Last|Optional)?\(' "$FILE_PATH" 2>/dev/null; then
+      CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}Blocking call (.block/.blockFirst/.blockLast/.blockOptional) in WebFlux project — $FILENAME. "
+    fi
+  fi
+
+  # Summer: warn if Summer patterns detected in non-Summer project
+  PROFILE_SUMMER=$(grep -o '"summer"[[:space:]]*:[[:space:]]*[a-z]*' "$PROFILE_FILE" | head -1 | sed 's/.*: *//')
+  if [ "$PROFILE_SUMMER" = "false" ] && [ -f "$FILE_PATH" ]; then
+    if grep -qE 'import io\.f8a\.|@AuthRoles|@Handler|RequestHandler|BaseController' "$FILE_PATH" 2>/dev/null; then
+      HIGH_VIOLATIONS="${HIGH_VIOLATIONS}Summer Framework patterns detected in non-Summer project — $FILENAME. Check project-profile.json. "
+    fi
+  fi
+fi
+
 # --- Output ---
 if [ -n "$CRITICAL_VIOLATIONS" ]; then
   REASON="$(printf '%s' "[QualityGate] CRITICAL: ${CRITICAL_VIOLATIONS}" | sed 's/"/\\"/g')"

@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/devco-agent-skills/devco-config.schema.json",
+  "title": "devco-agent-skills Configuration",
+  "description": "Configuration schema for devco-agent-skills plugin (v3.1). Defines workflow behavior, team spawning, skill loading, and project settings.",
+  "type": "object",
+  "required": ["version", "mode"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for editor validation and autocompletion."
+    },
+    "version": {
+      "type": "string",
+      "description": "Plugin version this config targets. Used for migration compatibility checks.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": ["3.1.0"]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["yolo", "standard", "strict"],
+      "description": "Workflow enforcement level. 'yolo': skips plan/spec confirmations, warns on violations. 'standard': requires plan/spec confirmation, blocks work without approved plan. 'strict': full enforcement with PreCompact guards and path enforcement on every phase transition.",
+      "default": "standard"
+    },
+    "workflow": {
+      "type": "object",
+      "description": "Controls the plan/spec/build/verify workflow pipeline behavior.",
+      "additionalProperties": false,
+      "properties": {
+        "skipPlanConfirm": {
+          "type": "boolean",
+          "description": "Skip user confirmation of the plan before proceeding. Auto-set to true in 'yolo' mode. In 'standard' and 'strict' modes, plan confirmation is always required regardless of this setting.",
+          "default": false
+        },
+        "skipSpecConfirm": {
+          "type": "boolean",
+          "description": "Skip user confirmation of the spec before proceeding to build. Auto-set to true in 'yolo' mode. In 'standard' and 'strict' modes, spec confirmation is always required regardless of this setting.",
+          "default": false
+        },
+        "autoVerify": {
+          "type": "boolean",
+          "description": "Automatically run /verify after build completes. When true, the build phase triggers verification (build, test, lint, security checks) without manual invocation.",
+          "default": true
+        },
+        "autoReview": {
+          "type": "boolean",
+          "description": "Automatically run /review after build completes. When true, triggers multi-aspect code review (security, quality, reactive correctness, performance) after successful build.",
+          "default": true
+        },
+        "maxRetryOnFail": {
+          "type": "integer",
+          "description": "Maximum number of automatic retry attempts when a build or test phase fails. After exhausting retries, control returns to the user with a failure summary.",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "maxIterationsPerPhase": {
+          "type": "integer",
+          "description": "Maximum iterations allowed within a single workflow phase (e.g., RED/GREEN/REFACTOR cycles in TDD). Prevents infinite loops in automated phases.",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 50
+        },
+        "noProgressThreshold": {
+          "type": "integer",
+          "description": "Number of consecutive iterations with no measurable progress before the agent stops and escalates to the user. Prevents spinning on unsolvable issues.",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10
+        }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "description": "Controls how domain skills are discovered and loaded.",
+      "additionalProperties": false,
+      "properties": {
+        "autoLoad": {
+          "type": "boolean",
+          "description": "Automatically load relevant skills based on project context (detected frameworks, file patterns, imports). When false, skills must be explicitly invoked via slash commands.",
+          "default": true
+        },
+        "profile": {
+          "type": "string",
+          "description": "Skill loading profile. 'standard' loads skills matching detected project type. 'minimal' loads only core skills. 'full' loads all available skills.",
+          "enum": ["minimal", "standard", "full"],
+          "default": "standard"
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Controls hook installation and behavior.",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string",
+          "description": "Hook profile to install. 'standard' installs recommended hooks for workflow enforcement. 'minimal' installs only essential hooks. 'full' installs all available hooks including optional ones.",
+          "enum": ["minimal", "standard", "full"],
+          "default": "standard"
+        }
+      }
+    },
+    "team": {
+      "type": "object",
+      "description": "Controls multi-agent team spawning and coordination. When enabled, complex tasks are decomposed and delegated to specialized teammate agents.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable multi-agent team mode. When true, the lead agent can spawn specialized teammates (implementer, reviewer, tester) for parallel execution.",
+          "default": false
+        },
+        "maxTeammates": {
+          "type": "integer",
+          "description": "Maximum number of concurrent teammate agents. Higher values increase parallelism but also resource consumption.",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 8
+        },
+        "spawnStrategy": {
+          "type": "string",
+          "enum": ["smart", "always", "never"],
+          "description": "When to spawn teammate agents. 'smart': spawn only when task complexity warrants it (default). 'always': spawn teammates for every task. 'never': disable spawning even if team is enabled (useful for debugging).",
+          "default": "smart"
+        },
+        "roles": {
+          "type": "object",
+          "description": "Configuration for each teammate role. Defines which model to use and concurrency limits per role.",
+          "additionalProperties": false,
+          "properties": {
+            "implementer": {
+              "$ref": "#/definitions/roleConfig",
+              "description": "TDD implementation specialist. Writes tests first, then implementation code."
+            },
+            "reviewer": {
+              "$ref": "#/definitions/roleConfig",
+              "description": "Multi-aspect code reviewer. Checks security, quality, reactive correctness, and performance."
+            },
+            "tester": {
+              "$ref": "#/definitions/roleConfig",
+              "description": "End-to-end and integration test specialist using Testcontainers."
+            }
+          }
+        },
+        "costControl": {
+          "type": "object",
+          "description": "Cost optimization settings for model selection across teammate agents.",
+          "additionalProperties": false,
+          "properties": {
+            "preferFastModel": {
+              "type": "boolean",
+              "description": "When true, teammates default to the fastest sufficient model (typically Sonnet) for routine tasks to reduce cost and latency.",
+              "default": true
+            },
+            "useOpusOnlyFor": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["plan", "spec", "architecture", "review", "build", "test"]
+              },
+              "description": "List of workflow phases that should use the Opus model. All other phases use the fast model. Opus is recommended for planning, spec writing, and architecture decisions where reasoning quality matters most.",
+              "default": ["plan", "spec", "architecture"]
+            }
+          }
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "description": "Project-specific settings detected or configured during /dc-setup.",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": ["string", "null"],
+          "enum": ["spring-webflux", "spring-mvc", "spring-mixed", null],
+          "description": "Detected or manually set project type. Determines which skills and patterns are loaded. null means auto-detect on next session start.",
+          "default": null
+        },
+        "useSummer": {
+          "type": "boolean",
+          "description": "Whether this project uses the Summer Framework (io.github.anthropic.summer). Enables Summer-specific skills (summer-core, summer-rest, summer-data, summer-security, summer-test, summer-ratelimit).",
+          "default": false
+        },
+        "stack": {
+          "type": "object",
+          "description": "Detected technology stack components. Keys are technology names, values are version strings or boolean flags. Populated during /dc-setup auto-detection.",
+          "additionalProperties": {
+            "type": ["string", "boolean"]
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "roleConfig": {
+      "type": "object",
+      "description": "Configuration for a teammate role.",
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": ["opus", "sonnet", "haiku"],
+          "description": "Claude model to use for this role. 'opus' for highest quality reasoning, 'sonnet' for balanced quality/speed, 'haiku' for fastest/cheapest.",
+          "default": "sonnet"
+        },
+        "maxConcurrent": {
+          "type": "integer",
+          "description": "Maximum number of concurrent agents for this role.",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    }
+  }
+}

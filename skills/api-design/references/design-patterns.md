@@ -1,14 +1,12 @@
 # API Design Patterns Reference
 
-Detailed pagination, filtering, sorting, field selection, content negotiation, HATEOAS, and OpenAPI config.
+Detailed pagination, filtering, sorting, field selection, and OpenAPI config.
 
 ## Table of Contents
 - [Cursor Pagination](#cursor-pagination)
 - [Keyset Pagination](#keyset-pagination)
 - [Filtering & Sorting](#filtering--sorting)
 - [Field Selection (Sparse Fieldsets)](#field-selection-sparse-fieldsets)
-- [Content Negotiation](#content-negotiation)
-- [HATEOAS](#hateoas)
 - [OpenAPI Configuration](#openapi-configuration)
 
 ---
@@ -201,101 +199,6 @@ private Map<String, Object> filterFields(UserResponse response, Set<String> fiel
     return mapper.toMap(response).entrySet().stream()
         .filter(e -> fields.contains(e.getKey()) && allowed.contains(e.getKey()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-}
-```
-
----
-
-## Content Negotiation
-
-```java
-// Versioning via Accept header (alternative to URI versioning)
-@GetMapping(produces = {
-    "application/vnd.api.v2+json",
-    MediaType.APPLICATION_JSON_VALUE
-})
-public Mono<UserResponseV2> getUserV2(@PathVariable String id) { ... }
-
-@GetMapping(produces = "application/vnd.api.v1+json")
-public Mono<UserResponseV1> getUserV1(@PathVariable String id) { ... }
-```
-
-```java
-// CSV export via content negotiation
-@GetMapping(produces = {MediaType.APPLICATION_JSON_VALUE, "text/csv"})
-public Mono<ResponseEntity<?>> exportOrders(
-        @RequestHeader(HttpHeaders.ACCEPT) MediaType accept) {
-    if (accept.includes(MediaType.parseMediaType("text/csv"))) {
-        return orderService.findAll()
-            .map(this::toCsvRow)
-            .collect(Collectors.joining("\n"))
-            .map(csv -> ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=orders.csv")
-                .contentType(MediaType.parseMediaType("text/csv"))
-                .body(csv));
-    }
-    return orderService.findAll().collectList()
-        .map(orders -> ResponseEntity.ok().body(orders));
-}
-```
-
----
-
-## HATEOAS
-
-Spring HATEOAS with WebFlux:
-
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-hateoas</artifactId>
-</dependency>
-```
-
-```java
-// Response with links
-public class OrderModel extends RepresentationModel<OrderModel> {
-    private String id;
-    private OrderStatus status;
-    private BigDecimal totalAmount;
-    // getters/setters or use @Data
-}
-
-// Assembler
-@Component
-public class OrderModelAssembler implements
-        ReactiveRepresentationModelAssembler<Order, OrderModel> {
-
-    @Override
-    public Mono<OrderModel> toModel(Order order, ServerWebExchange exchange) {
-        var model = new OrderModel();
-        model.setId(order.getId());
-        model.setStatus(order.getStatus());
-        model.setTotalAmount(order.getTotalAmount());
-
-        model.add(linkTo(methodOn(OrderController.class).getById(order.getId())).withSelfRel());
-
-        if (order.getStatus() == OrderStatus.PENDING) {
-            model.add(linkTo(methodOn(OrderController.class)
-                .cancel(order.getId())).withRel("cancel"));
-            model.add(linkTo(methodOn(OrderController.class)
-                .confirm(order.getId())).withRel("confirm"));
-        }
-        return Mono.just(model);
-    }
-}
-```
-
-```json
-{
-  "id": "ord-123",
-  "status": "PENDING",
-  "totalAmount": 99.99,
-  "_links": {
-    "self": { "href": "/api/v1/orders/ord-123" },
-    "cancel": { "href": "/api/v1/orders/ord-123/cancel" },
-    "confirm": { "href": "/api/v1/orders/ord-123/confirm" }
-  }
 }
 ```
 

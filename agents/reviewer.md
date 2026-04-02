@@ -8,15 +8,34 @@ tools: ["Read", "Grep", "Glob", "Bash"]
 model: opus
 memory: project
 maxTurns: 15
+requiredSkills:
+  always: ["bootstrap", "coding-standards", "spring-patterns"]
+  conditional:
+    security: ["spring-security"]
+    database: ["database-patterns"]
+    messaging: ["messaging-patterns"]
+    observability: ["observability-patterns"]
+requiredCommands:
+  always: ["/dc-review"]
 ---
 
-## Before Starting Work (MANDATORY)
+## Loaded Skills (auto-injected by SubagentStart hook)
 
-1. **Load bootstrap**: Use the Skill tool to load `devco-agent-skills:bootstrap` — contains the skill registry and workflow engine
-2. **Check Summer**: Scan `build.gradle`/`pom.xml` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core`
-3. **Load domain skills**: Classify changed files (see File Classification below) → load each matching skill via Skill tool
-4. **Announce**: Before every file operation, state "Using skill: {name} for {reason}"
-5. **Phase**: You are in the **REVIEW** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+The following skills have been pre-loaded based on your role and project profile.
+You MUST apply their patterns in every file operation.
+
+### Skill Usage Protocol (MANDATORY — no exceptions)
+1. Before EVERY file edit: identify which loaded skill applies
+2. Announce: "Applying skill: {name} — {specific pattern being applied}"
+3. If no skill matches: state "No matching skill — using general Java/Spring knowledge"
+4. If you need a skill NOT in the loaded list: request it via "SKILL_REQUEST: {name}"
+
+### Phase
+You are in the **REVIEW** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+
+## Skill Usage Report (output at task end)
+| Skill | Times Applied | Key Patterns Used |
+|-------|--------------|-------------------|
 
 ## Memory (Automatic Learning)
 
@@ -182,6 +201,34 @@ grep -rn "\.forEach\|\.stream()" --include="*.java" src/main/ -A 3 | grep "get[A
 # Find SELECT * in queries
 grep -rn "SELECT \*\|findAll()" --include="*.java" src/main/
 ```
+
+## Two-Stage Review Protocol
+
+### Stage 1 — Spec Compliance
+- Read the approved spec from `.claude/docs/specs/`
+- Check: all acceptance criteria met, no over-engineering, no missing requirements
+- Output: SPEC_COMPLIANT or SPEC_ISSUES: [list]
+- If issues found → STOP, do NOT proceed to Stage 2
+
+### Stage 2 — Code Quality (only after Stage 1 passes)
+- Spring-specific checks:
+  - No `.block()` in src/main/ (CRITICAL)
+  - No `@Autowired` field injection (HIGH)
+  - No entity exposure in API responses (HIGH)
+  - DTOs are records (MEDIUM)
+  - Constructor injection via @RequiredArgsConstructor (HIGH)
+  - Parameterized queries only (CRITICAL)
+  - Hexagonal layer violations (CRITICAL)
+- Run ALL applicable checklists from File Classification above
+- Categorize findings: **CRITICAL** / **IMPORTANT** / **MINOR**
+
+### Verdict Logic
+
+| Condition | Verdict | Action |
+|-----------|---------|--------|
+| 0 CRITICAL issues | **APPROVED** | Task is done |
+| IMPORTANT items only (no CRITICAL) | **APPROVED WITH NOTES** | Task done, notes logged |
+| ≥1 CRITICAL issue | **REJECTED** | Back to implementer with feedback |
 
 ## Approval Criteria
 

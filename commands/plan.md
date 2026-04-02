@@ -132,6 +132,27 @@ If you want changes, respond with:
 - "different approach: [alternative]" → plan document rewritten
 - "skip phase 2 and do phase 3 first" → plan document adjusted
 
+## Workflow State Tracking
+
+When this command runs, **create or update** `.claude/workflow-state.json`:
+
+```json
+{
+  "phase": "PLAN",
+  "task": "{task description from user}",
+  "startedAt": "{ISO timestamp}",
+  "phaseHistory": [],
+  "decisions": [],
+  "autoTransition": true,
+  "retryCount": 0
+}
+```
+
+When the user **approves** the plan:
+1. Update `workflow-state.json` — add `{"phase": "PLAN", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
+2. Update `phase` to `"PLAN_APPROVED"`
+3. Remind the user: **"Plan approved. Run `/spec` to define behavioral contracts."**
+
 ## After Planning
 
 - Run `/spec` to define behavioral contracts (reads from `.claude/docs/plans/`)

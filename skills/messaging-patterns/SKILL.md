@@ -2,19 +2,13 @@
 name: messaging-patterns
 description: >
   Kafka and RabbitMQ messaging patterns for Java Spring Boot 3.x. Covers producer
-  reliability, consumer error handling, DLT/DLQ, reactive messaging, exchange/topic
-  design, exactly-once semantics, and production configuration for both brokers.
+  reliability, consumer patterns, exactly-once semantics, dead letter topics/queues,
+  Schema Registry with Avro, Spring Cloud Stream, and reactive messaging. Use when
+  implementing Kafka producers or consumers, RabbitMQ listeners, message-driven
+  microservices, event streaming, or configuring messaging infrastructure.
 triggers:
-  - Kafka
-  - RabbitMQ
-  - "@KafkaListener"
-  - "@RabbitListener"
-  - producer
-  - consumer
-  - DLT
-  - DLQ
-  - dead letter
-  - messaging
+  natural: ["kafka consumer", "message queue", "event streaming", "rabbitmq", "dead letter"]
+  code: ["@KafkaListener", "KafkaTemplate", "@RabbitListener", "RabbitTemplate"]
 ---
 
 # Messaging Patterns for Spring Boot
@@ -51,37 +45,7 @@ Production-ready Kafka and RabbitMQ patterns for Java 17+ / Spring Boot 3.x.
 
 ## Critical Config
 
-### Kafka (application.yml)
-
-```yaml
-spring.kafka:
-  producer:
-    acks: all
-    properties:
-      enable.idempotence: true
-      max.in.flight.requests.per.connection: 5
-  consumer:
-    enable-auto-commit: false
-    properties:
-      isolation.level: read_committed
-      partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-```
-
-### RabbitMQ (application.yml)
-
-```yaml
-spring.rabbitmq:
-  publisher-confirm-type: correlated
-  publisher-returns: true
-  listener.simple:
-    acknowledge-mode: manual
-    prefetch: 10
-    retry:
-      enabled: true
-      max-attempts: 3
-      initial-interval: 1s
-      multiplier: 2.0
-```
+For full producer/consumer configuration, see references/kafka.md or references/rabbitmq.md.
 
 ## Verification Checklist
 
@@ -103,3 +67,11 @@ Load as needed:
 - **[references/kafka.md](references/kafka.md)** -- Kafka producer/consumer patterns, DLT, topic config, exactly-once semantics, reactive Kafka, Schema Registry/Avro, anti-patterns
 - **[references/rabbitmq.md](references/rabbitmq.md)** -- RabbitMQ exchange topology, producer confirms, consumer manual ACK, retry+DLQ with x-death, reactor-rabbitmq, production config, anti-patterns
 - **[references/testing-monitoring.md](references/testing-monitoring.md)** -- EmbeddedKafka, Testcontainers (Kafka + RabbitMQ), Awaitility, consumer lag monitoring, health indicators, Micrometer metrics
+- **[references/event-architecture.md](references/event-architecture.md)** -- Saga (choreography + orchestration), transactional outbox, event sourcing, schema evolution, idempotency
+
+## Related Skills
+
+- **summer-data** — OutboxService transactional outbox pattern publishes to Kafka/RabbitMQ
+- **architecture** — Event-driven bounded context communication, CQRS event sourcing
+- **testing-workflow** — Testcontainers for Kafka/RabbitMQ integration tests
+- **observability-patterns** — Consumer lag monitoring, Micrometer metrics for messaging

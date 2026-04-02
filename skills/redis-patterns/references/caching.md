@@ -131,9 +131,11 @@ public class WriteThroughCacheService {
 
 ---
 
-## Spring Cache Abstraction
+## Spring Cache Abstraction (MVC/Blocking Only)
 
-Integrates with Spring `@Cacheable`, `@CacheEvict`, and `@CachePut`. Works with **blocking** (imperative) code.
+> **Note:** The `@Cacheable` annotation does NOT work with `Mono`/`Flux` return types. For reactive caching, use the ReactiveCacheable pattern below.
+
+Integrates with Spring `@Cacheable`, `@CacheEvict`, and `@CachePut`. Works with **blocking** (imperative MVC) code only.
 
 ```java
 @Configuration
@@ -187,7 +189,7 @@ public class ProductService {
 }
 ```
 
-> **Note:** Spring's `@Cacheable` does NOT work with reactive `Mono/Flux` returns. Use manual cache-aside pattern or the custom AOP below for reactive services.
+> Use the manual cache-aside pattern or the custom AOP below for reactive services.
 
 ---
 

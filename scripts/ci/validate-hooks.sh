@@ -51,7 +51,7 @@ if [ -f "$SETTINGS_JSON" ]; then
   fi
 
   # Extract script paths from settings.json
-  scripts_referenced="$(grep -oE 'scripts/hooks/[a-z_-]+\.sh' "$SETTINGS_JSON" 2>/dev/null | sort -u)"
+  scripts_referenced="$(grep -oE 'scripts/hooks/[a-z_-]+\.sh' "$SETTINGS_JSON" 2>/dev/null | sort -u || true)"
   for script_path in $scripts_referenced; do
     full_path="$REPO_ROOT/$script_path"
     if [ ! -f "$full_path" ]; then

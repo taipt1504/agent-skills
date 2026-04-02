@@ -1,24 +1,14 @@
 ---
 name: summer-rest
-description: >
-  Summer Framework REST patterns — handler pattern (RequestHandler, @Handler,
-  SpringBus, BaseController), ResponseFactory, SummerGlobalExceptionHandler,
-  Jackson auto-configuration, WebClientBuilderFactory with pooled connections.
+description: Summer Framework REST patterns — handler pattern (RequestHandler, @Handler, SpringBus, BaseController), ResponseFactory, SummerGlobalExceptionHandler, Jackson auto-configuration, WebClientBuilderFactory with pooled connections.
 triggers:
-  - RequestHandler
-  - BaseController
-  - SpringBus
-  - ResponseFactory
-  - WebClientBuilderFactory
-  - SummerGlobalExceptionHandler
-  - f8a.common
-  - "@Handler"
-  - handler pattern
-  - summer rest
-  - summer webclient
+  natural: ["summer handler", "request handler", "summer controller"]
+  code: ["BaseController", "@Handler", "RequestHandler", "WebClientBuilderFactory"]
 ---
 
 # Summer REST — Handlers, WebClient & Exception Handling
+
+**Gate:** Verify summer-core is loaded and io.f8a.summer:summer-platform is in build.gradle before proceeding.
 
 **Module:** `summer-rest-autoconfigure` | **Config:** `f8a.common`
 
@@ -48,6 +38,14 @@ public class OrderController extends BaseController {
 ```
 
 **Registry** scans `@Handler`/`RequestHandler` beans at startup, maps request type to handler.
+
+Use `@RestTransactional` on handler methods that require reactive transaction management:
+
+```java
+@RestTransactional
+@Override
+public Mono<Order> handle(CreateOrderRequest req) { ... }
+```
 
 ## ResponseFactory
 
@@ -93,9 +91,27 @@ WebClient client = factory.newClient(
 
 Config: `f8a.common.webclient` — max-connections (100), connect-timeout (10s), read-timeout (30s), max-idle-time (30s), max-life-time (5m).
 
+## Logging Config
+
+`f8a.common.logging` controls AOP-based request/response logging. See `references/handler-examples.md` for the full YAML block (`log-headers`, `log-request-body`, `log-response-body` flags).
+
 ## Version Notes
 
 - **0.2.1:** `GlobalExceptionHandler` renamed to `SummerGlobalExceptionHandler`; `JsonErrorResponse` moved to `core.exception`; gains `timestamp` + `details` fields; `ViewableException` gains fluent `.detail()` builder; `DownstreamException` maps to 500 (was 502)
 - **0.2.1:** Custom tracing removed; use Micrometer + OpenTelemetry (`micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp`)
 
 See `references/handler-examples.md` for full CRUD, pagination, and optimistic locking handler examples.
+
+## Rules
+
+- Always extend `BaseController` for REST controllers — it provides SpringBus routing.
+- Always use `RequestHandler<Req, Res>` for business logic — never put logic in controllers.
+- Always use `@Valid` on `@RequestBody` parameters.
+- Never throw generic exceptions — use `ViewableException` via the enum pattern (see summer-core).
+- Never return entities directly — use response DTOs.
+
+## Related Skills
+
+- **summer-core** — Shared types (ViewableException, Member, CallerAware)
+- **summer-security** — @AuthRoles for endpoint authorization
+- **api-design** — REST conventions, pagination, RFC 7807

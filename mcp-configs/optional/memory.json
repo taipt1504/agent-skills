@@ -1,0 +1,14 @@
+{
+  "_comment": "Memory MCP — persistent knowledge graph for cross-session learning and entity tracking.",
+  "_install": "claude mcp add memory -s user -- npx -y @modelcontextprotocol/server-memory",
+  "_env_required": [],
+  "_env_example": {},
+  "_security": "Stores data locally in memory file. No external network calls. Safe for all environments.",
+  "_tools_added": 8,
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    }
+  }
+}

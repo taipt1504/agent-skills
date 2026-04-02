@@ -1,20 +1,19 @@
 ---
 name: summer-ratelimit
 description: >
-  Summer Framework rate limiting (v0.2.2+ ONLY). Three strategies: fixed-window,
-  sliding-window, token-bucket. Redis (default) or in-memory storage.
-  acquire() for auto-429, tryAcquire() for manual control.
+  Summer Framework rate limiting (v0.2.2+ ONLY). Three strategies -
+  fixed-window, sliding-window, token-bucket. Redis (default) or in-memory
+  storage. acquire() for auto-429, tryAcquire() for manual control. Use when
+  implementing rate limiting with RateLimiterService, RateLimitKey, or
+  RateLimitResult in Summer Framework projects.
 triggers:
-  - RateLimiterService
-  - RateLimitKey
-  - RateLimitResult
-  - f8a.rate-limiter
-  - rate limit
-  - summer ratelimit
-  - summer-ratelimit-autoconfigure
+  natural: ["rate limiter", "summer rate limit", "token bucket"]
+  code: ["RateLimiterService", "f8a.rate-limiter"]
 ---
 
 # Summer Rate Limiting — v0.2.2+ Only
+
+**Gate:** Verify summer-core is loaded and io.f8a.summer:summer-platform is in build.gradle before proceeding.
 
 **Module:** `summer-ratelimit-autoconfigure` | **Config:** `f8a.rate-limiter`
 
@@ -122,3 +121,26 @@ f8a:
 
 - **Redis** (default): Atomic Lua scripts. Auto-detected when `spring-boot-starter-data-redis-reactive` is on classpath.
 - **Memory**: In-process fallback (`storage-type: memory`). Use for development/testing only.
+
+WARNING: `storage-type: memory` is NOT cluster-safe and resets on restart. Use Redis storage in production. In-memory storage silently produces incorrect rate limiting in multi-instance deployments.
+
+## Strategy Override
+
+The `strategy` is defined per named policy in config and cannot be overridden at the call site. Only `limit` and `window` can be overridden at call site via `acquire(key, limit, window)` / `tryAcquire(key, limit, window)`.
+
+See `references/policy-examples.md` for common per-user, per-IP, and per-endpoint configuration examples.
+
+## Rules
+
+- Always use `acquire()` for standard endpoints — auto-429 is safer than manual handling.
+- Always use Redis storage in production — `storage-type: memory` is NOT cluster-safe.
+- Always define named policies for critical scopes (auth, write endpoints) — never rely solely on default-policy.
+- Never override strategy at call site — it's per-policy config only; only `limit` and `window` are overridable.
+- Always verify Summer version >= 0.2.2 — this module does not exist in earlier versions.
+
+## Related Skills
+
+- **summer-core** — CommonExceptions.RATE_LIMIT_EXCEEDED for manual error handling
+- **summer-rest** — Controllers using RateLimiterService with BaseController pattern
+- **redis-patterns** — Redis configuration for rate limit storage backend
+- **spring-security** — Rate limiting as part of security defense-in-depth

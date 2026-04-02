@@ -1,7 +1,7 @@
 {
-  "_comment": "Redis MCP — cache inspection, key browsing, TTL analysis. Enable only when project uses Redis.",
-  "_install": "claude mcp add redis -s user -- npx -y mcp-redis --url $REDIS_URL",
-  "_env_required": ["REDIS_URL"],
+  "_comment": "Redis MCP — cache inspection, key browsing, data structure access. Enable only when project uses Redis.",
+  "_install": "claude mcp add redis -s user -- npx -y @modelcontextprotocol/server-redis ${REDIS_URL:-redis://localhost:6379}",
+  "_env_required": [],
   "_env_example": {
     "REDIS_URL": "redis://localhost:6379"
   },
@@ -10,7 +10,7 @@
   "mcpServers": {
     "redis": {
       "command": "npx",
-      "args": ["-y", "mcp-redis", "--url", "${REDIS_URL}"]
+      "args": ["-y", "@modelcontextprotocol/server-redis", "${REDIS_URL:-redis://localhost:6379}"]
     }
   }
 }

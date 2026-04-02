@@ -1,24 +1,24 @@
 ---
-name: review
+name: dc-review
 description: Multi-aspect code review -- security, quality, reactive correctness, and performance. Blocks commit on critical issues.
 ---
 
-# /review -- Multi-Aspect Code Review
+# /dc-review -- Multi-Aspect Code Review
 
 Comprehensive security and quality review of uncommitted changes for Java Spring projects. Consolidates code-review, security-review, and Spring-specific checks into a single command.
 
 ## Usage
 
 ```
-/review              -> review all uncommitted changes
-/review security     -> security-focused review only
-/review performance  -> performance-focused review only
-/review <file>       -> review specific file
+/dc-review              -> review all uncommitted changes
+/dc-review security     -> security-focused review only
+/dc-review performance  -> performance-focused review only
+/dc-review <file>       -> review specific file
 ```
 
 ## Prerequisites
 
-- Run `/verify` before `/review` to catch compilation and test failures first
+- Run `/verify` before `/dc-review` to catch compilation and test failures first
 - If reviewing a feature implementation, ensure the approved spec is available for adherence checking
 
 ## Subagent Context (pass to spawned agent)
@@ -132,6 +132,44 @@ Fix: Extract helper methods
 
 VERDICT: [APPROVE / BLOCK]
 ```
+
+## Two-Stage Review Orchestration
+
+This command orchestrates two sequential review stages:
+
+### Stage 1: Spec Compliance Review
+
+1. Read the approved spec from `.claude/docs/specs/`
+2. Read the git diff (baseline SHA from `workflow-state.json` → current SHA)
+3. Check **every** acceptance criterion in the spec is met
+4. Check no over-engineering beyond spec scope
+5. Check no missing requirements
+
+**Output**: `SPEC_COMPLIANT` or `SPEC_ISSUES: [list]`
+
+**If SPEC_ISSUES**: Send issues back to implementer. Do NOT proceed to Stage 2.
+
+### Stage 2: Code Quality Review (only after Stage 1 passes)
+
+1. Run the full code quality review (all checklists above: Security, Reactive, Performance, Code Quality, Best Practices)
+2. Spring-specific checks from CLAUDE.md NEVER rules
+3. Categorize findings: **CRITICAL** / **IMPORTANT** / **MINOR**
+
+### Verdict Logic
+
+| Condition | Verdict | Action |
+|-----------|---------|--------|
+| 0 CRITICAL issues | **APPROVED** | Task is done |
+| IMPORTANT items only (no CRITICAL) | **APPROVED WITH NOTES** | Task done, notes logged |
+| ≥1 CRITICAL issue | **REJECTED** | Back to implementer with feedback |
+
+### After Review Complete
+
+1. Update `.claude/workflow-state.json`:
+   - Add `{"phase": "REVIEW", "completedAt": "{ISO timestamp}", "verdict": "{APPROVED|REJECTED}"}` to `phaseHistory`
+   - Set `phase` to `"COMPLETE"` (if approved) or `"BUILD"` (if rejected, for re-implementation)
+2. Output final verdict with summary
+3. Task is now **DONE** (if approved)
 
 ## Verdict Rules
 

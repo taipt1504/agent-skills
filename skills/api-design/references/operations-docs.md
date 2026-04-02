@@ -1,6 +1,6 @@
 # API Operations & Documentation Reference
 
-File upload/download, idempotency, bulk operations, long-running operations, and contract testing.
+File upload/download, idempotency, bulk operations, and long-running operations.
 
 ## Table of Contents
 - [File Upload](#file-upload)
@@ -8,7 +8,6 @@ File upload/download, idempotency, bulk operations, long-running operations, and
 - [Idempotency](#idempotency)
 - [Bulk Operations](#bulk-operations)
 - [Long-Running Operations (Async + Polling)](#long-running-operations-async--polling)
-- [Contract Testing](#contract-testing)
 
 ---
 
@@ -102,52 +101,10 @@ public Flux<DataBuffer> streamFile(@PathVariable String fileId) {
 
 ## Idempotency
 
-Safe to retry — Redis-backed deduplication with 24h TTL.
+Safe to retry — Redis-backed deduplication with 24h TTL. Implement at the service layer to keep the response body fully captured:
 
 ```java
-@Component @RequiredArgsConstructor
-public class IdempotencyFilter implements WebFilter {
-    private final ReactiveRedisTemplate<String, IdempotencyRecord> redis;
-
-    @Override
-    public Mono<WebFilterChain> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        String key = exchange.getRequest().getHeaders().getFirst("Idempotency-Key");
-        if (key == null || !isMutation(exchange.getRequest().getMethod())) {
-            return chain.filter(exchange).then(Mono.empty());
-        }
-
-        String redisKey = "idempotency:" + key;
-        return redis.opsForValue().get(redisKey)
-            .flatMap(cached -> {
-                // Return cached response
-                exchange.getResponse().setStatusCode(HttpStatus.valueOf(cached.statusCode()));
-                exchange.getResponse().getHeaders().add("X-Idempotent-Replayed", "true");
-                return exchange.getResponse().writeWith(
-                    Mono.just(exchange.getResponse().bufferFactory()
-                        .wrap(cached.body())));
-            })
-            .switchIfEmpty(chain.filter(exchange)
-                .then(Mono.defer(() -> {
-                    // Cache response for 24h
-                    // Note: in practice, use ResponseBodyInterceptor to capture body
-                    return redis.opsForValue().set(redisKey,
-                        new IdempotencyRecord(
-                            exchange.getResponse().getStatusCode().value(),
-                            new byte[0]),
-                        Duration.ofHours(24));
-                }))
-                .then(Mono.empty()));
-    }
-
-    private boolean isMutation(HttpMethod method) {
-        return method == HttpMethod.POST || method == HttpMethod.PUT ||
-               method == HttpMethod.PATCH || method == HttpMethod.DELETE;
-    }
-}
-```
-
-```java
-// Simpler: idempotency at service layer
+// Service-layer idempotency (recommended)
 public Mono<OrderResponse> createOrder(CreateOrderRequest request, String idempotencyKey) {
     String redisKey = "idem:create-order:" + idempotencyKey;
     return redis.<String>opsForValue().get(redisKey)
@@ -266,94 +223,4 @@ public Flux<ServerSentEvent<JobStatus>> streamProgress(@PathVariable String jobI
 
 ---
 
-## Contract Testing
-
-### Spring Cloud Contract (Provider-driven)
-
-```groovy
-// contracts/src/test/resources/contracts/orders/shouldCreateOrder.groovy
-Contract.make {
-    description "should create order"
-    request {
-        method POST()
-        url '/api/v1/orders'
-        body([
-            customerId: "customer-1",
-            items: [[productId: "P1", quantity: 2, unitPrice: 1000]]
-        ])
-        headers { contentType(applicationJson()) }
-    }
-    response {
-        status CREATED()
-        body([
-            id: $(producer(regex('[a-z0-9-]+')), consumer('ord-abc')),
-            status: "PENDING",
-            totalAmount: 2000
-        ])
-        headers {
-            contentType(applicationJson())
-            header('Location', $(producer(url('/api/v1/orders/.*'))))
-        }
-    }
-}
-```
-
-```java
-// Provider test base class
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public abstract class OrderContractBase {
-
-    @Autowired
-    private ApplicationContext context;
-
-    @MockBean
-    private OrderService orderService;
-
-    @BeforeEach
-    void setup() {
-        RestAssuredWebTestClient.applicationContextSetup(context);
-
-        when(orderService.create(any()))
-            .thenReturn(Mono.just(testOrder()));
-    }
-}
-```
-
-### Pact (Consumer-driven)
-
-```java
-// Consumer test
-@ExtendWith(PactConsumerTestExt.class)
-@PactTestFor(providerName = "order-service")
-class OrderClientPactTest {
-
-    @Pact(consumer = "payment-service")
-    public RequestResponsePact createOrderPact(PactDslWithProvider builder) {
-        return builder
-            .given("order can be created")
-            .uponReceiving("a create order request")
-            .method("POST")
-            .path("/api/v1/orders")
-            .body(new PactDslJsonBody()
-                .stringType("customerId", "c-1")
-                .minArrayLike("items", 1,
-                    new PactDslJsonBody()
-                        .stringType("productId", "P1")
-                        .integerType("quantity", 1)))
-            .willRespondWith()
-            .status(201)
-            .body(new PactDslJsonBody()
-                .stringMatcher("id", "[a-z0-9-]+", "ord-123")
-                .stringValue("status", "PENDING"))
-            .toPact();
-    }
-
-    @Test
-    @PactTestFor(pactMethod = "createOrderPact")
-    void shouldCreateOrder(MockServer mockServer) {
-        var client = new OrderClient(mockServer.getUrl());
-        var result = client.createOrder(testRequest());
-        assertThat(result.status()).isEqualTo("PENDING");
-    }
-}
-```
+For contract testing patterns (Spring Cloud Contract, Pact), see the `testing-workflow` skill.
