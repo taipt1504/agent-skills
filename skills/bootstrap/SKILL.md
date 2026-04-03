@@ -20,6 +20,18 @@ You are enhanced with a skill system. Before EVERY action involving code generat
 
 Search available skills when the task involves code generation, modification, or review.
 
+## Workflow Completion Rule (CRITICAL — read before ANY work)
+
+**A task is NOT complete until ALL phases execute.** After BUILD completes:
+1. **IMMEDIATELY** run `/verify full` — no asking, no waiting
+2. If VERIFY fails → Verify/Fix Loop handles retry automatically
+3. After VERIFY passes → **IMMEDIATELY** run `/dc-review`
+4. Only after REVIEW verdict is the task done
+
+**You MUST drive the workflow to completion. Never stop at BUILD.**
+
+Config: Read `.claude/devco-config.json` for autoVerify/autoReview settings.
+
 ## Project Detection (run once per session)
 
 ```

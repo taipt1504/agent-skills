@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# session-init.sh — Session Start Hook (v3.0)
+# session-init.sh — Session Start Hook (v3.1.1)
 # =============================================================================
 # Detects project type, restores L2 memory, injects bootstrap skill.
 # Replaces: session-start.sh
@@ -66,6 +66,24 @@ fi
 # --- Java version ---
 JAVA_VERSION="$(java -version 2>&1 | head -1 | cut -d'"' -f2 2>/dev/null || echo "")"
 
+# --- Java project version (from build config) ---
+JAVA_PROJECT_VERSION=""
+for gf in "$PROJECT_ROOT/build.gradle" "$PROJECT_ROOT/build.gradle.kts"; do
+  if [ -f "$gf" ]; then
+    ver=$(grep -oE "sourceCompatibility\s*=\s*['\"]?[0-9]+" "$gf" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+    [ -z "$ver" ] && ver=$(grep -oE "JavaVersion\.VERSION_([0-9]+)" "$gf" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+    [ -z "$ver" ] && ver=$(grep -oE "jvmTarget\s*=\s*['\"]?[0-9]+" "$gf" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+    [ -n "$ver" ] && JAVA_PROJECT_VERSION="$ver" && break
+  fi
+done
+if [ -z "$JAVA_PROJECT_VERSION" ] && [ -f "$PROJECT_ROOT/gradle.properties" ]; then
+  JAVA_PROJECT_VERSION=$(grep -oE "sourceCompatibility\s*=\s*[0-9]+" "$PROJECT_ROOT/gradle.properties" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+fi
+if [ -z "$JAVA_PROJECT_VERSION" ] && [ -f "$PROJECT_ROOT/pom.xml" ]; then
+  JAVA_PROJECT_VERSION=$(grep -oE "<maven\.compiler\.source>[0-9]+" "$PROJECT_ROOT/pom.xml" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+  [ -z "$JAVA_PROJECT_VERSION" ] && JAVA_PROJECT_VERSION=$(grep -oE "<java\.version>[0-9]+" "$PROJECT_ROOT/pom.xml" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+fi
+
 # --- Write project profile (single source of truth for downstream hooks) ---
 PROFILE_DIR="${PROJECT_ROOT}/.claude"
 PROFILE_FILE="${PROFILE_DIR}/project-profile.json"
@@ -86,6 +104,7 @@ cat > "$PROFILE_FILE" <<PROFILE_EOF
   "summer": $SUMMER_DETECTED,
   "summerVersion": $([ -n "$SUMMER_VERSION" ] && echo "\"$SUMMER_VERSION\"" || echo "null"),
   "javaVersion": $([ -n "$JAVA_VERSION" ] && echo "\"$JAVA_VERSION\"" || echo "null"),
+  "javaProjectVersion": $([ -n "$JAVA_PROJECT_VERSION" ] && echo "\"$JAVA_PROJECT_VERSION\"" || echo "null"),
   "branch": "$(printf '%s' "$BRANCH" | sed 's/"/\\"/g')"
 }
 PROFILE_EOF
@@ -147,6 +166,104 @@ if [ -n "$SPRING_TYPE" ]; then
 fi
 
 [ -f "PROJECT_GUIDELINES.md" ] && CONTEXT="${CONTEXT}**Project guidelines**: \`PROJECT_GUIDELINES.md\` present — read it before starting work.\n\n"
+
+# ---------------------------------------------------------------------------
+# Config & Profile Injection (v3.1.1 — agents MUST receive config at runtime)
+# ---------------------------------------------------------------------------
+CONFIG_FILE="${PROJECT_ROOT}/.claude/devco-config.json"
+PROFILE_FILE_INJ="${PROJECT_ROOT}/.claude/project-profile.json"
+
+CONFIG_CTX=""
+
+# Read devco-config.json
+if [ -f "$CONFIG_FILE" ] && command -v python3 &>/dev/null; then
+  CONFIG_CTX=$(python3 -c "
+import json, sys
+try:
+    c = json.load(open('$CONFIG_FILE'))
+    mode = c.get('mode', 'standard')
+    wf = c.get('workflow', {})
+    team = c.get('team', {})
+    proj = c.get('project', {})
+
+    lines = []
+    lines.append('## Plugin Configuration (from .claude/devco-config.json)')
+    lines.append('')
+    lines.append(f'**Mode**: {mode}')
+    lines.append(f'**Workflow**: autoVerify={wf.get(\"autoVerify\", True)}, autoReview={wf.get(\"autoReview\", True)}, skipPlanConfirm={wf.get(\"skipPlanConfirm\", False)}, skipSpecConfirm={wf.get(\"skipSpecConfirm\", False)}')
+    lines.append(f'**Limits**: maxRetryOnFail={wf.get(\"maxRetryOnFail\", 3)}, maxIterationsPerPhase={wf.get(\"maxIterationsPerPhase\", 10)}, noProgressThreshold={wf.get(\"noProgressThreshold\", 3)}')
+    lines.append(f'**Team**: enabled={team.get(\"enabled\", False)}, maxTeammates={team.get(\"maxTeammates\", 4)}, spawnStrategy={team.get(\"spawnStrategy\", \"smart\")}')
+    if team.get('enabled'):
+        roles = team.get('roles', {})
+        cost = team.get('costControl', {})
+        lines.append(f'**Model Routing**: implementer={roles.get(\"implementer\",{}).get(\"model\",\"sonnet\")}, reviewer={roles.get(\"reviewer\",{}).get(\"model\",\"sonnet\")}')
+        lines.append(f'**Cost Control**: preferFastModel={cost.get(\"preferFastModel\", True)}, useOpusOnlyFor={cost.get(\"useOpusOnlyFor\", [])}')
+    lines.append(f'**Project**: type={proj.get(\"type\")}, useSummer={proj.get(\"useSummer\", False)}')
+    print('\n'.join(lines))
+except Exception as e:
+    print(f'[SessionInit] WARNING: Could not read devco-config.json: {e}', file=sys.stderr)
+" 2>/dev/null) || true
+fi
+
+# Read project-profile.json
+PROFILE_CTX=""
+if [ -f "$PROFILE_FILE_INJ" ] && command -v python3 &>/dev/null; then
+  PROFILE_CTX=$(python3 -c "
+import json, sys
+try:
+    p = json.load(open('$PROFILE_FILE_INJ'))
+    lines = []
+    lines.append('')
+    lines.append('## Project Profile (from .claude/project-profile.json)')
+    lines.append('')
+    lines.append(f'**Build Tool**: {p.get(\"buildTool\", \"unknown\")}')
+    lines.append(f'**Spring Type**: {p.get(\"springType\", \"unknown\")}')
+    lines.append(f'**Summer Framework**: {p.get(\"summerFramework\", False)}')
+
+    java_os = p.get('javaVersion', 'unknown')
+    java_proj = p.get('javaProjectVersion', '')
+    if java_proj:
+        lines.append(f'**Java Version**: {java_proj} (project config) / {java_os} (OS runtime)')
+    else:
+        lines.append(f'**Java Version**: {java_os} (OS runtime — project version not detected)')
+
+    deps = p.get('dependencies', {})
+    active_deps = [k for k, v in deps.items() if v]
+    if active_deps:
+        lines.append(f'**Dependencies**: {\", \".join(active_deps)}')
+    lines.append(f'**GitHub**: {p.get(\"github\", False)}')
+
+    lines.append('')
+    lines.append('### Skill Loading Hints (from profile)')
+    spring_type = p.get('springType', 'unknown')
+    if spring_type == 'webflux':
+        lines.append('- Load **spring-patterns** (WebFlux mode — use Mono/Flux, StepVerifier, NEVER .block())')
+    elif spring_type == 'mvc':
+        lines.append('- Load **spring-patterns** (MVC mode — use RestTemplate, MockMvc, synchronous patterns)')
+    if p.get('summerFramework'):
+        lines.append('- Load **summer-core** + summer sub-skills (Summer Framework detected)')
+    else:
+        lines.append('- Do NOT load summer-* skills (Summer Framework not detected)')
+    if deps.get('postgresql') or deps.get('mysql'):
+        lines.append('- Load **database-patterns** (database dependency detected)')
+    if deps.get('kafka') or deps.get('rabbitmq'):
+        lines.append('- Load **messaging-patterns** (messaging dependency detected)')
+    if deps.get('redis'):
+        lines.append('- Load **redis-patterns** (Redis dependency detected)')
+
+    print('\n'.join(lines))
+except Exception as e:
+    print(f'[SessionInit] WARNING: Could not read project-profile.json: {e}', file=sys.stderr)
+" 2>/dev/null) || true
+fi
+
+# Output config context to session (stdout = agent context)
+if [ -n "$CONFIG_CTX" ]; then
+  CONTEXT="${CONTEXT}${CONFIG_CTX}\n\n"
+fi
+if [ -n "$PROFILE_CTX" ]; then
+  CONTEXT="${CONTEXT}${PROFILE_CTX}\n\n"
+fi
 
 # Output
 printf '%b' "$CONTEXT" 2>/dev/null || true

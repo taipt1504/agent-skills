@@ -252,6 +252,28 @@ detect_java_version() {
   fi
 }
 
+detect_project_java_version() {
+  local ver=""
+  for gf in "$PROJECT_ROOT/build.gradle" "$PROJECT_ROOT/build.gradle.kts"; do
+    if [ -f "$gf" ]; then
+      ver=$(grep -oE "sourceCompatibility\s*=\s*['\"]?[0-9]+" "$gf" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+      [ -z "$ver" ] && ver=$(grep -oE "JavaVersion\.VERSION_([0-9]+)" "$gf" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+      [ -z "$ver" ] && ver=$(grep -oE "jvmTarget\s*=\s*['\"]?[0-9]+" "$gf" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+      [ -n "$ver" ] && echo "$ver" && return
+    fi
+  done
+  if [ -z "$ver" ] && [ -f "$PROJECT_ROOT/gradle.properties" ]; then
+    ver=$(grep -oE "sourceCompatibility\s*=\s*[0-9]+" "$PROJECT_ROOT/gradle.properties" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+    [ -n "$ver" ] && echo "$ver" && return
+  fi
+  if [ -z "$ver" ] && [ -f "$PROJECT_ROOT/pom.xml" ]; then
+    ver=$(grep -oE "<maven\.compiler\.source>[0-9]+" "$PROJECT_ROOT/pom.xml" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+    [ -z "$ver" ] && ver=$(grep -oE "<java\.version>[0-9]+" "$PROJECT_ROOT/pom.xml" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+    [ -n "$ver" ] && echo "$ver" && return
+  fi
+  echo ""
+}
+
 detect_summer_framework() {
   if has_dependency "io.f8a.summer" || has_dependency "summer-platform" || has_dependency "summer-framework"; then
     echo "true"
@@ -549,7 +571,14 @@ else
 fi
 
 JAVA_VERSION=$(detect_java_version)
-pass "Java version: $JAVA_VERSION"
+pass "Java version (OS): $JAVA_VERSION"
+
+JAVA_PROJECT_VERSION=$(detect_project_java_version)
+if [ -n "$JAVA_PROJECT_VERSION" ]; then
+  pass "Java version (project config): $JAVA_PROJECT_VERSION"
+else
+  pass "Java version (project config): not detected"
+fi
 
 # Detect databases and messaging
 HAS_POSTGRES=false
@@ -584,6 +613,7 @@ profile = {
     'springType': '$SPRING_TYPE',
     'summerFramework': $( [ \"$SUMMER\" = \"true\" ] && echo True || echo False ),
     'javaVersion': '$JAVA_VERSION',
+    'javaProjectVersion': '$JAVA_PROJECT_VERSION' if '$JAVA_PROJECT_VERSION' else None,
     'dependencies': {
         'postgresql': $( $HAS_POSTGRES && echo True || echo False ),
         'mysql': $( $HAS_MYSQL && echo True || echo False ),
@@ -607,6 +637,7 @@ else
   "springType": "$SPRING_TYPE",
   "summerFramework": $( [ "$SUMMER" = "true" ] && echo true || echo false ),
   "javaVersion": "$JAVA_VERSION",
+  "javaProjectVersion": $([ -n "$JAVA_PROJECT_VERSION" ] && echo "\"$JAVA_PROJECT_VERSION\"" || echo "null"),
   "dependencies": {
     "postgresql": $( $HAS_POSTGRES && echo true || echo false ),
     "mysql": $( $HAS_MYSQL && echo true || echo false ),
@@ -638,6 +669,7 @@ config['project']['useSummer'] = $( [ \"$SUMMER\" = \"true\" ] && echo True || e
 config['project']['stack'] = {
     'buildTool': '$BUILD_TOOL',
     'javaVersion': '$JAVA_VERSION',
+    'javaProjectVersion': '$JAVA_PROJECT_VERSION' if '$JAVA_PROJECT_VERSION' else None,
     'postgresql': $( $HAS_POSTGRES && echo True || echo False ),
     'mysql': $( $HAS_MYSQL && echo True || echo False ),
     'redis': $( $HAS_REDIS && echo True || echo False ),

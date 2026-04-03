@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# session-save.sh — Session End Hook (v3.1)
+# session-save.sh — Session End Hook
 # =============================================================================
 
 source "$(dirname "$0")/run-with-flags.sh" "session-save" || exit 0
@@ -62,7 +62,7 @@ if [ "$HAS_UNCOMMITTED" = true ]; then
   warn "Uncommitted changes: ${UNCOMMITTED_COUNT} files"
 fi
 
-# --- Instinct candidate extraction (v3.2 — auto-extract) ---
+# --- Instinct candidate extraction (auto-extract) ---
 INSTINCTS_DIR="${PROJECT_ROOT}/.claude/instincts/personal"
 
 # Count session tool calls
@@ -97,7 +97,7 @@ if [ -d "$INSTINCTS_DIR" ]; then
 }
 INSTINCT_EOF
 
-  # --- AUTO-EXTRACT TRIGGER (v3.2) ---
+  # --- AUTO-EXTRACT TRIGGER ---
   # Harness Engineering principle: Learning system must be autonomous.
   # Trigger auto-extraction when session had significant activity:
   #   - >20 tool calls AND >3 file changes

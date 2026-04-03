@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# run-with-flags.sh — Profile-based hook gating system (v3.2)
+# run-with-flags.sh — Profile-based hook gating system
 # =============================================================================
 #
 # Source this file at the top of any hook script to enable profile-based gating.
@@ -15,7 +15,7 @@
 #   2. HOOK_PROFILE env var
 #   3. default: "standard"
 #
-# Profiles (v3.2):
+# Profiles:
 #   minimal:  session-init, session-save, subagent-init
 #   standard: + skill-router, quality-gate, compact-advisor, git-guard,
 #               pre-compact, post-compact, workflow-tracker,

@@ -5,6 +5,13 @@ description: TDD cycle command -- explicit BUILD phase trigger. Invokes implemen
 
 # /build -- TDD Implementation Cycle
 
+> **AUTO-CONTINUATION RULE — READ FIRST**
+> After ALL tasks complete and tests pass:
+> 1. **IMMEDIATELY** invoke `/verify full` — do NOT ask, do NOT wait
+> 2. After VERIFY passes → **IMMEDIATELY** invoke `/dc-review` — do NOT stop
+> 3. Task is NOT done until REVIEW verdict. **Stopping after BUILD is FORBIDDEN.**
+> Read `.claude/devco-config.json` for `workflow.autoVerify` (default: true) and `workflow.autoReview` (default: true).
+
 Explicit BUILD phase trigger. Invokes the implementer agent to follow the RED-GREEN-REFACTOR TDD cycle based on the approved spec.
 
 ## Prerequisites

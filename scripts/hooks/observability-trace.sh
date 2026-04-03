@@ -5,7 +5,7 @@
 # Performance: <50ms, append-only, minimal overhead
 
 set -o pipefail
-trap 'exit 0' ERR  # Graceful error handling - never block tool execution
+trap 'echo "[ObservabilityTrace] Error: $?" >&2; exit 0' ERR  # Graceful error handling - never block tool execution
 
 # Source profile gating (project convention)
 source "$(dirname "$0")/run-with-flags.sh" "observability-trace" || exit 0
@@ -17,7 +17,10 @@ TRACE_DIR=".claude/sessions"
 TRACE_FILE="$TRACE_DIR/execution-trace.jsonl"
 METRICS_FILE="$TRACE_DIR/session-metrics.json"
 
+# Ensure trace file and directory exist
 mkdir -p "$TRACE_DIR" 2>/dev/null || true
+touch "$TRACE_FILE"
+touch "$METRICS_FILE"
 
 # Capture timing
 START_TIME=$(date +%s%N)
@@ -68,7 +71,7 @@ print(json.dumps(entry, separators=(',', ':')))
 } &
 
 # Update session metrics (atomic JSON merge)
-if [[ -f "$METRICS_FILE" ]]; then
+{
   python3 << 'PYTHON_END' "$METRICS_FILE" "$TOOL_NAME" "$SKILL" "$PHASE" "$STATUS" 2>/dev/null || true
 import json
 import sys
@@ -99,7 +102,7 @@ metrics['totalToolCalls'] = metrics['totalToolCalls'] + 1
 with open(metrics_file, 'w') as f:
   json.dump(metrics, f)
 PYTHON_END
-fi &
+} &
 
 wait 2>/dev/null || true
 exit 0

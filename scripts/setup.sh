@@ -137,11 +137,9 @@ if [ "$SKIP_PROJECT" = "false" ]; then
     info "Commit .claude/ to version control to share with your team."
   fi
 
-  # 1c. Initialize memory directory
-  if [ -f "$PLUGIN_DIR/scripts/memory/init.sh" ]; then
-    bash "$PLUGIN_DIR/scripts/memory/init.sh" "$PROJECT_ROOT"
-    ok "Memory directory initialized → $CLAUDE_DIR/memory/"
-  fi
+  # 1c. Initialize memory directory (context subdirectory for active-work.json)
+  mkdir -p "$CLAUDE_DIR/memory/context"
+  ok "Memory directory initialized → $CLAUDE_DIR/memory/"
 
   # 1d. Team config → .claude/settings.json
   # Writes extraKnownMarketplaces + enabledPlugins so teammates are auto-prompted
@@ -201,12 +199,12 @@ fi
 # 3. Summary
 # ---------------------------------------------------------------------------
 
-h "Done (v3.0)"
+h "Done"
 echo ""
 echo "  Installed at project scope (all under .claude/):"
 echo "    .claude/CLAUDE.md           — project conventions (~400 tokens)"
 echo "    .claude/rules/              — 9 coding rules (flat)"
-echo "    .claude/memory/             — 3-tier session & knowledge storage"
+echo "    .claude/memory/             — session context storage"
 echo "    .claude/settings.json       — team auto-install config"
 echo ""
 echo "  Workflow enforcement via bootstrap skill (hook-bootstrapped, not CLAUDE.md)."

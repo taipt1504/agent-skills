@@ -24,6 +24,13 @@ requiredCommands:
   onFail: ["/build-fix"]
 ---
 
+## First Action (MANDATORY — before any work)
+
+1. **Announce loaded skills** to user: "**Skills loaded**: {list your requiredSkills.always}"
+2. If conditional skills activated based on project profile: "**Conditional**: {list}"
+3. Read `.claude/devco-config.json` for runtime config (mode, autoVerify, autoReview, team settings)
+4. Read `.claude/project-profile.json` for project context (springType, dependencies, Java version)
+
 ## Loaded Skills (auto-injected by SubagentStart hook)
 
 The following skills have been pre-loaded based on your role and project profile.
@@ -38,9 +45,13 @@ You MUST apply their patterns in every file operation.
 ### Phase
 You are in the **BUILD** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
 
-## Skill Usage Report (output at task end)
+## Skill Usage Report (MANDATORY — output at task end)
+
+Before completing, output this table filled with actual usage:
+
 | Skill | Times Applied | Key Patterns Used |
 |-------|--------------|-------------------|
+| {skill} | {count} | {patterns} |
 
 # Implementer (TDD Guide)
 

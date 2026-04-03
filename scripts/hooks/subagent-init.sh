@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# subagent-init.sh — SubagentStart Context Injection (v3.1)
+# subagent-init.sh — SubagentStart Context Injection (v3.1.1)
 # =============================================================================
 # Injects skill protocol + project context into every subagent via additionalContext.
 # Fires on: SubagentStart (synchronous)
@@ -120,9 +120,38 @@ if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/agents" ]; then
           done
         fi
       fi
-      break  # Only match one agent per subagent invocation
+      # v3.1.1: Removed break — inject ALL agent skills since SubagentStart
+      # doesn't pass agent name. Let conditional resolution use project-profile.
     fi
   done
+fi
+
+# ---------------------------------------------------------------------------
+# Config injection for subagent (v3.1.1)
+# ---------------------------------------------------------------------------
+CONFIG_FILE="${PROJECT_ROOT}/.claude/devco-config.json"
+
+if [ -f "$CONFIG_FILE" ] && command -v python3 &>/dev/null; then
+  CONFIG_SECTION=$(python3 -c "
+import json
+c = json.load(open('$CONFIG_FILE'))
+wf = c.get('workflow', {})
+team = c.get('team', {})
+mode = c.get('mode', 'standard')
+lines = []
+lines.append('\n## Runtime Config')
+lines.append(f'Mode: {mode} | autoVerify: {wf.get(\"autoVerify\", True)} | autoReview: {wf.get(\"autoReview\", True)}')
+lines.append(f'maxRetryOnFail: {wf.get(\"maxRetryOnFail\", 3)} | noProgressThreshold: {wf.get(\"noProgressThreshold\", 3)}')
+if team.get('enabled'):
+    lines.append(f'Team: ENABLED (maxTeammates: {team.get(\"maxTeammates\", 4)})')
+if mode == 'yolo':
+    lines.append('Mode yolo: Skip plan/spec confirmations. Warn on violations, do not block.')
+elif mode == 'strict':
+    lines.append('Mode strict: All gates enforced. Block on violations.')
+print('\n'.join(lines))
+" 2>/dev/null) || true
+
+  [ -n "$CONFIG_SECTION" ] && CTX="${CTX}${CONFIG_SECTION}\n"
 fi
 
 # --- Output structured JSON ---

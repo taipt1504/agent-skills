@@ -5,6 +5,13 @@ description: Run build, test, lint, security, and static analysis pipeline. Mode
 
 # /verify -- Build + Test + Security Pipeline
 
+> **AUTO-CONTINUATION RULE — READ FIRST**
+> After verification PASSES:
+> 1. **IMMEDIATELY** invoke `/dc-review` — do NOT ask, do NOT wait
+> 2. Task is NOT done until REVIEW verdict. Never stop after VERIFY.
+> On FAIL: invoke build-fixer → re-verify (max 3 retries, then escalate to user).
+> Read `.claude/devco-config.json` for `workflow.autoReview` (default: true).
+
 Run verification on current Java/Spring codebase. Supports multiple modes.
 
 ## Usage

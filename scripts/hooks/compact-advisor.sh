@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# compact-advisor.sh — Context Monitor & Token Budget Advisor (v3.2)
+# compact-advisor.sh — Context Monitor & Token Budget Advisor
 # =============================================================================
 # Monitors tool call count AND estimates token usage for context budget.
 # Progressive unloading + real-time token estimation.
@@ -33,7 +33,7 @@ fi
 echo "$COUNT" > "$COUNTER_FILE"
 
 # ---------------------------------------------------------------------------
-# Token Budget Estimation (v3.2 — replaces pure proxy metric)
+# Token Budget Estimation (replaces pure proxy metric)
 #
 # Estimates context token usage from known sources:
 #   - Bootstrap skill: ~1500 tokens (always loaded)
@@ -69,7 +69,7 @@ BUDGET=200000
 PERCENT=$((TOTAL_ESTIMATED * 100 / BUDGET))
 
 # ---------------------------------------------------------------------------
-# Progressive unloading strategy (v3.2)
+# Progressive unloading strategy
 #
 # Stage 1 (50 calls OR 70%):  Suggest unloading meta skills
 # Stage 2 (75 calls OR 85%):  Suggest unloading unused domain skills
