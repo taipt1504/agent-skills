@@ -4,6 +4,7 @@ description: Summer Framework security — APISIX auth integration with X-Userin
 triggers:
   natural: ["auth roles", "keycloak client", "summer security"]
   code: ["@AuthRoles", "ReactiveKeycloakClient", "f8a.security"]
+requires: ["summer-core", "spring-security"]
 ---
 
 # Summer Security — APISIX, Keycloak & Roles

@@ -1,14 +1,15 @@
 ---
 name: summer-ratelimit
 description: >
-  Summer Framework rate limiting (v0.2.2+ ONLY). Three strategies -
-  fixed-window, sliding-window, token-bucket. Redis (default) or in-memory
-  storage. acquire() for auto-429, tryAcquire() for manual control. Use when
-  implementing rate limiting with RateLimiterService, RateLimitKey, or
-  RateLimitResult in Summer Framework projects.
+  Summer Framework rate limiting (v0.2.2+ ONLY) — fixed-window, sliding-window, token-bucket
+  strategies with Redis or in-memory storage. acquire() for auto-429, tryAcquire() for manual
+  control. Use when implementing rate limiting in Summer Framework projects — per-user, per-IP,
+  per-tenant, or global rate limits with RateLimiterService. Includes distributed Redis patterns
+  and multi-tenant tiered policy configuration.
 triggers:
   natural: ["rate limiter", "summer rate limit", "token bucket"]
   code: ["RateLimiterService", "f8a.rate-limiter"]
+requires: ["summer-core", "redis-patterns"]
 ---
 
 # Summer Rate Limiting — v0.2.2+ Only

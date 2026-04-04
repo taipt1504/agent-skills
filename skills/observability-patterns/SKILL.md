@@ -1,11 +1,11 @@
 ---
 name: observability-patterns
 description: >
-  Observability patterns for Spring Boot — structured logging, distributed tracing,
-  custom metrics, health checks, alerting, and Prometheus monitoring. Use when adding
-  logging to services, configuring log formats, setting up distributed tracing, creating
-  custom Micrometer metrics, configuring health endpoints, writing Prometheus alert rules,
-  or setting up Grafana dashboards.
+  Observability patterns for Spring Boot — structured JSON logging (Logstash encoder),
+  distributed tracing (Micrometer Tracing), custom Micrometer metrics, Prometheus alerting,
+  and Grafana dashboards. Use when configuring logback-spring.xml, adding MDC correlation,
+  creating @Timed/@Counted metrics, writing PromQL alert rules, setting up ELK/Loki log
+  pipelines, or building Grafana dashboards for Spring Boot services.
 triggers:
   natural: ["structured logging", "metrics", "distributed tracing", "health check", "alerting"]
   code: ["Micrometer", "@Timed", "MeterRegistry", "logback", "MDC"]

@@ -1,12 +1,11 @@
 ---
 name: continuous-learning
 description: >
-  Observable learning system for tracking what Claude has learned during sessions.
-  Manages dual learning: native Claude memory (automatic) and MCP knowledge graph
-  (structured entities and relations). Use when a user asks what Claude has learned
-  about the project, wants to store a preference, requests a learning summary, asks
-  about memory or knowledge graph state, wants to extract patterns from a session,
-  or invokes /meta learn commands.
+  Observable learning system — tracks what Claude learns across sessions. Manages native
+  Claude memory and MCP knowledge graph (entities + relations). Use when the user asks
+  "what have you learned?", wants to store a preference or pattern, requests a learning
+  summary, asks about memory/knowledge state, wants to extract instincts from a session,
+  or runs /meta learn commands. Includes scripts/extract-instincts.sh for pattern mining.
 triggers:
   natural: ["learn pattern", "extract skill", "evolve", "meta command"]
   code: ["/meta"]

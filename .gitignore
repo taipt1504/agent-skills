@@ -34,8 +34,13 @@ private/
 # Skill eval workspaces (generated during testing, not part of the plugin)
 skills/*-workspace/
 
-# Claude Code local state (sessions only — CLAUDE.md, rules/, WORKING_WORKFLOW.md are committed)
+# Claude Code local state (runtime-generated, not part of the plugin)
 .claude/sessions/
+.claude/workflow-state.json
+.claude/verify-fix-state.json
+.claude/build-checkpoint.json
+.claude/project-profile.json
+.claude/session-metrics.json
 
 # Java
 *.class

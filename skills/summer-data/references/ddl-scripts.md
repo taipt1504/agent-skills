@@ -1,4 +1,6 @@
-# Summer Data — DDL Scripts
+# Summer Data — DDL Scripts & Implementation Reference
+
+> Read when: setting up audit_log or outbox_events tables, implementing AuditService or OutboxService.
 
 ## audit_log Table
 
@@ -51,9 +53,64 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_audit_log_immutable
+    BEFORE UPDATE OR DELETE ON audit_log
+    FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_modification();
 ```
 
 **23 columns.** `AuditTableValidator` verifies all columns exist on startup.
+
+## AuditService Implementation
+
+### Builder Pattern Usage
+
+```java
+// Basic audit entry
+auditService.audit()
+    .action("CREATE")
+    .intent("order.placed")
+    .entityType("Order")
+    .entityId(orderId)
+    .newValues(orderDto)
+    .save();
+
+// With actor context (auto-extracted from SecurityContext)
+auditService.audit()
+    .action("UPDATE")
+    .intent("order.status_changed")
+    .entityType("Order")
+    .entityId(orderId)
+    .oldValues(previousState)
+    .newValues(newState)
+    .comment("Status changed from PENDING to CONFIRMED")
+    .save();
+```
+
+### Annotation-Based Auditing
+
+```java
+@Audit(action = "DELETE", intent = "order.cancelled", entityType = "Order")
+public Mono<Void> cancelOrder(@AuditEntityId String orderId) {
+    return orderRepository.deleteById(orderId);
+}
+```
+
+### Querying Audit Logs
+
+```java
+// By entity
+auditService.findByEntity("Order", orderId)
+    .collectList();
+
+// By actor in time range
+auditService.findByActor(actorId, startTime, endTime)
+    .collectList();
+
+// By intent with pagination
+auditService.findByIntent("order.placed", PageRequest.of(0, 50))
+    .collectList();
+```
 
 ## outbox_events Table
 
@@ -73,9 +130,64 @@ CREATE TABLE outbox_events
 
 CREATE INDEX idx_outbox_unpublished ON outbox_events (published, created_at)
     WHERE published = FALSE;
+CREATE INDEX idx_outbox_aggregate ON outbox_events (aggregate_id, created_at DESC);
+CREATE INDEX idx_outbox_type ON outbox_events (event_type, created_at DESC);
 ```
 
 **9 columns.** `OutboxTableValidator` validates column names and types on startup.
+
+## OutboxService Implementation
+
+### Saving Events (Transactional)
+
+```java
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+    private final OrderRepository orderRepository;
+    private final OutboxService outboxService;
+
+    @Transactional
+    public Mono<Order> createOrder(CreateOrderCommand cmd) {
+        return orderRepository.save(Order.create(cmd))
+            .flatMap(order -> outboxService.save(
+                OutboxEvent.builder()
+                    .aggregateId(order.getId())
+                    .eventType("OrderCreated")
+                    .payload(order)
+                    .build()
+            ).thenReturn(order));
+    }
+}
+```
+
+### Outbox Scheduler (Polling Publisher)
+
+The `OutboxScheduler` runs at a configurable interval, fetching unpublished events and publishing them:
+
+```yaml
+f8a:
+  outbox:
+    scheduler:
+      enabled: true
+      interval: 5s             # polling interval
+      batch-size: 100          # max events per poll
+      max-retries: 5           # retry limit before dead-lettering
+    circuit-breaker:
+      enabled: true
+      failure-rate-threshold: 50
+      wait-duration-in-open-state: 30s
+```
+
+### Error Handling & Dead Letter
+
+Events exceeding `max-retries` are marked with `published = true` and `error_message` populated. Query dead-lettered events:
+
+```sql
+SELECT * FROM outbox_events
+WHERE published = TRUE AND error_message IS NOT NULL
+ORDER BY created_at DESC;
+```
 
 ## Flyway Migration Notes
 
@@ -90,3 +202,31 @@ Place DDL scripts in `src/main/resources/db/migration/`:
 ```
 
 Embedded Flyway scripts were deleted from `data-audit` in 0.2.1 — you must include them in your project migrations.
+
+## Partition Strategy (High-Volume)
+
+For audit_log with >10M rows/month, consider range partitioning:
+
+```sql
+CREATE TABLE audit_log (
+    -- same columns as above
+) PARTITION BY RANGE (created_at);
+
+CREATE TABLE audit_log_2024_01 PARTITION OF audit_log
+    FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+
+-- Auto-create partitions with pg_partman
+CREATE EXTENSION IF NOT EXISTS pg_partman;
+SELECT create_parent('public.audit_log', 'created_at', 'native', 'monthly');
+```
+
+For outbox_events, partition by `published` status:
+
+```sql
+CREATE TABLE outbox_events (
+    -- same columns as above
+) PARTITION BY LIST (published);
+
+CREATE TABLE outbox_events_pending PARTITION OF outbox_events FOR VALUES IN (FALSE);
+CREATE TABLE outbox_events_done PARTITION OF outbox_events FOR VALUES IN (TRUE);
+```

@@ -4,6 +4,7 @@ description: Summer Framework REST patterns — handler pattern (RequestHandler,
 triggers:
   natural: ["summer handler", "request handler", "summer controller"]
   code: ["BaseController", "@Handler", "RequestHandler", "WebClientBuilderFactory"]
+requires: ["summer-core", "api-design"]
 ---
 
 # Summer REST — Handlers, WebClient & Exception Handling

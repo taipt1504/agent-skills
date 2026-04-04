@@ -4,6 +4,7 @@ description: Gate skill for Summer Framework detection and shared types. MUST lo
 triggers:
   natural: ["summer framework", "summer platform"]
   code: ["io.f8a.summer", "summer-platform"]
+requires: []
 ---
 
 # Summer Core — Gate & Shared Types

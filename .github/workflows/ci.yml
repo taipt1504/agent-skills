@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Shell Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint hook scripts
+        run: |
+          shellcheck -s bash scripts/hooks/*.sh || true
+          echo "Shellcheck complete (warnings are non-blocking for now)"
+
+  test-hooks:
+    name: Hook Tests (bats-core)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats-core
+        run: |
+          git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats
+          sudo /tmp/bats/install.sh /usr/local
+
+      - name: Run hook tests
+        run: bats tests/hooks/*.bats
+
+  test-skills:
+    name: Skill Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats-core
+        run: |
+          git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats
+          sudo /tmp/bats/install.sh /usr/local
+
+      - name: Run skill trigger tests
+        run: bats tests/skill-triggers.bats
+
+  validate-structure:
+    name: Structure Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required files exist
+        run: |
+          echo "Checking required files..."
+          MISSING=0
+          for f in CLAUDE.md QUICKSTART.md .claude-plugin/plugin.json .claude-plugin/marketplace.json config/defaults.json hooks/README.md; do
+            if [ ! -f "$f" ]; then
+              echo "MISSING: $f"
+              MISSING=$((MISSING + 1))
+            else
+              echo "OK: $f"
+            fi
+          done
+          [ "$MISSING" -eq 0 ] || (echo "$MISSING required files missing" && exit 1)
+
+      - name: Check version consistency
+        run: |
+          echo "Checking version consistency..."
+          V_CLAUDE=$(grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+' CLAUDE.md | head -1 || echo "none")
+          V_PLUGIN=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])" || echo "none")
+          V_MARKET=$(python3 -c "import json; print(json.load(open('.claude-plugin/marketplace.json'))['plugins'][0]['version'])" || echo "none")
+          V_DEFAULTS=$(python3 -c "import json; print(json.load(open('config/defaults.json'))['version'])" || echo "none")
+
+          echo "CLAUDE.md:       $V_CLAUDE"
+          echo "plugin.json:     $V_PLUGIN"
+          echo "marketplace.json:$V_MARKET"
+          echo "defaults.json:   $V_DEFAULTS"
+
+          if [ "$V_PLUGIN" != "$V_MARKET" ] || [ "$V_PLUGIN" != "$V_DEFAULTS" ]; then
+            echo "ERROR: Version mismatch detected!"
+            exit 1
+          fi
+          echo "All versions consistent: $V_PLUGIN"
+
+      - name: Check all hooks are executable
+        run: |
+          echo "Checking hook scripts..."
+          FAIL=0
+          for f in scripts/hooks/*.sh; do
+            if [ ! -x "$f" ] && [ "$(head -1 "$f")" = "#!/usr/bin/env bash" -o "$(head -1 "$f")" = "#!/bin/bash" ]; then
+              echo "WARN: $f is not executable (may need chmod +x)"
+            fi
+            # Syntax check
+            bash -n "$f" 2>/dev/null || { echo "SYNTAX ERROR: $f"; FAIL=$((FAIL + 1)); }
+          done
+          [ "$FAIL" -eq 0 ] || (echo "$FAIL scripts have syntax errors" && exit 1)
+          echo "All hook scripts pass syntax check"
+
+      - name: Check agent frontmatter has protocol reference
+        run: |
+          echo "Checking agent protocol references..."
+          MISSING=0
+          for f in agents/*.md; do
+            [ "$(basename "$f")" = "_shared-protocol.md" ] && continue
+            if ! head -30 "$f" | grep -q 'protocol:'; then
+              echo "MISSING protocol: $f"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+          [ "$MISSING" -eq 0 ] || (echo "$MISSING agents missing protocol reference" && exit 1)
+          echo "All agents reference shared protocol"

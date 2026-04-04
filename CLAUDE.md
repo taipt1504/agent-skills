@@ -1,4 +1,4 @@
-# CLAUDE.md — agent-skills v3.2
+# CLAUDE.md — agent-skills v3.2.0
 
 > Claude Code plugin for Java Spring backend development.
 > Agent = Model + Harness. This file is the harness entry point.

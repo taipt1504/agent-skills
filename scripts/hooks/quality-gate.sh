@@ -53,9 +53,9 @@ _run_with_timeout() {
 }
 
 if [ -f "gradlew" ]; then
-  RESULT=$(_run_with_timeout ./gradlew compileJava --console=plain 2>&1) || RESULT=""
+  RESULT=$(_run_with_timeout ./gradlew compileJava --console=plain --daemon 2>&1) || RESULT=""
 elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
-  RESULT=$(_run_with_timeout gradle compileJava --console=plain 2>&1) || RESULT=""
+  RESULT=$(_run_with_timeout gradle compileJava --console=plain --daemon 2>&1) || RESULT=""
 fi
 
 if [ -n "$RESULT" ]; then
@@ -99,7 +99,27 @@ if [ -f "$FILE_PATH" ]; then
   fi
 fi
 
-# --- 4. Workflow phase enforcement (standard/strict mode) ---
+# --- 4. Secret pattern scanning ---
+if [ -f "$FILE_PATH" ]; then
+  # API keys / tokens (generic patterns)
+  if grep -qE '(api[_-]?key|api[_-]?secret|access[_-]?token|secret[_-]?key|private[_-]?key)\s*=\s*"[A-Za-z0-9+/=_-]{16,}"' "$FILE_PATH" 2>/dev/null; then
+    CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}Possible hardcoded secret (API key/token) in $FILENAME — use environment variables or vault. "
+  fi
+  # AWS-style keys
+  if grep -qE 'AKIA[0-9A-Z]{16}' "$FILE_PATH" 2>/dev/null; then
+    CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}AWS Access Key ID detected in $FILENAME — remove immediately. "
+  fi
+  # Generic password in string
+  if grep -qE '(password|passwd|pwd)\s*=\s*"[^"]{8,}"' "$FILE_PATH" 2>/dev/null; then
+    HIGH_VIOLATIONS="${HIGH_VIOLATIONS}Possible hardcoded password in $FILENAME — use config/vault. "
+  fi
+  # Bearer token in code
+  if grep -qE 'Bearer\s+[A-Za-z0-9._-]{20,}' "$FILE_PATH" 2>/dev/null; then
+    HIGH_VIOLATIONS="${HIGH_VIOLATIONS}Hardcoded Bearer token in $FILENAME — use runtime injection. "
+  fi
+fi
+
+# --- 5. Workflow phase enforcement ---
 WORKFLOW_STATE="${PROJECT_ROOT}/.claude/workflow-state.json"
 if [ -f "$WORKFLOW_STATE" ]; then
   CURRENT_PHASE=$(grep -o '"phase"[[:space:]]*:[[:space:]]*"[^"]*"' "$WORKFLOW_STATE" | head -1 | sed 's/.*: *"//' | sed 's/".*//')
@@ -111,7 +131,7 @@ if [ -f "$WORKFLOW_STATE" ]; then
   fi
 fi
 
-# --- 5. Skill-aligned pattern checks ---
+# --- 6. Skill-aligned pattern checks ---
 PROFILE_FILE="${PROJECT_ROOT}/.claude/project-profile.json"
 if [ -f "$PROFILE_FILE" ] && [ -f "$FILE_PATH" ]; then
   # WebFlux: extra-aggressive .block() check (also catches blockFirst/blockLast/blockOptional)
@@ -140,6 +160,11 @@ fi
 
 if [ -n "$HIGH_VIOLATIONS" ]; then
   MSG="$(printf '%s' "[QualityGate] HIGH: ${HIGH_VIOLATIONS}" | sed 's/"/\\"/g')"
+  # Strict mode: HIGH violations also block (not just warn)
+  if [ "${STRICT_MODE:-false}" = "true" ]; then
+    printf '{"decision":"block","reason":"%s"}' "$MSG"
+    exit 2
+  fi
   printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}' "$MSG"
   exit 0
 fi

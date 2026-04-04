@@ -1,11 +1,11 @@
 ---
 name: messaging-patterns
 description: >
-  Kafka and RabbitMQ messaging patterns for Java Spring Boot 3.x. Covers producer
-  reliability, consumer patterns, exactly-once semantics, dead letter topics/queues,
-  Schema Registry with Avro, Spring Cloud Stream, and reactive messaging. Use when
-  implementing Kafka producers or consumers, RabbitMQ listeners, message-driven
-  microservices, event streaming, or configuring messaging infrastructure.
+  Kafka and RabbitMQ patterns for Spring Boot 3.x — producer reliability, consumer groups,
+  exactly-once semantics, dead letter topics/queues, Schema Registry with Avro, Spring Cloud
+  Stream, and reactive messaging. Use when writing @KafkaListener consumers, KafkaTemplate
+  producers, RabbitMQ listeners, configuring DLQ/DLT, implementing event-driven microservices,
+  or setting up message serialization with Avro/JSON schemas.
 triggers:
   natural: ["kafka consumer", "message queue", "event streaming", "rabbitmq", "dead letter"]
   code: ["@KafkaListener", "KafkaTemplate", "@RabbitListener", "RabbitTemplate"]

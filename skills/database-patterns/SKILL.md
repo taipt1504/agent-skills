@@ -1,10 +1,11 @@
 ---
 name: database-patterns
 description: >
-  Unified database patterns for Java Spring — PostgreSQL, MySQL, JPA/Hibernate, R2DBC,
-  connection pooling, and Flyway migrations. Use when designing schemas, writing Repository
-  or Entity classes, configuring SQL queries, planning migrations, tuning pool/connection
-  settings, or reviewing database-related code.
+  Database patterns for Java Spring — R2DBC (reactive), JPA/Hibernate (servlet), PostgreSQL,
+  MySQL, connection pooling (HikariCP/r2dbc-pool), Flyway migrations, and query optimization.
+  Use when writing @Entity or R2DBC models, creating Repository interfaces, writing @Query
+  methods, planning Flyway migrations, tuning connection pools, or reviewing SQL performance.
+  Includes scripts/validate-migration.sh for migration file validation.
 triggers:
   natural: ["db migration", "jpa entity", "connection pool", "query optimization", "r2dbc"]
   code: ["*Repository.java", "*Entity.java", "*.sql", "@Query"]

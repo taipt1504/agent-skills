@@ -4,6 +4,7 @@ description: Summer Framework data layer — AuditService (builder, annotation, 
 triggers:
   natural: ["audit service", "outbox pattern", "summer audit"]
   code: ["AuditService", "OutboxService", "f8a.audit"]
+requires: ["summer-core", "database-patterns"]
 ---
 
 # Summer Data — Audit, Outbox & R2DBC

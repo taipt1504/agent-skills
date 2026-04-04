@@ -1,12 +1,11 @@
 ---
 name: testing-workflow
 description: >
-  Unified testing workflow: TDD (RED/GREEN/REFACTOR), blackbox integration testing
-  with F8A Summer Test (JSON-driven test cases, WireMock, Testcontainers), and
-  7-phase verification pipeline (compile, unit, integration, coverage, security,
-  static analysis, diff review). Use when writing or modifying tests, configuring
-  JaCoCo coverage, running verification pipelines, using StepVerifier, MockMvc,
-  WebTestClient, or setting up Testcontainers.
+  Unified testing workflow — TDD (RED/GREEN/REFACTOR), blackbox integration testing with
+  F8A Summer Test (JSON test cases, WireMock, Testcontainers), and 7-phase verification
+  pipeline. Use when writing unit or integration tests, generating test scaffolds, configuring
+  JaCoCo coverage thresholds, using StepVerifier for reactive tests, MockMvc/WebTestClient
+  for API tests, or setting up Testcontainers. Includes scripts/generate-test-scaffold.sh.
 triggers:
   natural: ["write test", "tdd", "coverage", "testcontainers", "step verifier"]
   code: ["*Test.java", "StepVerifier", "@SpringBootTest", "Testcontainers"]

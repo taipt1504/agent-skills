@@ -1,6 +1,6 @@
 {
   "$schema": "./devco-config.schema.json",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "mode": "standard",
   "workflow": {
     "skipPlanConfirm": false,
@@ -17,6 +17,10 @@
   },
   "hooks": {
     "profile": "standard"
+  },
+  "traces": {
+    "retentionDays": 7,
+    "schemaVersion": 2
   },
   "team": {
     "enabled": false,

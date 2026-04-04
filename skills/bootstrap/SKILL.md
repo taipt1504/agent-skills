@@ -1,9 +1,10 @@
 ---
 name: bootstrap
 description: >
-  Core enforcement engine for devco-agent-skills plugin. Loaded automatically at session start
-  via SessionStart hook. Teaches the agent: skill discovery, workflow compliance, project detection,
-  and mandatory skill usage. This skill is the foundation — all other skills depend on it.
+  Core enforcement engine for devco-agent-skills plugin. Auto-loaded at session start via
+  SessionStart hook. Teaches skill discovery, 5-phase workflow (PLAN→SPEC→BUILD→VERIFY→REVIEW),
+  project detection, and mandatory skill usage. Foundation skill — all others depend on it.
+  Do NOT manually load; injected by the harness.
 triggers:
   natural: ["plugin status", "skill discovery", "workflow engine"]
   code: ["SessionStart"]

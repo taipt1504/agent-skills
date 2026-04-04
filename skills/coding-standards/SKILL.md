@@ -1,9 +1,10 @@
 ---
 name: coding-standards
 description: >
-  Java 17+ coding standards and patterns — KISS/DRY/SOLID principles, records, sealed classes,
-  pattern matching, naming conventions, immutability rules, Optional/Stream best practices,
-  error handling with domain exceptions, and code smells.
+  Java 17+ coding standards — records, sealed classes, pattern matching, SOLID principles,
+  naming conventions, immutability rules, Optional/Stream best practices, domain exceptions,
+  and code smell detection. Use when writing new Java classes, reviewing code quality,
+  refactoring for immutability, or enforcing naming conventions in a Spring Boot project.
 triggers:
   natural: ["naming convention", "java pattern", "code style", "immutability", "records"]
   code: ["*.java"]

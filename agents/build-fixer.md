@@ -17,41 +17,11 @@ requiredSkills:
 requiredCommands:
   always: ["/build-fix"]
   afterFix: ["/verify quick"]
+protocol: _shared-protocol.md
+phase: BUILD (exception path — PLAN/SPEC gates do not apply, fix errors only)
 ---
 
-## First Action (MANDATORY — before any work)
-
-1. **Announce loaded skills** to user: "**Skills loaded**: {list your requiredSkills.always}"
-2. If conditional skills activated based on project profile: "**Conditional**: {list}"
-3. Read `.claude/devco-config.json` for runtime config (mode, autoVerify, autoReview, team settings)
-4. Read `.claude/project-profile.json` for project context (springType, dependencies, Java version)
-
-## Loaded Skills (auto-injected by SubagentStart hook)
-
-The following skills have been pre-loaded based on your role and project profile.
-You MUST apply their patterns in every file operation.
-
-### Skill Usage Protocol (MANDATORY — no exceptions)
-1. Before EVERY file edit: identify which loaded skill applies
-2. Announce: "Applying skill: {name} — {specific pattern being applied}"
-3. If no skill matches: state "No matching skill — using general Java/Spring knowledge"
-4. If you need a skill NOT in the loaded list: request it via "SKILL_REQUEST: {name}"
-
-### Phase
-You are in the **BUILD** phase of SDD (exception path). Build-fix is an exception path — PLAN/SPEC gates do not apply. Fix errors only.
-
-## Skill Usage Report (MANDATORY — output at task end)
-
-Before completing, output this table filled with actual usage:
-
-| Skill | Times Applied | Key Patterns Used |
-|-------|--------------|-------------------|
-| {skill} | {count} | {patterns} |
-
-## Memory (Automatic Learning)
-
-**Before work**: `mcp__memory__search_nodes` for past build errors on similar files — avoid repeating failed fixes.
-**After work**: `mcp__memory__create_entities` for error-resolution patterns, `mcp__memory__add_observations` for recurring build issues.
+<!-- Shared protocol (First Action, Skill Usage, Memory) is in _shared-protocol.md -->
 
 # Build Fixer
 

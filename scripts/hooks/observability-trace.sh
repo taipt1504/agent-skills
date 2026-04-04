@@ -3,6 +3,8 @@
 # Purpose: Record structured execution traces for all tool uses
 # Trigger: PostToolUse (fires after tool execution)
 # Performance: <50ms, append-only, minimal overhead
+# Schema: v2 (added schema_version field for forward compatibility)
+# Retention: configurable via devco-config.json → traces.retentionDays (default: 7)
 
 set -o pipefail
 trap 'echo "[ObservabilityTrace] Error: $?" >&2; exit 0' ERR  # Graceful error handling - never block tool execution
@@ -17,10 +19,46 @@ TRACE_DIR=".claude/sessions"
 TRACE_FILE="$TRACE_DIR/execution-trace.jsonl"
 METRICS_FILE="$TRACE_DIR/session-metrics.json"
 
+# Schema version for forward compatibility
+TRACE_SCHEMA_VERSION="2"
+
+# Retention policy (days) — configurable via devco-config.json → traces.retentionDays
+RETENTION_DAYS=7
+if [ -f ".claude/devco-config.json" ]; then
+  _CUSTOM_RETENTION=$(_json_get ".claude/devco-config.json" "traces" "retentionDays")
+  if [ -n "$_CUSTOM_RETENTION" ] && [ "$_CUSTOM_RETENTION" -gt 0 ] 2>/dev/null; then
+    RETENTION_DAYS="$_CUSTOM_RETENTION"
+  fi
+fi
+
 # Ensure trace file and directory exist
 mkdir -p "$TRACE_DIR" 2>/dev/null || true
 touch "$TRACE_FILE"
 touch "$METRICS_FILE"
+
+# Retention cleanup: remove trace entries older than RETENTION_DAYS (run at most once per session)
+RETENTION_MARKER="$TRACE_DIR/.last-retention-check"
+if [ ! -f "$RETENTION_MARKER" ] || [ "$(find "$RETENTION_MARKER" -mtime +0 2>/dev/null)" ]; then
+  if [ "$_HAS_PYTHON3" = true ] && [ -s "$TRACE_FILE" ]; then
+    python3 -c "
+import json, sys
+from datetime import datetime, timedelta, timezone
+cutoff = datetime.now(timezone.utc) - timedelta(days=$RETENTION_DAYS)
+kept = []
+for line in open('$TRACE_FILE'):
+    line = line.strip()
+    if not line: continue
+    try:
+        entry = json.loads(line)
+        ts = datetime.fromisoformat(entry.get('ts','').replace('Z','+00:00'))
+        if ts >= cutoff: kept.append(line)
+    except: kept.append(line)
+with open('$TRACE_FILE','w') as f:
+    f.write('\n'.join(kept) + '\n' if kept else '')
+" 2>/dev/null || true
+  fi
+  touch "$RETENTION_MARKER" 2>/dev/null || true
+fi
 
 # Capture timing
 START_TIME=$(date +%s%N)
@@ -57,6 +95,7 @@ fi
 import json
 import sys
 entry = {
+    'schema_version': $TRACE_SCHEMA_VERSION,
     'ts': '$TS',
     'tool': '$TOOL_NAME',
     'file': '${FILE_PATH}',

@@ -1,8 +1,10 @@
 ---
 name: api-design
 description: >
-  REST API design patterns for Spring Boot WebFlux — HTTP methods, status codes, URL conventions,
-  RFC 7807 errors, pagination, versioning, validation, rate limiting, and OpenAPI documentation.
+  REST API design patterns for Spring Boot — HTTP methods, status codes, URL conventions,
+  RFC 7807 ProblemDetail errors, pagination, versioning, validation, and OpenAPI documentation.
+  Use when designing REST endpoints, choosing HTTP status codes, implementing error responses,
+  adding pagination to list APIs, versioning APIs, or generating OpenAPI/Swagger specs.
 triggers:
   natural: ["api design", "error format", "pagination design", "openapi", "rest conventions"]
   code: ["RFC 7807", "ProblemDetail", "OpenAPI", "Pageable"]

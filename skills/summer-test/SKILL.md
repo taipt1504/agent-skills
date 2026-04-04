@@ -4,6 +4,7 @@ description: Summer Framework testing — PostgresTestContainer setup with Flywa
 triggers:
   natural: ["summer test", "blackbox test", "summer testcontainer"]
   code: ["summer-test", "BlackboxTest", "WireMockServiceManager"]
+requires: ["summer-core", "testing-workflow"]
 ---
 
 # Summer Test — Containers, WireMock & Blackbox
