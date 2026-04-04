@@ -16,11 +16,14 @@ Explicit BUILD phase trigger. Invokes the implementer agent to follow the RED-GR
 
 ## Prerequisites
 
-- `/plan` must have been run and approved — check `.claude/docs/plans/` for an approved plan file
-- `/spec` must have been run and approved — check `.claude/docs/specs/` for an approved spec file with `status: approved`
-- If no approved spec file exists: **STOP** -- output: `"No approved spec found in .claude/docs/specs/. Run /spec first."`
-- Read `.claude/workflow-state.json` — verify SPEC phase completed (check `phaseHistory` contains a SPEC entry or `phase` is `SPEC_APPROVED`)
-- Read the spec file to get task decomposition and scenarios
+- Read `.claude/workflow-state.json`:
+  1. Verify SPEC phase completed (`phaseHistory` contains SPEC entry or `phase` is `SPEC_APPROVED`)
+  2. **Read `artifacts.spec`** — this is the exact path to the approved spec file
+  3. **Read `artifacts.plan`** — this is the exact path to the approved plan file (for reference)
+  4. If `artifacts.spec` missing: fallback to scanning `.claude/docs/specs/` for `status: approved`
+- If no approved spec found: **STOP** — output: `"No approved spec found. Run /spec first."`
+- **Read the spec file** to get task decomposition, scenarios, and `plan_ref`
+- **Validate**: spec's `plan_ref` matches `artifacts.plan` in workflow-state.json
 
 ### Workflow State on Entry
 

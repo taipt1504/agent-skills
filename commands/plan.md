@@ -143,15 +143,21 @@ When this command runs, **create or update** `.claude/workflow-state.json`:
   "startedAt": "{ISO timestamp}",
   "phaseHistory": [],
   "decisions": [],
+  "artifacts": {},
   "autoTransition": true,
   "retryCount": 0
 }
 ```
 
 When the user **approves** the plan:
-1. Update `workflow-state.json` — add `{"phase": "PLAN", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
-2. Update `phase` to `"PLAN_APPROVED"`
-3. Remind the user: **"Plan approved. Run `/spec` to define behavioral contracts."**
+1. Update `workflow-state.json`:
+   - Add `{"phase": "PLAN", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
+   - Set `phase` to `"PLAN_APPROVED"`
+   - **Set `artifacts.plan` to the plan file path** (e.g., `".claude/docs/plans/order-notification.md"`)
+2. Output to user: **"Plan approved and saved to: `.claude/docs/plans/{feature-name}.md`"**
+3. Output: **"Run `/spec` to define behavioral contracts — it will read from this plan file."**
+
+**CRITICAL**: The `artifacts.plan` field in workflow-state.json is how `/spec` finds the correct plan. Without it, the spec-writer cannot link to the plan.
 
 ## After Planning
 

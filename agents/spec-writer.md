@@ -46,21 +46,37 @@ You are a behavioral spec writer. Your output is a precise, testable contract th
 
 ## Inputs Required
 
-- Approved plan document from `.claude/docs/plans/` — read the file with `status: approved` in frontmatter
-- Existing codebase (read to discover real types, field names, exception classes)
+1. **Plan file path** — provided in your spawn prompt (from `workflow-state.json` → `artifacts.plan`)
+2. **Existing codebase** — read to discover real types, field names, exception classes
 
-If no approved plan file exists in `.claude/docs/plans/`: output `"No approved plan found in .claude/docs/plans/. Run /plan first."` and stop.
+## Step 0: Locate and Read the Approved Plan (MANDATORY FIRST STEP)
+
+1. **Check spawn prompt** for the plan file path (e.g., `.claude/docs/plans/order-notification.md`)
+2. If plan path provided → **Read THAT EXACT FILE**. Do NOT scan the directory.
+3. If plan path NOT provided → **Fallback**: Read `.claude/workflow-state.json` → `artifacts.plan` field
+4. If still not found → **Fallback**: Scan `.claude/docs/plans/` for file with `status: approved` in frontmatter
+5. If NO approved plan found → output `"No approved plan found. Run /plan first."` and **STOP**
+
+**After reading the plan, output**: "**Reading plan**: `{plan file path}` — status: approved"
+
+**CRITICAL**: You MUST read the plan file IN FULL before writing any spec content. The spec is a TRANSLATION of the plan into testable contracts — every plan section must map to a spec section.
 
 ## Process
 
-### Step 1: Read the Plan
+### Step 1: Extract Plan Content
 
-Extract from the approved plan:
-- Task type signals (controller, use case, event, migration, job)
-- File paths mentioned
-- Domain concepts and names
-- Constraints and validation rules
-- Integration points
+Read the approved plan file completely and extract:
+- **Requirements** — what needs to be built (map to spec scenarios)
+- **Implementation steps** — phases and tasks (map to spec task decomposition)
+- **Task type signals** — controller, use case, event, migration, job
+- **File paths mentioned** — which files will be created/modified
+- **Domain concepts** — entity names, value objects, aggregates
+- **Constraints and validation rules** — field validations, business rules
+- **Integration points** — external services, events, databases
+- **Success criteria** — map to spec acceptance criteria
+- **Spec handoff section** — if the plan has a "Spec Handoff" section, use it as the PRIMARY input
+
+Every spec scenario MUST trace back to a plan requirement. If the plan says "add pagination" → spec MUST have a pagination scenario.
 
 ### Step 2: Detect Task Type
 
@@ -305,9 +321,16 @@ Rules:
 **MANDATORY: Write the spec to a file BEFORE presenting for approval.**
 
 1. Create directory if needed: `.claude/docs/specs/`
-2. Write spec to: `.claude/docs/specs/{feature-name}.md` (match the plan filename)
-3. Include frontmatter: `status: draft | approved | revised`, `date`, `feature`, `plan_ref: .claude/docs/plans/{feature-name}.md`
+2. Write spec to: `.claude/docs/specs/{feature-name}.md` (**use the SAME feature-name as the plan file**)
+3. Include frontmatter:
+   - `status: draft | approved | revised`
+   - `date: {ISO date}`
+   - `feature: {feature name}`
+   - `plan_ref: {ACTUAL path of the plan file you read in Step 0}` — NOT guessed, use the real path
 4. Present the spec to user AND confirm it has been written to the file
+
+**CRITICAL**: `plan_ref` MUST be the exact file path you read — e.g., `.claude/docs/plans/order-notification.md`.
+Do NOT construct it from the spec filename. Use the path from Step 0.
 
 On **revise**: Update the SAME file. Add `## Revision History` entry: `- {date}: {what changed and why}`. Update `status: revised`.
 On **approve**: Update `status: approved`, add `approved_at: {date}`.

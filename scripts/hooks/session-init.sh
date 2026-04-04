@@ -110,6 +110,30 @@ cat > "$PROFILE_FILE" <<PROFILE_EOF
 PROFILE_EOF
 log "Project profile written → $PROFILE_FILE"
 
+# --- Ensure workflow-state.json exists (CRITICAL for phase tracking) ---
+# This is hook-enforced, not prompt-dependent. If the file doesn't exist,
+# create it with IDLE phase. /plan will update it to PLAN when it runs.
+# This guarantees all downstream hooks (workflow-tracker, quality-gate,
+# pre-compact, build-checkpoint) always have a file to read.
+WORKFLOW_FILE="${PROFILE_DIR}/workflow-state.json"
+if [ ! -f "$WORKFLOW_FILE" ]; then
+  cat > "$WORKFLOW_FILE" <<WF_EOF
+{
+  "phase": "IDLE",
+  "task": null,
+  "startedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "phaseHistory": [],
+  "decisions": [],
+  "artifacts": {},
+  "autoTransition": true,
+  "retryCount": 0
+}
+WF_EOF
+  log "Workflow state initialized (IDLE) → $WORKFLOW_FILE"
+else
+  log "Workflow state exists → phase=$(grep -o '"phase"[[:space:]]*:[[:space:]]*"[^"]*"' "$WORKFLOW_FILE" 2>/dev/null | head -1 | sed 's/.*: *"//' | sed 's/".*//')"
+fi
+
 # --- Build context output ---
 CONTEXT=""
 

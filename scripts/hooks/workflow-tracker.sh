@@ -22,8 +22,22 @@ COMMAND=$(echo "$DATA" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | h
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 WORKFLOW_FILE="$PROJECT_ROOT/.claude/workflow-state.json"
 
-# Only proceed if workflow-state.json exists
-[ -f "$WORKFLOW_FILE" ] || exit 0
+# Create workflow-state.json if missing (hook-enforced, not prompt-dependent)
+if [ ! -f "$WORKFLOW_FILE" ]; then
+  mkdir -p "$(dirname "$WORKFLOW_FILE")" 2>/dev/null || true
+  cat > "$WORKFLOW_FILE" <<WF_EOF
+{
+  "phase": "IDLE",
+  "task": null,
+  "startedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "phaseHistory": [],
+  "decisions": [],
+  "artifacts": {},
+  "autoTransition": true,
+  "retryCount": 0
+}
+WF_EOF
+fi
 
 # Detect activity type
 ACTIVITY=""

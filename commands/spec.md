@@ -10,19 +10,26 @@ Generate a behavioral specification from the approved plan. Defines observable c
 ## Prerequisites
 
 - `/plan` must have been run and approved
-- If no plan exists: **STOP** -- output: `"No approved plan found. Run /plan first."`
-- Read `.claude/workflow-state.json` — verify PLAN phase completed (check `phaseHistory` contains a PLAN entry or `phase` is `PLAN_APPROVED`)
+- Read `.claude/workflow-state.json`:
+  1. Verify PLAN phase completed (`phaseHistory` contains PLAN entry or `phase` is `PLAN_APPROVED`)
+  2. **Read `artifacts.plan`** — this is the exact path to the approved plan file
+  3. If `artifacts.plan` is missing: scan `.claude/docs/plans/` for any file with `status: approved`
+- If no approved plan found: **STOP** — output: `"No approved plan found. Run /plan first."`
+- **Validate** the plan file exists and `status: approved` in its frontmatter
 
 ## Subagent Context (pass to spawned agent)
 
 When invoking the **spec-writer** agent, include in its prompt:
 
+- **Plan file**: `"Read the approved plan at: {artifacts.plan from workflow-state.json}. This is the EXACT file you must base the spec on. Do NOT scan the directory — use THIS file."`
 - **Phase**: You are in the **SPEC** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
 - **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
 - **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first
 - **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
 - **Gate**: This is the gate between PLAN and BUILD — spec must be approved before any code is written
 - **Suggested skill**: `devco-agent-skills:api-design` for REST contract design and status code conventions
+
+**CRITICAL**: The plan file path MUST be passed to the spec-writer agent. Without it, the spec-writer cannot find the correct plan.
 
 ## Workflow
 
@@ -119,9 +126,12 @@ When this command runs, **update** `.claude/workflow-state.json`:
 - Add `{"phase": "PLAN", "completedAt": "{ISO timestamp}"}` to `phaseHistory` (if not already present)
 
 When the user **approves** the spec:
-1. Update `workflow-state.json` — add `{"phase": "SPEC", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
-2. Update `phase` to `"SPEC_APPROVED"`
-3. Remind the user: **"Spec approved. Run `/build` to start TDD implementation."**
+1. Update `workflow-state.json`:
+   - Add `{"phase": "SPEC", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
+   - Set `phase` to `"SPEC_APPROVED"`
+   - **Set `artifacts.spec` to the spec file path** (e.g., `".claude/docs/specs/order-notification.md"`)
+2. Output to user: **"Spec approved and saved to: `.claude/docs/specs/{feature-name}.md`"**
+3. Output: **"Run `/build` to start TDD implementation — it will read from this spec file."**
 
 ## Approval Protocol
 

@@ -167,8 +167,15 @@ Load skills as needed: architecture, spring-patterns, database-patterns, messagi
 ### On User Approval
 1. Update `status: approved` in frontmatter
 2. Add `approved_at: {date}` to frontmatter
-3. The file path becomes the reference for `/spec` phase
+3. **Update `.claude/workflow-state.json`** — set `artifacts.plan` to the plan file path:
+   ```json
+   "artifacts": {
+     "plan": ".claude/docs/plans/{feature-name}.md"
+   }
+   ```
+4. Output to user: **"Plan approved and saved to: `.claude/docs/plans/{feature-name}.md`"**
 
+**CRITICAL**: The `artifacts.plan` field is how `/spec` finds and reads the correct plan.
 **NEVER present a plan without writing it to `.claude/docs/plans/`. This is non-negotiable.**
 
 ## Plan Format
