@@ -1,4 +1,4 @@
-# Agent Skills v3.1.0
+# Agent Skills v3.2.0
 
 A lightweight, context-efficient [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin for **Java Spring** backend development.
 
@@ -46,11 +46,12 @@ The plugin treats the agent as `Model + Harness`. CLAUDE.md is passive (project 
 | Harness Component      | Implementation                                                                        |
 | ---------------------- | ------------------------------------------------------------------------------------- |
 | **Tool Orchestration** | 13 hooks across 7 lifecycle events, skill-router auto-matching                        |
-| **Knowledge Curation** | 19 domain skills, 3-tier lazy loading, ≤800 tokens each                               |
+| **Knowledge Curation** | 21 domain skills, 3-tier lazy loading, progressive disclosure                         |
 | **Context Management** | Token budget estimation, progressive unload warnings at 70/85/95%                     |
 | **State Persistence**  | workflow-state.json, verify-fix-state.json, build-checkpoint.json — all on disk       |
 | **Verification Loops** | Ralph Pattern: detect failure → extract error signature → retry with circuit breakers |
 | **Observability**      | execution-trace.jsonl (per-call), session-metrics.json (aggregated)                   |
+| **Evaluation**         | 9-criteria benchmark framework, 15 eval tasks, automated session scoring              |
 
 ### Hook-Bootstrapped Enforcement
 
@@ -58,7 +59,7 @@ The plugin treats the agent as `Model + Harness`. CLAUDE.md is passive (project 
 SessionStart hook → injects bootstrap/SKILL.md
   → Agent learns: search skills → announce → use → follow workflow
   → Auto-detects: Java/Spring type, Summer Framework, project structure
-  → Lazy loads: domain skills on demand, ≤800 tokens each
+  → Lazy loads: domain skills on demand, progressive disclosure
 ```
 
 ### Context Budget
@@ -109,7 +110,7 @@ State persists in `.claude/verify-fix-state.json` — survives context resets.
 ```
 agent-skills/
 ├── CLAUDE.md                          # Harness entry point (~800 tokens)
-├── skills/                            # 19 skills (flat, auto-discovered)
+├── skills/                            # 21 skills (flat, auto-discovered)
 │   ├── bootstrap/                    # Enforcement engine (SessionStart hook)
 │   ├── spring-patterns/              # MVC + WebFlux + Boot patterns
 │   ├── spring-security/              # Auth, JWT, CORS, OWASP
@@ -121,6 +122,9 @@ agent-skills/
 │   ├── api-design/                   # REST conventions, pagination, RFC 7807
 │   ├── redis-patterns/               # Caching, locking, Pub/Sub, Streams
 │   ├── observability-patterns/       # Logging, tracing, metrics, alerting
+│   ├── deployment-patterns/          # Docker, K8s, CI/CD, health probes
+│   ├── grpc-patterns/               # gRPC, protobuf, streaming, interceptors
+│   ├── pentest/                     # Security scanner, OWASP, CVE patterns
 │   ├── summer-core/                  # Summer: version detection, shared types
 │   ├── summer-rest/                  # Summer: handlers, controllers, WebClient
 │   ├── summer-data/                  # Summer: audit, outbox, R2DBC
@@ -129,6 +133,7 @@ agent-skills/
 │   ├── summer-test/                  # Summer: Testcontainers, WireMock
 │   └── continuous-learning/          # Meta: pattern extraction (on-demand)
 ├── agents/                           # 9 specialized agents
+│   ├── _shared-protocol.md          # Common agent protocol
 │   ├── planner.md                   # Architecture + planning (opus)
 │   ├── spec-writer.md               # Behavioral specs (opus)
 │   ├── implementer.md               # TDD cycle (sonnet)
@@ -139,56 +144,32 @@ agent-skills/
 │   ├── refactorer.md               # Dead code cleanup (sonnet)
 │   └── pentest.md                  # Security penetration testing (sonnet)
 ├── commands/                         # 14 slash commands
-│   ├── plan.md                      # Start planning
-│   ├── spec.md                      # Define contracts
-│   ├── build.md                     # TDD cycle
-│   ├── verify.md                    # Verification pipeline
-│   ├── dc-review.md                 # Multi-aspect review
-│   ├── dc-setup.md                  # Project install
-│   ├── dc-status.md                 # Health check + metrics
-│   ├── build-fix.md                 # Fix build errors
-│   ├── refactor.md                  # Dead code cleanup
-│   ├── db-migrate.md               # Database migrations
-│   ├── e2e.md                       # E2E test generation
+│   ├── plan.md, spec.md, build.md  # Workflow phase commands
+│   ├── verify.md, dc-review.md     # Verification + review
+│   ├── dc-setup.md, dc-status.md   # Project install + health check
+│   ├── build-fix.md, refactor.md   # Fix + cleanup
+│   ├── db-migrate.md, e2e.md       # Database + E2E tests
 │   ├── meta.md                      # learn, evolve, instinct, create-skill
 │   ├── pentest-scan.md             # Security penetration testing
 │   └── threat-model.md            # Threat modeling
+├── evals/                            # Benchmark & evaluation framework
+│   ├── tasks/                       # 15 eval tasks across 6 categories
+│   ├── rubrics/                     # 9-criteria scoring + grader prompt
+│   └── scripts/                     # Benchmark runner, session scorer, aggregator
 ├── rules/                            # 10 production-grounded rules
-│   ├── development-workflow.md
-│   ├── spec-driven.md
-│   ├── coding-style.md
-│   ├── architecture-patterns.md
-│   ├── security.md
-│   ├── git-workflow.md
-│   ├── api-design.md
-│   ├── testing.md
-│   ├── observability.md
-│   └── skill-enforcement.md
 ├── hooks/hooks.json                  # 13 hooks across 7 lifecycle events
 ├── scripts/hooks/                    # 12 hook scripts + run-with-flags
-│   ├── session-init.sh              # Bootstrap injection + project detection
-│   ├── session-save.sh              # Session persistence + auto-extract learning
-│   ├── subagent-init.sh             # Teammate context injection
-│   ├── skill-router.sh             # File→skill matching
-│   ├── quality-gate.sh             # Compile + debug check + format
-│   ├── workflow-tracker.sh          # Phase transition tracking
-│   ├── git-guard.sh                # Git operation guardrails
-│   ├── compact-advisor.sh          # Token budget estimation + progressive warnings
-│   ├── pre-compact.sh              # State checkpoint before compaction
-│   ├── post-compact.sh             # State restoration after compaction
-│   ├── verify-fix-loop.sh          # Ralph Pattern: auto-retry with circuit breakers
-│   ├── build-checkpoint.sh         # BUILD file tracking for context-reset recovery
-│   ├── observability-trace.sh      # Per-call JSONL traces + session metrics
-│   └── run-with-flags.sh           # Hook profile manager + granular disabling
 ├── scripts/memory/                   # 3-tier memory management
+├── tests/                            # Hook + skill trigger tests
 ├── config/                           # devco-config schema + defaults
 ├── templates/                        # PROJECT_GUIDELINES_TEMPLATE.md
+├── docs/                             # Design documents
 └── mcp-configs/                      # MCP server configurations
 ```
 
 ---
 
-## Skills (19)
+## Skills (21)
 
 ### Bootstrap (auto-loaded every session)
 
@@ -196,20 +177,28 @@ agent-skills/
 | ----------- | ----------------------------------------------------------------------------------------------------------------- |
 | `bootstrap` | Enforcement engine — skill discovery, workflow compliance, verify/fix loops, project detection, harness awareness |
 
-### Generic (lazy-loaded for Java/Spring projects)
+### Domain (lazy-loaded, progressive disclosure)
 
-| Skill                    | Triggers                                               |
-| ------------------------ | ------------------------------------------------------ |
-| `spring-patterns`        | Controllers, handlers, WebClient, filters, Boot config |
-| `spring-security`        | JWT, CORS, @PreAuthorize, secrets, OWASP               |
-| `database-patterns`      | Repository, Entity, SQL, migrations, R2DBC             |
-| `messaging-patterns`     | @KafkaListener, @RabbitListener, DLT/DLQ               |
-| `testing-workflow`       | Test files, coverage, verification pipeline            |
-| `coding-standards`       | Any Java file                                          |
-| `architecture`           | Package structure, CQRS, domain events                 |
-| `api-design`             | REST endpoints, pagination, error format (RFC 7807)    |
-| `redis-patterns`         | Redis, caching, locking, rate limiting                 |
-| `observability-patterns` | Logging, metrics, tracing, health checks               |
+| Skill                    | Refs | Scripts | Triggers                                               |
+| ------------------------ | ---- | ------- | ------------------------------------------------------ |
+| `spring-patterns`        | 4    | 0       | Controllers, handlers, WebClient, filters, Boot config |
+| `spring-security`        | 5    | 0       | JWT, CORS, @PreAuthorize, secrets, OWASP               |
+| `database-patterns`      | 5    | 1       | Repository, Entity, SQL, migrations, R2DBC             |
+| `messaging-patterns`     | 4    | 0       | @KafkaListener, @RabbitListener, DLT/DLQ               |
+| `testing-workflow`       | 3    | 1       | Test files, coverage, verification pipeline            |
+| `coding-standards`       | 1    | 0       | Any Java file                                          |
+| `architecture`           | 4    | 0       | Package structure, CQRS, domain events                 |
+| `api-design`             | 2    | 0       | REST endpoints, pagination, error format (RFC 7807)    |
+| `redis-patterns`         | 4    | 0       | Redis, caching, locking, rate limiting                 |
+| `observability-patterns` | 3    | 0       | Logging, metrics, tracing, health checks               |
+| `deployment-patterns`    | 4    | 1       | Dockerfile, K8s, CI/CD, health probes                  |
+| `grpc-patterns`          | 4    | 0       | Proto files, @GrpcService, streaming                   |
+
+### Security (on-demand)
+
+| Skill     | Refs | Scripts | Triggers                                         |
+| --------- | ---- | ------- | ------------------------------------------------ |
+| `pentest` | 5    | 6       | `/pentest-scan`, `/threat-model`, security audit |
 
 ### Summer Framework (hard gate: `io.f8a.summer:summer-platform` required)
 
@@ -222,21 +211,17 @@ agent-skills/
 | `summer-ratelimit` | RateLimiterService (v0.2.2+ only)        |
 | `summer-test`      | src/test/ + summer-test dependency       |
 
-### Security (on-demand)
-
-| Skill     | Triggers                                         |
-| --------- | ------------------------------------------------ |
-| `pentest` | `/pentest-scan`, `/threat-model`, security audit |
-
 ### Meta (on-demand)
 
-| Skill                 | Triggers                      |
-| --------------------- | ----------------------------- |
-| `continuous-learning` | `/meta learn`, `/meta evolve` |
+| Skill                 | Scripts | Triggers                      |
+| --------------------- | ------- | ----------------------------- |
+| `continuous-learning` | 1       | `/meta learn`, `/meta evolve` |
 
 ---
 
 ## Agents (9)
+
+All agents share a common protocol (`_shared-protocol.md`) enforcing skill usage, memory management, and workflow compliance.
 
 | Agent               | Model  | Role                                                     |
 | ------------------- | ------ | -------------------------------------------------------- |
@@ -270,7 +255,7 @@ agent-skills/
 | `skill-router`        | PreToolUse    | sync  | File→skill matching before edits                           |
 | `compact-advisor`     | PreToolUse    | sync  | Token budget estimation, progressive warnings at 70/85/95% |
 | `workflow-tracker`    | PreToolUse    | async | Phase transition tracking                                  |
-| `quality-gate`        | PostToolUse   | sync  | Compile check + debug audit + format enforcement           |
+| `quality-gate`        | PostToolUse   | sync  | Compile check + debug audit + secret scanning              |
 | `verify-fix-loop`     | PostToolUse   | sync  | Ralph Pattern: error detection → retry → circuit breaker   |
 | `build-checkpoint`    | PostToolUse   | async | Track file edits during BUILD for recovery                 |
 | `observability-trace` | PostToolUse   | async | JSONL traces + aggregated session metrics                  |
@@ -279,7 +264,38 @@ agent-skills/
 | `post-compact`        | PostCompact   | sync  | State restoration after compaction                         |
 | `session-save`        | Stop          | sync  | Session summary + auto-extract learning signal             |
 
-Granular disabling: `DISABLED_HOOKS="hook1,hook2"` env var or `devco-config.json → hooks.disabled[]`.
+---
+
+## Evaluation & Benchmarking
+
+The plugin includes a built-in evaluation framework (`evals/`) to measure agent effectiveness across **9 criteria**:
+
+| # | Criterion | Weight | What it measures |
+|---|-----------|--------|------------------|
+| 1 | Code Quality | 15% | Compile, tests, violations, coverage |
+| 2 | Convention Compliance | 10% | CLAUDE.md hard blocks (`.block()`, `@Autowired` field, etc.) |
+| 3 | Workflow Compliance | 10% | 5-phase workflow adherence |
+| 4 | Skill Utilization | 15% | Are agents using skills/commands effectively? |
+| 5 | Skill Trigger Accuracy | 10% | Right skill loaded for right task |
+| 6 | Context & Memory | 10% | Progressive disclosure, memory cross-session |
+| 7 | Task Completion | 15% | REVIEW pass rate, verify retries |
+| 8 | Execution Optimality | 10% | Tool call efficiency, recovery speed |
+| 9 | Cross-Session Memory | 5% | Recall, accuracy, knowledge graph updates |
+
+### Running Benchmarks
+
+```bash
+# Score a real session (0 extra tokens)
+python3 evals/scripts/score-session.py --project-dir /path/to/project
+
+# Full benchmark (15 tasks × N runs × with/without plugin)
+bash evals/scripts/run-benchmark.sh --project-dir /path/to/project --runs 1
+
+# Aggregate results
+python3 evals/scripts/aggregate-scores.py --results-dir evals/results/
+```
+
+15 eval tasks across 6 categories: feature development, bug fix, security review, database, deployment, TDD, refactoring, multi-skill composition, context stress testing, and cross-session memory.
 
 ---
 
@@ -345,52 +361,47 @@ claude                  # auto-prompted to install plugin
 
 ## Stack Coverage
 
-Java 17+ · Spring Boot 3.x · Spring WebFlux · Spring MVC · R2DBC · JPA/Hibernate · Kafka · RabbitMQ · Redis · PostgreSQL · MySQL · Docker · Testcontainers · Summer Framework (io.f8a.summer)
+Java 17+ · Spring Boot 3.x · Spring WebFlux · Spring MVC · R2DBC · JPA/Hibernate · Kafka · RabbitMQ · Redis · PostgreSQL · MySQL · Docker · Kubernetes · gRPC · Testcontainers · Summer Framework (io.f8a.summer)
 
 ---
 
 ## Changelog
 
+### v3.2.0 (2026-04-05)
+
+**Skill optimization + Evaluation framework** — progressive disclosure enforcement, 4 new automation scripts, benchmark system with 9-criteria scoring.
+
+#### Skill Optimization
+
+- **deployment-patterns** refactored: 305→116 lines SKILL.md + 4 reference files (dockerfile.md, kubernetes.md, cicd.md, health-probes.md) — was the worst anti-pattern, now follows gold standard
+- **3 thin references expanded**: observability/logging.md (70→208 lines with ELK/Loki), summer-data/ddl-scripts.md (92→232 lines with AuditService/OutboxService impl), summer-ratelimit/policy-examples.md (99→255 lines with distributed Redis, multi-tenant)
+- **4 automation scripts created**: `generate-test-scaffold.sh` (testing-workflow), `validate-migration.sh` (database-patterns), `generate-dockerfile.sh` (deployment-patterns), `extract-instincts.sh` (continuous-learning)
+- **13 frontmatter descriptions optimized**: all now include "Use when..." trigger scenarios for better skill routing accuracy
+- **QUICKSTART.md deleted**: not auto-loaded by Claude Code, wasted context
+
+#### Evaluation Framework (`evals/`)
+
+- **9-criteria scoring rubric**: code quality, convention compliance, workflow compliance, skill utilization effectiveness, trigger accuracy, context efficiency & memory, task completion, execution optimality, cross-session memory
+- **15 eval tasks** across 6 categories: CRUD API, bug fix, Kafka consumer, security review, DB migration, Redis caching, gRPC service, deployment, Summer rate limiting, hexagonal refactor, observability, TDD, cross-session memory, multi-skill composition, context stress
+- **3 benchmark scripts**: `score-session.py` (score real sessions from traces — 0 token cost), `run-benchmark.sh` (orchestrate with/without-plugin comparison), `aggregate-scores.py` (statistics + trend analysis)
+- **Grader agent prompt**: LLM-as-judge for qualitative criteria
+
+#### Infrastructure Improvements (from improvement plan items 2.4–5.4)
+
+- **Shared agent protocol** (`_shared-protocol.md`): extracted ~270 lines of duplicate boilerplate from 9 agents
+- **Agent frontmatter**: all agents now declare `protocol:` and `phase:` fields
+- **Quality gate**: strict mode blocking for HIGH violations + secret pattern scanning (AWS keys, API tokens, passwords, Bearer tokens)
+- **Observability traces v2**: schema versioning, configurable retention policy, automatic cleanup
+- **Skill dependencies**: all Summer skills declare `requires:` field for proper load ordering
+- **Architecture skill expanded**: 94→303 lines with full code examples (Aggregate Root, Value Objects, CQRS, Ports wiring)
+- **grpc-patterns promoted**: from docs/optional-skills/ to full skill with 4 reference files
+- **Hook tests**: 28 tests across 3 test files + stress test + CI pipeline
+- **Skill trigger tests**: 10 validation tests for skill structure compliance
+- **`.gitignore`**: runtime state files excluded
+
 ### v3.1.0 (2026-04-02)
 
 **Harness Engineering upgrade** — 3 new hooks, 4 upgraded scripts, bootstrap rewrite, rules deep upgrade, skill cross-references, interactive setup.
-
-#### Hooks & Harness
-
-- **Verify/Fix Loop** (`verify-fix-loop.sh`): Ralph Pattern — auto-detects gradle failures, extracts normalized error signatures, retries with circuit breakers (same-error escalation + max-retry force-accept)
-- **Observability Traces** (`observability-trace.sh`): Every tool call traced to JSONL, session metrics aggregated (tool distribution, skill usage, phase timing, quality gate violations)
-- **BUILD Checkpoint** (`build-checkpoint.sh`): Tracks file edits during BUILD for context-reset recovery
-- **Context Budget** (`compact-advisor.sh` v3.2): Real token estimation replacing proxy metrics, dual-triggered thresholds (call count OR budget %)
-- **Auto-Extract Learning** (`session-save.sh` v3.2): Signals productive sessions (>20 calls, >3 file changes) for pattern extraction
-- **Hook Profiles** (`run-with-flags.sh` v3.2): Granular `DISABLED_HOOKS` override, all new hooks integrated into profiles
-- **Bootstrap SKILL.md**: Added Ralph Loop, Checkpoint-Resume, Operational Awareness sections (1,700 tokens)
-- **13 hooks** across 7 lifecycle events (up from 6 hooks in v3.0)
-
-#### Rules Deep Upgrade (8 of 10 rules rewritten)
-
-Research-backed rewrite grounded in 5 core philosophies: _Explain the Why_, _Hard Blocks vs Guidance_, _Technology-Current_, _Production-Grounded_, _Cross-Referenced_.
-
-- **security**: Hard Blocks table with WHY + Fix columns, Spring Security 6.x `SecurityWebFilterChain` patterns, supply chain security (SBOM, dependency scanning), component security by layer
-- **observability**: Structured logging (JSON/ECS, Spring Boot 3.4+ config), Micrometer Observation API, cardinality management, SLO-based alerting, reactive context propagation
-- **architecture-patterns**: Hexagonal layers with WHY, DDD tactical patterns (Vaughn Vernon's 5 aggregate rules), value objects, ArchUnit enforcement with code examples
-- **testing**: Test pyramid ratios (70/20/10), TDD cycle, BlockHound setup, Testcontainers over H2, contract testing with Spring Cloud Contract
-- **coding-style**: Immutability philosophy, value object patterns, error handling in reactive chains (flatMap + Mono.error), `@ConfigurationProperties` over `@Value`
-- **api-design**: Async operations (202 Accepted + polling), idempotency keys, bulk operations (cap 100, 207 Multi-Status), enhanced 12-item checklist
-- **skill-enforcement**: Expanded registry (10 patterns with WHY column), Summer override precedence table, multi-skill loading examples
-- **git-workflow**: Conventional commits table, branch naming, 7-item PR checklist (added ArchUnit, migration expand-contract)
-
-#### Skills Improvement
-
-- **Related Skills** sections added to all 18 domain skills (cross-referencing for navigation)
-- **Rules sections** added to all 6 Summer skills (5 rules each with NEVER/WHY format)
-- **2 new reference files**: `event-architecture.md` (saga, outbox, event sourcing), `event-sourcing.md` (event store, aggregates, snapshots, projections)
-- **Token budget compliance**: All 19 skills verified within budget (bootstrap ≤1,700, domain ≤800)
-
-#### Setup & Onboarding
-
-- **Interactive config** (`setup-kit.sh`): Mode selection (standard/yolo/strict), workflow options, team features — no longer silently applies defaults
-- **Bug fixes**: Python boolean casing (`True`/`False`), Summer framework detection (`io.f8a.summer`), bash operator precedence in dependency checks
-- **`--mode` flag**: Skip interactive prompts with `--mode standard|yolo|strict`
 
 ### v3.0.3 (initial release)
 
