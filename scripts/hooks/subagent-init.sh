@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# subagent-init.sh — SubagentStart Context Injection (v3.1.1)
+# subagent-init.sh — SubagentStart Context Injection
 # =============================================================================
 # Injects skill protocol + project context into every subagent via additionalContext.
 # Fires on: SubagentStart (synchronous)
@@ -127,7 +127,7 @@ if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/agents" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Config injection for subagent (v3.1.1)
+# Config injection for subagent
 # ---------------------------------------------------------------------------
 CONFIG_FILE="${PROJECT_ROOT}/.claude/devco-config.json"
 

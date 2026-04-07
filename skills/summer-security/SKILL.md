@@ -45,16 +45,48 @@ Enforce with `@PreAuthorize("hasAnyRole(@roles.USER_VIEW)")`.
 
 Role string format: `service-name:resource:action` (e.g., `my-svc:user:view`).
 
+**7 mandatory actions** — EVERY resource MUST define all 7:
+
+| Action | Constant Suffix | Description |
+|--------|----------------|-------------|
+| `view` | `_VIEW` | Xem danh sách / chi tiết |
+| `create` | `_CREATE` | Tạo mới |
+| `update` | `_UPDATE` | Cập nhật |
+| `delete` | `_DELETE` | Xóa |
+| `approve` | `_APPROVE` | Phê duyệt |
+| `import` | `_IMPORT` | Nhập dữ liệu |
+| `export` | `_EXPORT` | Xuất dữ liệu |
+
+**FeatureDef / ResourceDef `name`** — ALWAYS Vietnamese. The `code` stays in English kebab-case.
+
 ```java
 @AuthRoles(resources = {
-    @ResourceDef(code = "my-svc", name = "My Service",
+    @ResourceDef(code = "my-svc", name = "Dịch vụ của tôi",
         attributes = @AttributeDef(key = "tier", value = "premium"),
-        features = @FeatureDef(code = "user-mgmt", name = "User Management"))
+        features = {
+            @FeatureDef(code = "user-mgmt", name = "Quản lý người dùng"),
+            @FeatureDef(code = "order-mgmt", name = "Quản lý đơn hàng")
+        })
 })
 @Component
 public class Roles {
-    public static final String USER_VIEW = "my-svc:user:view";
-    public static final String USER_EDIT = "my-svc:user:edit";
+    // user-mgmt: all 7 actions
+    public static final String USER_VIEW    = "my-svc:user:view";
+    public static final String USER_CREATE  = "my-svc:user:create";
+    public static final String USER_UPDATE  = "my-svc:user:update";
+    public static final String USER_DELETE  = "my-svc:user:delete";
+    public static final String USER_APPROVE = "my-svc:user:approve";
+    public static final String USER_IMPORT  = "my-svc:user:import";
+    public static final String USER_EXPORT  = "my-svc:user:export";
+
+    // order-mgmt: all 7 actions
+    public static final String ORDER_VIEW    = "my-svc:order:view";
+    public static final String ORDER_CREATE  = "my-svc:order:create";
+    public static final String ORDER_UPDATE  = "my-svc:order:update";
+    public static final String ORDER_DELETE  = "my-svc:order:delete";
+    public static final String ORDER_APPROVE = "my-svc:order:approve";
+    public static final String ORDER_IMPORT  = "my-svc:order:import";
+    public static final String ORDER_EXPORT  = "my-svc:order:export";
 }
 ```
 
@@ -141,6 +173,8 @@ See `references/keycloak-error-map.md` for the full KeycloakException error mapp
 
 - Always use `summerCustomizer.customize(http)` + `apisixCustomizer.customize(http)` in SecurityWebFilterChain — never manually configure CORS/CSRF/session for Summer projects.
 - Always define roles using `@AuthRoles` + `@ResourceDef` — never hardcode role strings outside the Roles class.
+- Always define ALL 7 actions (view, create, update, delete, approve, import, export) for every resource — incomplete role sets break permission UIs and audits.
+- Always use Vietnamese for `@ResourceDef(name)` and `@FeatureDef(name)` — `code` stays English kebab-case.
 - Always use `@PreAuthorize("hasAnyRole(@roles.XXX)")` for endpoint authorization — never rely solely on path matchers.
 - Never expose Keycloak client secrets in application.yml — use environment variables or Vault.
 - Always check Summer version before using group-role authorization — requires 0.2.4+.

@@ -13,6 +13,53 @@ requires: ["summer-core", "api-design"]
 
 **Module:** `summer-rest-autoconfigure` | **Config:** `f8a.common`
 
+## API Path Routing
+
+ALL APIs in Summer projects MUST use the correct path prefix based on audience:
+
+| Prefix | Audience | Auth | Description |
+|--------|----------|------|-------------|
+| `/bo/api/**` | Backoffice | Authen realm `backoffice` | Admin/CMS APIs |
+| `/internal/api/**` | Internal service | Không expose qua API Gateway | Service-to-service calls |
+| `/partner/api/**` | Partner | JWT tại gateway (tuỳ chọn) | Third-party integrations |
+| `/public/api/**` | Public | Không authen | Open APIs |
+| `/api/**` | End User | Authen realm `user` | Consumer-facing APIs |
+
+**URL structure** follows the api-design standard with prefix:
+- **Resource mapping** (controller): `/{prefix}/api/${resource}` → `@RequestMapping("/bo/api/orders")`
+- **Path APIs** (method): `/${versioning}/...` → `@GetMapping("/v1")`, `@GetMapping("/v1/{id}")`
+- **End-user** uses the standard: `/api/${resource}` → `@RequestMapping("/api/orders")`
+
+```
+# Backoffice: @RequestMapping("/bo/api/users")
+GET    /bo/api/users/v1                 # List users (backoffice)
+POST   /bo/api/orders/v1/123/approve    # Approve order
+
+# Internal: @RequestMapping("/internal/api/notifications")
+POST   /internal/api/notifications/v1   # Send notification (service-to-service)
+
+# Partner: @RequestMapping("/partner/api/products")
+GET    /partner/api/products/v1         # Partner product listing
+
+# Public: @RequestMapping("/public/api/health")
+GET    /public/api/health/v1            # Health check
+GET    /public/api/configs/v1           # Public configs
+
+# End User: @RequestMapping("/api/orders") — standard per api-design skill
+GET    /api/orders/v1               # User's orders
+POST   /api/orders/v1               # Create order
+GET    /api/orders/v1/123           # Get order by ID
+```
+
+**SecurityConfig** must whitelist by prefix:
+```java
+return http.authorizeExchange(auth -> auth
+    .pathMatchers("/actuator/**").permitAll()
+    .pathMatchers("/public/api/**").permitAll()
+    .pathMatchers("/internal/api/**").permitAll()  // Gateway blocks external access
+    .anyExchange().authenticated()).build();
+```
+
 ## Handler Pattern
 
 1. Define request DTO (with validation) + response DTO
@@ -28,12 +75,26 @@ public class CreateOrderHandler extends RequestHandler<CreateOrderRequest, Order
     public Mono<Order> handle(CreateOrderRequest req) { /* ... */ }
 }
 
-// Controller
-@RestController @RequestMapping("/api/orders")
-public class OrderController extends BaseController {
-    @PostMapping
+// Backoffice controller — /{prefix}/api/{resource}
+@RestController @RequestMapping("/bo/api/orders")
+public class BoOrderController extends BaseController {
+    @PostMapping("/v1")
     public Mono<ResponseEntity<Order>> create(@Valid @RequestBody CreateOrderRequest req) {
         return execute(req); // auto-routes to CreateOrderHandler
+    }
+
+    @PostMapping("/v1/{id}/approve")
+    public Mono<ResponseEntity<Order>> approve(@PathVariable String id) {
+        return execute(new ApproveOrderRequest(id));
+    }
+}
+
+// End-user controller — /api/{resource} (standard)
+@RestController @RequestMapping("/api/orders")
+public class OrderController extends BaseController {
+    @PostMapping("/v1")
+    public Mono<ResponseEntity<Order>> create(@Valid @RequestBody CreateOrderRequest req) {
+        return execute(req);
     }
 }
 ```
@@ -105,9 +166,11 @@ See `references/handler-examples.md` for full CRUD, pagination, and optimistic l
 
 ## Rules
 
+- Always use the correct path prefix with `/api/` segment: `/bo/api/**` (backoffice), `/internal/api/**` (internal), `/partner/api/**` (partner), `/public/api/**` (public), `/api/**` (end-user) — wrong prefix = wrong auth realm.
 - Always extend `BaseController` for REST controllers — it provides SpringBus routing.
 - Always use `RequestHandler<Req, Res>` for business logic — never put logic in controllers.
 - Always use `@Valid` on `@RequestBody` parameters.
+- Always use versioned method paths: `@GetMapping("/v1")`, `@PostMapping("/v1/{id}")` — never omit version.
 - Never throw generic exceptions — use `ViewableException` via the enum pattern (see summer-core).
 - Never return entities directly — use response DTOs.
 

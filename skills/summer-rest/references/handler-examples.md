@@ -4,13 +4,13 @@
 
 ```java
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/bo/api/users")
 @Validated
-public class UserController extends BaseController {
+public class BoUserController extends BaseController {
 
     private final UserService userService;
 
-    @GetMapping("/{id}")
+    @GetMapping("/v1/{id}")
     public Mono<ResponseEntity<User>> getUser(@PathVariable String id) {
         return userService.findById(id)
             .flatMap(responseFactory::success)
@@ -18,7 +18,7 @@ public class UserController extends BaseController {
                 .detailValue("userId", id)));
     }
 
-    @GetMapping
+    @GetMapping("/v1")
     public Mono<ResponseEntity<List<User>>> getUsers(
             @RequestParam(defaultValue = "ACTIVE") UserStatus status,
             @RequestParam(defaultValue = "0") int page,
@@ -28,12 +28,12 @@ public class UserController extends BaseController {
             .flatMap(responseFactory::success);
     }
 
-    @PostMapping
+    @PostMapping("/v1")
     public Mono<ResponseEntity<User>> createUser(@Valid @RequestBody CreateUserRequest request) {
         return execute(request); // routes to CreateUserRequestHandler
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/v1/{id}")
     public Mono<ResponseEntity<User>> updateUser(
             @PathVariable String id,
             @Valid @RequestBody UpdateUserRequest request) {
@@ -41,7 +41,7 @@ public class UserController extends BaseController {
             .flatMap(responseFactory::success);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/v1/{id}")
     public Mono<ResponseEntity<Void>> deleteUser(@PathVariable String id) {
         return userService.delete(id)
             .then(Mono.just(ResponseEntity.noContent().build()));

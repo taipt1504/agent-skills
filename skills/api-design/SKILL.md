@@ -28,17 +28,27 @@ Key status codes: 201 (Created + Location), 202 (Async accepted), 204 (No conten
 
 ## URL Conventions
 
+**Structure**: Resource mapping + versioned path
+
+- **Resource mapping** (controller level): `/api/${resource}`
+- **Path APIs** (method level): `/${versioning}/...`
+- **Full URL**: `/api/${resource}/${versioning}/...`
+
 ```
-GET    /api/v1/users              # List
-POST   /api/v1/users              # Create
-GET    /api/v1/users/123          # Get by ID
-PUT    /api/v1/users/123          # Replace
-DELETE /api/v1/users/123          # Delete
-GET    /api/v1/users/123/orders   # Nested (max 2 levels)
-POST   /api/v1/orders/123/cancel  # Action as sub-resource
+# Controller: @RequestMapping("/api/users")
+GET    /api/users/v1               # List
+POST   /api/users/v1               # Create
+GET    /api/users/v1/123           # Get by ID
+PUT    /api/users/v1/123           # Replace
+DELETE /api/users/v1/123           # Delete
+GET    /api/users/v1/123/orders    # Nested (max 2 levels)
+
+# Controller: @RequestMapping("/api/orders")
+POST   /api/orders/v1/123/cancel   # Action as sub-resource
 ```
 
 Rules: plural nouns, kebab-case, lowercase, no trailing slash, no verbs in path.
+Version belongs to the path method, NOT the resource mapping — enables per-resource version bumps.
 
 ## Error Format — RFC 7807
 
@@ -66,7 +76,7 @@ Always cap `size` at 100. Prefer cursor/keyset for APIs.
 
 ## Versioning
 
-URI path: `/api/v1/...`. v1 is forever — backward compatible. Add optional fields for minor changes. Breaking changes = new version. Use `Sunset` + `Deprecation` headers.
+Version in method path: `/api/{resource}/{version}/...`. v1 is forever — backward compatible. Add optional fields for minor changes. Breaking changes = new version per resource. Use `Sunset` + `Deprecation` headers.
 
 ## Validation & Rate Limiting
 

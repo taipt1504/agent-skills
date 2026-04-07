@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# session-init.sh — Session Start Hook (v3.1.1)
+# session-init.sh — Session Start Hook
 # =============================================================================
 # Detects project type, restores L2 memory, injects bootstrap skill.
 # Replaces: session-start.sh
@@ -192,7 +192,7 @@ fi
 [ -f "PROJECT_GUIDELINES.md" ] && CONTEXT="${CONTEXT}**Project guidelines**: \`PROJECT_GUIDELINES.md\` present — read it before starting work.\n\n"
 
 # ---------------------------------------------------------------------------
-# Config & Profile Injection (v3.1.1 — agents MUST receive config at runtime)
+# Config & Profile Injection (agents MUST receive config at runtime)
 # ---------------------------------------------------------------------------
 CONFIG_FILE="${PROJECT_ROOT}/.claude/devco-config.json"
 PROFILE_FILE_INJ="${PROJECT_ROOT}/.claude/project-profile.json"

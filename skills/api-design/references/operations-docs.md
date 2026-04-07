@@ -171,9 +171,9 @@ public Mono<ResponseEntity<BulkResult<OrderResponse>>> bulkCreate(
 ## Long-Running Operations (Async + Polling)
 
 ```
-POST /api/v1/reports → 202 Accepted + Location: /api/v1/jobs/{jobId}
-GET  /api/v1/jobs/{jobId} → {status: "PROCESSING", progress: 45}
-GET  /api/v1/jobs/{jobId} → {status: "DONE", resultUrl: "/api/v1/reports/{id}"}
+POST /api/reports/v1 → 202 Accepted + Location: /api/jobs/v1/{jobId}
+GET  /api/jobs/v1/{jobId} → {status: "PROCESSING", progress: 45}
+GET  /api/jobs/v1/{jobId} → {status: "DONE", resultUrl: "/api/reports/v1/{id}"}
 ```
 
 ```java
@@ -194,7 +194,7 @@ public Mono<ResponseEntity<Map<String, String>>> startReport(
     return jobService.submit(request)
         .map(jobId -> ResponseEntity
             .accepted()
-            .header(HttpHeaders.LOCATION, "/api/v1/jobs/" + jobId)
+            .header(HttpHeaders.LOCATION, "/api/jobs/v1/" + jobId)
             .header("Retry-After", "5")
             .body(Map.of("jobId", jobId)));
 }

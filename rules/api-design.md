@@ -8,10 +8,17 @@ globs: "*.java"
 
 ## URL Conventions
 
-- ALWAYS plural nouns: `/api/v1/orders`, `/api/v1/users`
-- ALWAYS kebab-case for multi-word: `/api/v1/order-items`
-- NEVER verbs in URLs — use HTTP methods instead (POST `/orders/123/cancel` not POST `/cancelOrder/123`)
-- NEVER nested deeper than 2 levels: `/orders/{id}/items` (max) — deeper nesting signals a missing top-level resource
+**Structure**: `Resource Mapping` + `Versioned Path`
+- Resource mapping (controller): `/api/${resource}` → `@RequestMapping("/api/orders")`
+- Path APIs (method): `/${versioning}/...` → `@GetMapping("/v1")`, `@GetMapping("/v1/{id}")`
+- Full URL: `/api/${resource}/${versioning}/...` → `/api/orders/v1`, `/api/orders/v1/{id}`
+
+**Rules:**
+- ALWAYS plural nouns: `/api/orders`, `/api/users`
+- ALWAYS kebab-case for multi-word: `/api/order-items`
+- NEVER verbs in URLs — use HTTP methods instead (POST `/api/orders/v1/123/cancel` not POST `/cancelOrder/123`)
+- NEVER nested deeper than 2 levels: `/api/orders/v1/{id}/items` (max) — deeper nesting signals a missing top-level resource
+- Version belongs to method path, NOT resource mapping — enables per-resource version bumps
 
 ## HTTP Methods & Status Codes
 
@@ -27,8 +34,8 @@ globs: "*.java"
 
 For long-running operations (>5s), return `202 Accepted` with a polling URL:
 ```
-POST /api/v1/reports → 202 Accepted
-Location: /api/v1/reports/123/status
+POST /api/reports/v1 → 202 Accepted
+Location: /api/reports/v1/123/status
 ```
 
 ## Error Responses (RFC 7807)
@@ -73,9 +80,11 @@ Mutation endpoints (POST, PATCH) should accept an `Idempotency-Key` header for s
 
 ## Versioning
 
-- PREFER URL path versioning: `/api/v1/orders` — simplest, most visible, easiest to route
+- ALWAYS version in method path: `/api/orders/v1/...` — version after resource, not before
+- Resource mapping is version-agnostic: `@RequestMapping("/api/orders")`
+- Method paths carry the version: `@GetMapping("/v1")`, `@PostMapping("/v2")`
 - Maintain backward compatibility within a version
-- Breaking changes = new version (`v2`)
+- Breaking changes = new version per resource (`v2`) — other resources stay on `v1`
 - Use `Sunset` + `Deprecation` headers when deprecating a version
 
 ## Checklist

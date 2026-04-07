@@ -87,7 +87,7 @@ private CursorPage<OrderResponse> buildPage(List<Order> items, int size) {
 Best for large datasets — uses composite index for O(log N) performance.
 
 ```java
-// URL: GET /api/v1/orders?afterId=abc&afterCreatedAt=2024-01-15T10:00:00Z&size=20
+// URL: GET /api/orders/v1?afterId=abc&afterCreatedAt=2024-01-15T10:00:00Z&size=20
 @GetMapping
 public Flux<OrderResponse> list(
         @RequestParam(required = false) String afterId,
@@ -181,7 +181,7 @@ public Flux<Order> findWithFilter(OrderFilter filter, Sort sort) {
 Reduces payload size — useful for list endpoints.
 
 ```java
-// URL: GET /api/v1/users?fields=id,email,name
+// URL: GET /api/users/v1?fields=id,email,name
 @GetMapping
 public Mono<Map<String, Object>> getUser(
         @PathVariable String id,

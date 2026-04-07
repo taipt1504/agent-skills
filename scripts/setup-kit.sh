@@ -28,6 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
 CLAUDE_DIR="$PROJECT_ROOT/.claude"
+PLUGIN_VERSION=$(python3 -c "import json; print(json.load(open('$PLUGIN_DIR/package.json'))['version'])" 2>/dev/null || grep -o '"version": *"[^"]*"' "$PLUGIN_DIR/package.json" | head -1 | grep -o '[0-9][0-9.]*' || echo "unknown")
 TOTAL_STEPS=6
 
 # Colors
@@ -608,7 +609,7 @@ if command -v python3 &>/dev/null; then
 import json
 
 profile = {
-    'version': '3.2.0',
+    'version': '$PLUGIN_VERSION',
     'buildTool': '$BUILD_TOOL',
     'springType': '$SPRING_TYPE',
     'summerFramework': $( [ \"$SUMMER\" = \"true\" ] && echo True || echo False ),
@@ -632,7 +633,7 @@ with open('$PROFILE_FILE', 'w') as f:
 else
   cat > "$PROFILE_FILE" <<PROFILEJSON
 {
-  "version": "3.1.0",
+  "version": "$PLUGIN_VERSION",
   "buildTool": "$BUILD_TOOL",
   "springType": "$SPRING_TYPE",
   "summerFramework": $( [ "$SUMMER" = "true" ] && echo true || echo false ),

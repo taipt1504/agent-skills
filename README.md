@@ -1,4 +1,4 @@
-# Agent Skills v3.2.0
+# Agent Skills
 
 A lightweight, context-efficient [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin for **Java Spring** backend development.
 
@@ -366,6 +366,15 @@ Java 17+ · Spring Boot 3.x · Spring WebFlux · Spring MVC · R2DBC · JPA/Hibe
 ---
 
 ## Changelog
+
+### v3.2.1 (2026-04-07)
+
+**Version centralization + Summer skill updates** — eliminated hardcoded version strings, standardized API path routing.
+
+- **Version management**: centralized in `package.json` + `.claude-plugin/plugin.json` only. Removed hardcoded versions from `session-init.sh`, `subagent-init.sh`, `setup-kit.sh` (now reads from `package.json` dynamically)
+- **summer-rest**: API path format corrected to `/{prefix}/api/{resource}/{version}/...` — all prefixes now include `/api/` segment (`/bo/api/**`, `/internal/api/**`, `/partner/api/**`, `/public/api/**`, `/api/**`)
+- **summer-security**: enforced 7 mandatory actions (view, create, update, delete, approve, import, export) per resource; Vietnamese names for `@FeatureDef`/`@ResourceDef`
+- **api-design**: decoupled resource mapping (`/api/{resource}`) from versioning (`/v1/...`) for per-resource version bumps
 
 ### v3.2.0 (2026-04-05)
 
