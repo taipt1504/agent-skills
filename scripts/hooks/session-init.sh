@@ -52,6 +52,11 @@ if [ -n "$BUILD_SRC" ] && [ -f "$BUILD_SRC" ]; then
     if [ -f "gradle.properties" ]; then
       SUMMER_VERSION="$(grep -oE 'summerVersion\s*=\s*[0-9.]+' gradle.properties 2>/dev/null | grep -oE '[0-9.]+' || echo "")"
     fi
+    # Fallback: scan build file for inline version declaration
+    if [ -z "$SUMMER_VERSION" ] && [ -n "$GRADLE_FILE" ]; then
+      SUMMER_VERSION="$(grep -oE 'io\.f8a\.summer:summer-platform:[0-9]+\.[0-9]+\.[0-9]+' "$GRADLE_FILE" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")"
+      [ -z "$SUMMER_VERSION" ] && SUMMER_VERSION="$(grep -oE 'io\.f8a\.summer:summer-platform:[0-9]+\.[0-9]+\.[0-9]+' "$GRADLE_FILE" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")"
+    fi
     log "Summer Framework: detected${SUMMER_VERSION:+ (v$SUMMER_VERSION)}"
   fi
 fi
@@ -83,11 +88,42 @@ if [ -z "$JAVA_PROJECT_VERSION" ] && [ -f "$PROJECT_ROOT/pom.xml" ]; then
   JAVA_PROJECT_VERSION=$(grep -oE "<maven\.compiler\.source>[0-9]+" "$PROJECT_ROOT/pom.xml" 2>/dev/null | grep -oE "[0-9]+" | head -1)
   [ -z "$JAVA_PROJECT_VERSION" ] && JAVA_PROJECT_VERSION=$(grep -oE "<java\.version>[0-9]+" "$PROJECT_ROOT/pom.xml" 2>/dev/null | grep -oE "[0-9]+" | head -1)
 fi
+# Fallback: toolchain languageVersion (may span multiple lines — use tr to flatten)
+if [ -z "$JAVA_PROJECT_VERSION" ] && [ -n "$GRADLE_FILE" ]; then
+  JAVA_PROJECT_VERSION=$(tr '\n' ' ' < "$GRADLE_FILE" 2>/dev/null \
+    | grep -oE 'toolchain\s*\{[^}]*languageVersion[^}]*\}' \
+    | grep -oE 'JavaLanguageVersion\.of\(([0-9]+)\)' \
+    | grep -oE '[0-9]+' | head -1 || echo "")
+fi
+
+# --- Dependency detection ---
+DEP_POSTGRESQL=false
+DEP_MYSQL=false
+DEP_REDIS=false
+DEP_KAFKA=false
+DEP_RABBITMQ=false
+DEP_DOCKER=false
+
+_scan_dep() {
+  local pattern="$1"
+  local build_src="${GRADLE_FILE:-}"
+  [ -z "$build_src" ] && [ -f "pom.xml" ] && build_src="pom.xml"
+  [ -n "$build_src" ] && grep -qi "$pattern" "$build_src" 2>/dev/null
+}
+
+{ _scan_dep "postgresql" || _scan_dep "r2dbc-postgresql"; } && DEP_POSTGRESQL=true || true
+{ _scan_dep "mysql" || _scan_dep "r2dbc-mysql"; } && DEP_MYSQL=true || true
+{ _scan_dep "redis" || _scan_dep "lettuce"; } && DEP_REDIS=true || true
+_scan_dep "kafka" && DEP_KAFKA=true || true
+{ _scan_dep "rabbitmq" || _scan_dep "amqp"; } && DEP_RABBITMQ=true || true
+{ _scan_dep "testcontainers" || _scan_dep "docker"; } && DEP_DOCKER=true || true
 
 # --- Write project profile (single source of truth for downstream hooks) ---
 PROFILE_DIR="${PROJECT_ROOT}/.claude"
 PROFILE_FILE="${PROFILE_DIR}/project-profile.json"
 mkdir -p "$PROFILE_DIR" 2>/dev/null || true
+mkdir -p "${PROFILE_DIR}/memory/context" 2>/dev/null || true
+mkdir -p "${PROFILE_DIR}/sessions" 2>/dev/null || true
 
 SPRING_TYPE_SHORT=""
 case "$SPRING_TYPE" in
@@ -95,8 +131,42 @@ case "$SPRING_TYPE" in
   *MVC*|*Servlet*) SPRING_TYPE_SHORT="MVC" ;;
 esac
 
+# --- Merge with existing profile (preserve non-null user-provided values) ---
+_EXISTING_SPRING_TYPE=""
+_EXISTING_SUMMER_VERSION=""
+_EXISTING_JAVA_VERSION=""
+_EXISTING_JAVA_PROJECT_VERSION=""
+if [ -f "$PROFILE_FILE" ] && command -v python3 &>/dev/null; then
+  _merge_result=$(python3 -c "
+import json, sys
+try:
+    p = json.load(open('$PROFILE_FILE'))
+    # Return pipe-delimited non-null preserved values
+    st   = p.get('springType') or ''
+    sv   = p.get('summerVersion') or ''
+    jv   = p.get('javaVersion') or ''
+    jpv  = p.get('javaProjectVersion') or ''
+    print(f'{st}|{sv}|{jv}|{jpv}')
+except Exception:
+    print('|||')
+" 2>/dev/null) || _merge_result="|||"
+  _EXISTING_SPRING_TYPE="${_merge_result%%|*}"
+  _rest="${_merge_result#*|}"
+  _EXISTING_SUMMER_VERSION="${_rest%%|*}"
+  _rest="${_rest#*|}"
+  _EXISTING_JAVA_VERSION="${_rest%%|*}"
+  _EXISTING_JAVA_PROJECT_VERSION="${_rest#*|}"
+fi
+
+# Only overwrite null values with newly detected values; prefer existing if already set
+[ -z "$SPRING_TYPE_SHORT" ] && [ -n "$_EXISTING_SPRING_TYPE" ] && SPRING_TYPE_SHORT="$_EXISTING_SPRING_TYPE"
+[ -z "$SUMMER_VERSION" ]    && [ -n "$_EXISTING_SUMMER_VERSION" ] && SUMMER_VERSION="$_EXISTING_SUMMER_VERSION"
+[ -z "$JAVA_VERSION" ]      && [ -n "$_EXISTING_JAVA_VERSION" ] && JAVA_VERSION="$_EXISTING_JAVA_VERSION"
+[ -z "$JAVA_PROJECT_VERSION" ] && [ -n "$_EXISTING_JAVA_PROJECT_VERSION" ] && JAVA_PROJECT_VERSION="$_EXISTING_JAVA_PROJECT_VERSION"
+
 cat > "$PROFILE_FILE" <<PROFILE_EOF
 {
+  "\$schema": "../config/project-profile.schema.json",
   "detectedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "projectName": "$PROJECT_NAME",
   "buildTool": "$BUILD_TOOL",
@@ -105,7 +175,15 @@ cat > "$PROFILE_FILE" <<PROFILE_EOF
   "summerVersion": $([ -n "$SUMMER_VERSION" ] && echo "\"$SUMMER_VERSION\"" || echo "null"),
   "javaVersion": $([ -n "$JAVA_VERSION" ] && echo "\"$JAVA_VERSION\"" || echo "null"),
   "javaProjectVersion": $([ -n "$JAVA_PROJECT_VERSION" ] && echo "\"$JAVA_PROJECT_VERSION\"" || echo "null"),
-  "branch": "$(printf '%s' "$BRANCH" | sed 's/"/\\"/g')"
+  "branch": "$(printf '%s' "$BRANCH" | sed 's/"/\\"/g')",
+  "dependencies": {
+    "postgresql": $DEP_POSTGRESQL,
+    "mysql": $DEP_MYSQL,
+    "redis": $DEP_REDIS,
+    "kafka": $DEP_KAFKA,
+    "rabbitmq": $DEP_RABBITMQ,
+    "docker": $DEP_DOCKER
+  }
 }
 PROFILE_EOF
 log "Project profile written → $PROFILE_FILE"
@@ -177,6 +255,18 @@ if [ "$SUMMER_DETECTED" = true ]; then
       log "Summer core skill injected ✓"
     fi
   fi
+
+  # Inject compact summaries of Summer sub-skills (trigger keywords only — load full skill on demand)
+  CONTEXT="${CONTEXT}### Summer Sub-Skills (load on demand via Skill tool)\n\n"
+  CONTEXT="${CONTEXT}| Sub-Skill | Trigger Keywords | Load When |\n"
+  CONTEXT="${CONTEXT}|-----------|-----------------|----------|\n"
+  CONTEXT="${CONTEXT}| \`summer-rest\` | BaseController, RequestHandler, @Handler, WebClientBuilderFactory | Building REST endpoints or HTTP handlers |\n"
+  CONTEXT="${CONTEXT}| \`summer-data\` | AuditService, OutboxService, f8a.audit, f8a.outbox | Audit logging, outbox/event persistence |\n"
+  CONTEXT="${CONTEXT}| \`summer-security\` | @AuthRoles, ReactiveKeycloakClient, f8a.security | Auth roles, Keycloak integration, security config |\n"
+  CONTEXT="${CONTEXT}| \`summer-ratelimit\` | RateLimiterService, f8a.rate-limiter (v0.2.2+) | Rate limiting, token bucket, throttling |\n"
+  CONTEXT="${CONTEXT}| \`summer-test\` | src/test/ + summer-test dependency | Integration/blackbox tests using Summer test utilities |\n\n"
+  CONTEXT="${CONTEXT}Load each sub-skill via: \`Skill tool \u2192 devco-agent-skills:summer-{name}\`\n\n"
+  log "Summer sub-skill summaries injected \u2713"
 fi
 
 # ---------------------------------------------------------------------------
@@ -190,6 +280,55 @@ if [ -n "$SPRING_TYPE" ]; then
 fi
 
 [ -f "PROJECT_GUIDELINES.md" ] && CONTEXT="${CONTEXT}**Project guidelines**: \`PROJECT_GUIDELINES.md\` present — read it before starting work.\n\n"
+
+# ---------------------------------------------------------------------------
+# Memory Restoration (bidirectional memory — reads session-summary.json)
+# ---------------------------------------------------------------------------
+SESSION_SUMMARY_FILE="${PROJECT_ROOT}/.claude/sessions/session-summary.json"
+if [ -f "$SESSION_SUMMARY_FILE" ] && command -v python3 &>/dev/null; then
+  MEMORY_CTX=$(python3 -c "
+import json, sys
+
+try:
+    s = json.load(open('$SESSION_SUMMARY_FILE'))
+    task  = s.get('task') or 'unknown'
+    phase = s.get('phase') or 'unknown'
+
+    # Top-3 decisions (cap each at 120 chars)
+    decisions = s.get('decisions', [])
+    top3 = [str(d)[:120] for d in decisions[:3]]
+
+    # Top-2 skills by usage count
+    skills = s.get('skillsUsed', {})
+    top_skills = sorted(skills.items(), key=lambda x: x[1], reverse=True)[:2]
+    skill_names = [k for k, _ in top_skills]
+
+    lines = []
+    lines.append('## Previous Session Context')
+    lines.append(f'- **Last Task**: {task[:200]}')
+    lines.append(f'- **Last Phase**: {phase}')
+    if top3:
+        lines.append(f'- **Key Decisions**: {chr(10).join(\"  - \" + d for d in top3)}')
+    if skill_names:
+        lines.append(f'- **Skills Used**: {chr(44).join(skill_names)}')
+    lines.append('Resume from where you left off. Check .claude/workflow-state.json for current state.')
+
+    print('\n'.join(lines))
+except Exception as e:
+    sys.stderr.write(f'[SessionInit] WARNING: Could not restore session summary: {e}\n')
+    sys.exit(1)
+" 2>/dev/null) && {
+    CONTEXT="${CONTEXT}${MEMORY_CTX}\n\n"
+    log "Previous session context restored ✓"
+  } || true
+fi
+
+# Check for pending auto-extract signal
+AUTO_EXTRACT_PENDING="${PROJECT_ROOT}/.claude/instincts/personal/.auto-extract-pending.json"
+if [ -f "$AUTO_EXTRACT_PENDING" ]; then
+  CONTEXT="${CONTEXT}> **Note**: A high-activity session was detected. Run \`/meta learn extract\` to capture patterns from last session.\n\n"
+  log "Auto-extract pending signal detected"
+fi
 
 # ---------------------------------------------------------------------------
 # Config & Profile Injection (agents MUST receive config at runtime)
@@ -208,7 +347,6 @@ try:
     mode = c.get('mode', 'standard')
     wf = c.get('workflow', {})
     team = c.get('team', {})
-    proj = c.get('project', {})
 
     lines = []
     lines.append('## Plugin Configuration (from .claude/devco-config.json)')
@@ -222,7 +360,6 @@ try:
         cost = team.get('costControl', {})
         lines.append(f'**Model Routing**: implementer={roles.get(\"implementer\",{}).get(\"model\",\"sonnet\")}, reviewer={roles.get(\"reviewer\",{}).get(\"model\",\"sonnet\")}')
         lines.append(f'**Cost Control**: preferFastModel={cost.get(\"preferFastModel\", True)}, useOpusOnlyFor={cost.get(\"useOpusOnlyFor\", [])}')
-    lines.append(f'**Project**: type={proj.get(\"type\")}, useSummer={proj.get(\"useSummer\", False)}')
     print('\n'.join(lines))
 except Exception as e:
     print(f'[SessionInit] WARNING: Could not read devco-config.json: {e}', file=sys.stderr)
@@ -289,8 +426,17 @@ if [ -n "$PROFILE_CTX" ]; then
   CONTEXT="${CONTEXT}${PROFILE_CTX}\n\n"
 fi
 
+# ---------------------------------------------------------------------------
+# Reset skills-loaded registry (tracks which skills agent has loaded this session)
+# skill-router.sh checks this file before blocking on skill load enforcement.
+# Reset here ensures every new session starts clean — no stale carry-over.
+# ---------------------------------------------------------------------------
+SKILLS_LOADED="${PROJECT_ROOT}/.claude/sessions/skills-loaded.json"
+echo "{\"skills\":[],\"resetAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$SKILLS_LOADED" 2>/dev/null || true
+log "Skills-loaded registry reset \u2713 \u2192 $SKILLS_LOADED"
+
 # Output
 printf '%b' "$CONTEXT" 2>/dev/null || true
 
-log "Session initialized ✓"
+log "Session initialized \u2713"
 exit 0

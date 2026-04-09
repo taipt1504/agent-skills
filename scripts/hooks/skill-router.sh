@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-# skill-router.sh — PreToolUse Skill Router (v3.1)
+# skill-router.sh — PreToolUse Skill Router (v3.2)
 # =============================================================================
-# Checks file→skill mapping before file operations, suggests relevant skill.
-# Uses: filename patterns → file content → natural language triggers (hardcoded).
+# Checks file→skill mapping before file operations, enforces skill loading.
+# Uses: filename patterns → directory patterns → file content → NL triggers.
 # Fires on: PreToolUse (Edit|Write|MultiEdit)
+#
+# Behavior:
+#   - If skill matched AND skill NOT in skills-loaded.json → exit 2 (block)
+#   - If skill matched AND skill already loaded → exit 0 (pass through)
+#   - If no skill matched → exit 0 (pass through)
+#
+# Registry: .claude/sessions/skills-loaded.json
+#   Updated by: session-init.sh (reset on session start)
+#   The agent's Skill tool usage is tracked externally; agents should update
+#   skills-loaded.json after loading a skill, or the next hook call will
+#   block again. This creates a soft-block loop that enforces skill loading.
 # =============================================================================
 
 source "$(dirname "$0")/run-with-flags.sh" "skill-router" || exit 0
@@ -42,6 +53,24 @@ case "$FILENAME" in
   *.sql)
     SKILL="database-patterns" ;;
 esac
+
+# Directory-based routing (fires after filename patterns, before content check)
+# Catches new/empty files where content-based routing would fail.
+if [ -z "$SKILL" ]; then
+  LOWER_DIR="$(echo "$FILE_PATH" | tr '[:upper:]' '[:lower:]')"
+  if echo "$LOWER_DIR" | grep -qE '/controller/|/handler/'; then
+    SKILL="spring-patterns"
+  elif echo "$LOWER_DIR" | grep -qE '/security/'; then
+    SKILL="spring-security"
+  elif echo "$LOWER_DIR" | grep -qE '/repository/|/entity/'; then
+    SKILL="database-patterns"
+  elif echo "$LOWER_DIR" | grep -qE '/consumer/|/producer/|/listener/'; then
+    SKILL="messaging-patterns"
+  elif echo "$LOWER_DIR" | grep -qE '/config/' && echo "$LOWER_DIR" | grep -qE 'security|auth|jwt|oauth'; then
+    SKILL="spring-security"
+  fi
+  # Note: /test/ directory matches are advisory-only (do not block test files)
+fi
 
 # Check file content for more specific routing
 if [ -z "$SKILL" ] && [ -f "$FILE_PATH" ]; then
@@ -173,11 +202,29 @@ fi
 
 if [ -n "$SKILL" ]; then
   SKILL_PATH="skills/$SKILL/SKILL.md"
-  MSG="LOAD SKILL before editing $FILENAME: Use Skill tool to load devco-agent-skills:$SKILL (or read $SKILL_PATH)"
-  # Output structured JSON with additionalContext — agent will see this
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"%s"}}' \
-    "$(printf '%s' "$MSG" | sed 's/"/\\"/g')"
-  exit 0
+
+  # --- Check loaded-skills registry ---
+  # skills-loaded.json is reset by session-init.sh on session start.
+  # Agents should update this file after loading a skill to avoid repeated blocks.
+  SKILLS_LOADED_FILE="${PROJECT_ROOT}/.claude/sessions/skills-loaded.json"
+  ALREADY_LOADED=false
+  if [ -f "$SKILLS_LOADED_FILE" ]; then
+    if grep -q "\"$SKILL\"" "$SKILLS_LOADED_FILE" 2>/dev/null; then
+      ALREADY_LOADED=true
+    fi
+  fi
+
+  if [ "$ALREADY_LOADED" = true ]; then
+    # Skill already loaded — pass through, no interruption
+    printf '%s' "$DATA"
+    exit 0
+  fi
+
+  # Skill NOT loaded — soft-block: require the agent to load the skill first
+  BLOCK_MSG="BLOCKED: Load skill '${SKILL}' before editing ${FILENAME}. Use Skill tool: devco-agent-skills:${SKILL} (path: ${SKILL_PATH}). After loading, update .claude/sessions/skills-loaded.json to acknowledge."
+  printf '{"decision":"block","reason":"%s"}' \
+    "$(printf '%s' "$BLOCK_MSG" | sed 's/"/\\"/g')"
+  exit 2
 fi
 
 # No skill match — pass through original data

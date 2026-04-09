@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/devco-agent-skills/devco-config.schema.json",
   "title": "devco-agent-skills Configuration",
-  "description": "Configuration schema for devco-agent-skills plugin (v3.1). Defines workflow behavior, team spawning, skill loading, and project settings.",
+  "description": "Configuration schema for devco-agent-skills plugin (v3.3). Defines workflow behavior, team spawning, skill loading, and hook settings. Project-specific settings live in project-profile.json.",
   "type": "object",
   "required": ["version", "mode"],
   "additionalProperties": false,
@@ -104,13 +104,19 @@
     },
     "team": {
       "type": "object",
-      "description": "Controls multi-agent team spawning and coordination. When enabled, complex tasks are decomposed and delegated to specialized teammate agents.",
+      "description": "Controls multi-agent coordination. Supports two modes: 'subagent' (stable — Agent tool with worktree isolation, independent parallel execution) and 'team' (experimental — TeamCreate with shared task list, inter-agent messaging). When enabled, complex tasks are decomposed and delegated.",
       "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Enable multi-agent team mode. When true, the lead agent can spawn specialized teammates (implementer, reviewer, tester) for parallel execution.",
+          "description": "Enable multi-agent mode. When true, the lead agent can spawn specialized agents for parallel execution.",
           "default": false
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["subagent", "team"],
+          "description": "Multi-agent coordination mode. 'subagent' (default, stable): Uses Agent tool with isolation:worktree for safe parallel file edits. Agents report results to parent only — no inter-agent communication. Best for independent TDD modules. 'team' (experimental): Uses TeamCreate + TaskCreate for shared task list and inter-agent messaging via SendMessage. Agents can coordinate directly. Shared working directory (no worktree). Best for interdependent work requiring negotiation. Requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1.",
+          "default": "subagent"
         },
         "maxTeammates": {
           "type": "integer",
@@ -167,28 +173,21 @@
         }
       }
     },
-    "project": {
+    "traces": {
       "type": "object",
-      "description": "Project-specific settings detected or configured during /dc-setup.",
+      "description": "Observability trace settings.",
       "additionalProperties": false,
       "properties": {
-        "type": {
-          "type": ["string", "null"],
-          "enum": ["spring-webflux", "spring-mvc", "spring-mixed", null],
-          "description": "Detected or manually set project type. Determines which skills and patterns are loaded. null means auto-detect on next session start.",
-          "default": null
+        "retentionDays": {
+          "type": "integer",
+          "description": "Number of days to retain trace files.",
+          "default": 7,
+          "minimum": 1
         },
-        "useSummer": {
-          "type": "boolean",
-          "description": "Whether this project uses the Summer Framework (io.github.anthropic.summer). Enables Summer-specific skills (summer-core, summer-rest, summer-data, summer-security, summer-test, summer-ratelimit).",
-          "default": false
-        },
-        "stack": {
-          "type": "object",
-          "description": "Detected technology stack components. Keys are technology names, values are version strings or boolean flags. Populated during /dc-setup auto-detection.",
-          "additionalProperties": {
-            "type": ["string", "boolean"]
-          }
+        "schemaVersion": {
+          "type": "integer",
+          "description": "Trace schema version for migration compatibility.",
+          "default": 2
         }
       }
     }

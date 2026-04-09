@@ -5,6 +5,34 @@ description: Run build, test, lint, security, and static analysis pipeline. Mode
 
 # /verify -- Build + Test + Security Pipeline
 
+## First Action (MANDATORY)
+
+Before anything else, update the workflow state:
+
+```bash
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+mkdir -p "$PROJECT_ROOT/.claude"
+python3 -c "
+import json, datetime, os
+path = os.environ['PROJECT_ROOT'] + '/.claude/workflow-state.json'
+state = {}
+if os.path.exists(path):
+    with open(path) as f:
+        state = json.load(f)
+now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+state['phase'] = 'VERIFY'
+state.setdefault('phaseHistory', [])
+already = any(e.get('phase') == 'BUILD' for e in state['phaseHistory'])
+if not already:
+    state['phaseHistory'].append({'phase': 'BUILD', 'completedAt': now})
+state['retryCount'] = 0
+with open(path, 'w') as f:
+    json.dump(state, f, indent=2)
+    f.write('\n')
+print('workflow-state.json updated: phase=VERIFY')
+" 2>/dev/null || echo "workflow-state.json update skipped"
+```
+
 > **AUTO-CONTINUATION RULE — READ FIRST**
 > After verification PASSES:
 > 1. **IMMEDIATELY** invoke `/dc-review` — do NOT ask, do NOT wait

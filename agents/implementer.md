@@ -24,6 +24,10 @@ requiredCommands:
   onFail: ["/build-fix"]
 protocol: _shared-protocol.md
 phase: BUILD
+spawnTemplate:
+  description: "Implement: {task_title}"
+  model: "sonnet"
+  prompt: "You are an implementer. Task: {task_description}. Spec: {spec_path}. Follow TDD (RED→GREEN→REFACTOR). Load skills: coding-standards, testing-workflow, spring-patterns. No .block() in src/main/. No git commit."
 ---
 
 <!-- Shared protocol (First Action, Skill Usage, Memory) is in _shared-protocol.md -->

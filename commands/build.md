@@ -5,6 +5,34 @@ description: TDD cycle command -- explicit BUILD phase trigger. Invokes implemen
 
 # /build -- TDD Implementation Cycle
 
+## First Action (MANDATORY)
+
+Before anything else, update the workflow state:
+
+```bash
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+mkdir -p "$PROJECT_ROOT/.claude"
+python3 -c "
+import json, datetime, os
+path = os.environ['PROJECT_ROOT'] + '/.claude/workflow-state.json'
+state = {}
+if os.path.exists(path):
+    with open(path) as f:
+        state = json.load(f)
+now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+state['phase'] = 'BUILD'
+state.setdefault('phaseHistory', [])
+already = any(e.get('phase') == 'SPEC' for e in state['phaseHistory'])
+if not already:
+    state['phaseHistory'].append({'phase': 'SPEC', 'completedAt': now})
+state['retryCount'] = 0
+with open(path, 'w') as f:
+    json.dump(state, f, indent=2)
+    f.write('\n')
+print('workflow-state.json updated: phase=BUILD')
+" 2>/dev/null || echo "workflow-state.json update skipped"
+```
+
 > **AUTO-CONTINUATION RULE — READ FIRST**
 > After ALL tasks complete and tests pass:
 > 1. **IMMEDIATELY** invoke `/verify full` — do NOT ask, do NOT wait
@@ -38,6 +66,63 @@ Update `.claude/workflow-state.json`:
 /build <task#>      -> start from specific task number in decomposition
 /build continue     -> resume BUILD from last completed task
 ```
+
+## Multi-Agent Evaluation (when team.enabled = true)
+
+Before starting BUILD, check if parallel execution is appropriate:
+
+1. Read `.claude/devco-config.json` → `team.enabled` and `team.mode`
+2. If `enabled: false` → proceed with single-agent BUILD (below)
+3. If `enabled: true` → read the approved spec and count independent tasks
+4. If spec has **≥2 independent tasks** AND estimated total change is **>50 lines**:
+   - You become the **coordinator** — do NOT implement yourself
+   - Check `team.mode` to determine spawning strategy (see below)
+   - After all agents complete → run `/verify full` → `/dc-review`
+5. If spec has **1 task** OR change is small → proceed with single-agent BUILD
+
+### Mode: `subagent` (default, stable)
+
+Each agent gets an **isolated git worktree** — safe for parallel file edits. Agents are independent and report results to you only.
+
+```
+Agent({
+  description: "Implement: {task title from spec}",
+  prompt: "Implement task from spec at {artifacts.spec path}. Task: {task description}. Follow TDD: RED→GREEN→REFACTOR. Load devco-agent-skills:coding-standards and devco-agent-skills:testing-workflow. No .block() in src/main/, no git commit.",
+  model: "{team.roles.implementer.model, default: sonnet}",
+  isolation: "worktree",
+  run_in_background: true
+})
+```
+
+### Mode: `team` (experimental)
+
+Agents share a **working directory** and a **task list**. They can message each other via `SendMessage`.
+
+```
+# 1. Create team
+TeamCreate({ team_name: "build-{feature}", description: "TDD for {feature}" })
+
+# 2. Create tasks
+TaskCreate({ subject: "{task title}", description: "{task description}" })
+
+# 3. Spawn teammates
+Agent({
+  description: "Implement: {task title}",
+  prompt: "You are a teammate. Read task via TaskGet. TDD. Mark done via TaskUpdate.",
+  team_name: "build-{feature}",
+  name: "impl-{N}",
+  model: "{team.roles.implementer.model, default: sonnet}",
+  run_in_background: true
+})
+```
+
+### Which mode to use?
+
+| Scenario | Mode | Why |
+|----------|------|-----|
+| Independent modules (separate files) | `subagent` | Worktree isolation prevents conflicts |
+| Shared domain model needing coordination | `team` | Agents negotiate interfaces via messaging |
+| First time / unsure | `subagent` | Stable, safe default |
 
 ## Subagent-per-Task Isolation
 

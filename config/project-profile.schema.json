@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/devco-agent-skills/project-profile.schema.json",
+  "title": "devco-agent-skills Project Profile",
+  "description": "Auto-detected project metadata written by session-init.sh and setup-kit.sh. Serves as the single source of truth for project context consumed by all downstream hooks and skills.",
+  "type": "object",
+  "required": ["projectName", "buildTool"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for editor validation and autocompletion."
+    },
+    "detectedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this profile was last written by session-init.sh."
+    },
+    "projectName": {
+      "type": "string",
+      "description": "Basename of the project root directory."
+    },
+    "buildTool": {
+      "type": "string",
+      "enum": ["Gradle Wrapper (./gradlew)", "Gradle", "Maven Wrapper (./mvnw)", "Maven", "unknown"],
+      "description": "Detected build tool for this project."
+    },
+    "springType": {
+      "type": ["string", "null"],
+      "enum": ["WebFlux", "MVC", null],
+      "description": "Detected Spring framework type. 'WebFlux' for reactive projects, 'MVC' for servlet-based projects, null if not detected.",
+      "default": null
+    },
+    "summer": {
+      "type": "boolean",
+      "description": "Whether the Summer Framework (io.f8a.summer) is detected in the project's build file.",
+      "default": false
+    },
+    "summerVersion": {
+      "type": ["string", "null"],
+      "description": "Detected Summer Framework version (e.g. '1.2.3'). Null if Summer is not used or version cannot be detected.",
+      "default": null
+    },
+    "javaVersion": {
+      "type": ["string", "null"],
+      "description": "OS-level Java runtime version string as reported by 'java -version' (e.g. '17.0.9'). Null if Java is not found.",
+      "default": null
+    },
+    "javaProjectVersion": {
+      "type": ["string", "null"],
+      "description": "Java version configured in the project's build file (e.g. sourceCompatibility, toolchain languageVersion). Null if not configured explicitly.",
+      "default": null
+    },
+    "branch": {
+      "type": "string",
+      "description": "Current git branch name at the time of detection. 'detached' if in detached HEAD state. Empty string if not a git repo.",
+      "default": ""
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "Boolean flags for detected infrastructure dependencies, scanned from the project's build file.",
+      "additionalProperties": false,
+      "properties": {
+        "postgresql": {
+          "type": "boolean",
+          "description": "True if postgresql or r2dbc-postgresql dependency detected.",
+          "default": false
+        },
+        "mysql": {
+          "type": "boolean",
+          "description": "True if mysql or r2dbc-mysql dependency detected.",
+          "default": false
+        },
+        "redis": {
+          "type": "boolean",
+          "description": "True if redis or lettuce dependency detected.",
+          "default": false
+        },
+        "kafka": {
+          "type": "boolean",
+          "description": "True if kafka dependency detected.",
+          "default": false
+        },
+        "rabbitmq": {
+          "type": "boolean",
+          "description": "True if rabbitmq or amqp dependency detected.",
+          "default": false
+        },
+        "docker": {
+          "type": "boolean",
+          "description": "True if testcontainers or docker dependency detected.",
+          "default": false
+        }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "description": "Additional detected stack information. Keys are technology names, values are version strings or boolean flags. Populated during /dc-setup auto-detection.",
+      "additionalProperties": {
+        "type": ["string", "boolean"]
+      }
+    }
+  }
+}

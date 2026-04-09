@@ -128,7 +128,8 @@ Does this look correct? Any changes needed?
 ## Important Notes
 
 - **Hooks are auto-registered** by the Claude Code plugin system from `hooks/hooks.json`. Do NOT copy hooks into `.claude/settings.json` — the plugin system handles this.
-- **project-profile.json** and **devco-config.json** must be in sync — detected stack info should populate both files.
+- **Config separation (v3.3+)**: Project detection results (build tool, Spring type, dependencies, Summer version, Java version) are written exclusively to `project-profile.json`. Plugin behavior settings (mode, workflow, team) are written exclusively to `devco-config.json`. Do NOT write project detection data into `devco-config.json`.
+- **project-profile.json** is the single source of truth for project context. All downstream hooks (quality-gate, skill-router, subagent-init) read from it. The `project.*` block in `devco-config.json` has been removed in v3.3.
 - **Safe to re-run** — setup-kit.sh is idempotent, won't overwrite user customizations.
 
 ## Quick Re-run (after plugin update)

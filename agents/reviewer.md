@@ -19,6 +19,10 @@ requiredCommands:
   always: ["/dc-review"]
 protocol: _shared-protocol.md
 phase: REVIEW
+spawnTemplate:
+  description: "Review: {feature_name}"
+  model: "sonnet"
+  prompt: "You are a code reviewer. Review changes for: {feature_name}. Run git diff, classify files, apply all checklists. Load skills: coding-standards, spring-patterns. Two-stage: spec compliance first, then code quality."
 ---
 
 <!-- Shared protocol (First Action, Skill Usage, Memory) is in _shared-protocol.md -->

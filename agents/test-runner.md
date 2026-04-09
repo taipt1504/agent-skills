@@ -19,6 +19,10 @@ requiredCommands:
   always: ["/e2e", "/verify"]
 protocol: _shared-protocol.md
 phase: VERIFY
+spawnTemplate:
+  description: "E2E test: {feature_name}"
+  model: "sonnet"
+  prompt: "You are a test runner. Run E2E/integration tests for: {feature_name}. Use Testcontainers. Load skills: testing-workflow. Report pass/fail with coverage."
 ---
 
 <!-- Shared protocol (First Action, Skill Usage, Memory) is in _shared-protocol.md -->

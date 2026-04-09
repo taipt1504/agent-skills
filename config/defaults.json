@@ -1,6 +1,6 @@
 {
   "$schema": "./devco-config.schema.json",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "mode": "standard",
   "workflow": {
     "skipPlanConfirm": false,
@@ -24,6 +24,7 @@
   },
   "team": {
     "enabled": false,
+    "mode": "subagent",
     "maxTeammates": 4,
     "spawnStrategy": "smart",
     "roles": {
@@ -35,10 +36,5 @@
       "preferFastModel": true,
       "useOpusOnlyFor": ["plan", "spec", "architecture"]
     }
-  },
-  "project": {
-    "type": null,
-    "useSummer": false,
-    "stack": {}
   }
 }

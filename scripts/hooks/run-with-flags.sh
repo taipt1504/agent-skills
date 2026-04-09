@@ -20,7 +20,8 @@
 #   minimal:  session-init, session-save, subagent-init
 #   standard: + skill-router, quality-gate, compact-advisor, git-guard,
 #               pre-compact, post-compact, workflow-tracker,
-#               verify-fix-loop, build-checkpoint, observability-trace
+#               verify-fix-loop, build-checkpoint, observability-trace,
+#               workflow-gate, workflow-phase-lock
 #   strict:   all standard hooks + STRICT_MODE flag (quality-gate blocks
 #             on HIGH violations, not just CRITICAL; mandatory spec compliance)
 #
@@ -89,15 +90,15 @@ case "$_HOOK_PROFILE" in
     _ENABLED_HOOKS="session-init session-save subagent-init"
     ;;
   standard)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace workflow-gate workflow-phase-lock memory-gate team-spawn-evaluator"
     ;;
   strict)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace workflow-gate workflow-phase-lock memory-gate team-spawn-evaluator"
     export STRICT_MODE=true
     ;;
   *)
     # Unknown profile → fall back to standard (not all-enabled)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace workflow-gate workflow-phase-lock memory-gate team-spawn-evaluator"
     ;;
 esac
 

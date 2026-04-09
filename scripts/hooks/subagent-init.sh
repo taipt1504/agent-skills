@@ -95,12 +95,19 @@ if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/agents" ]; then
       | grep -oE '"[^"]*"' | tr -d '"' | tr '\n' ' ')
 
     if [ -n "$ALWAYS_SKILLS" ]; then
-      # Inject skill summaries for this agent's required skills
+      # Inject skill summaries for this agent's required skills.
+      # Extract first 15 lines after frontmatter — key patterns without bloating context.
       for SKILL_NAME in $ALWAYS_SKILLS; do
         SKILL_FILE="${PLUGIN_ROOT}/skills/${SKILL_NAME}/SKILL.md"
         if [ -f "$SKILL_FILE" ]; then
-          # Extract first 30 lines as summary (skip frontmatter)
-          SKILL_SUMMARY=$(sed -n '/^---$/,/^---$/d; 1,30p' "$SKILL_FILE" 2>/dev/null | head -30 | tr '\n' ' ' | sed 's/"/\\"/g')
+          # Skip YAML frontmatter (between --- delimiters), then take first 15 content lines.
+          # Uses awk so frontmatter of any length is handled correctly.
+          SKILL_SUMMARY=$(awk '
+            /^---$/ { if (in_fm==0) { in_fm=1; next } else { in_fm=0; fm_done=1; next } }
+            fm_done && count<15 { print; count++ }
+          ' in_fm=0 fm_done=0 count=0 "$SKILL_FILE" 2>/dev/null \
+            | sed 's/"/\\"/g' \
+            | tr '\n' ' ')
           CTX="${CTX}\n### Loaded Skill: ${SKILL_NAME}\n${SKILL_SUMMARY}\n"
         fi
       done
@@ -124,6 +131,34 @@ if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/agents" ]; then
       # doesn't pass agent name. Let conditional resolution use project-profile.
     fi
   done
+fi
+
+# ---------------------------------------------------------------------------
+# Session summary injection (bidirectional memory for subagents)
+# ---------------------------------------------------------------------------
+SESSION_SUMMARY_FILE="${PROJECT_ROOT}/.claude/sessions/session-summary.json"
+if [ -f "$SESSION_SUMMARY_FILE" ] && command -v python3 &>/dev/null; then
+  SUMMARY_CTX=$(python3 -c "
+import json, sys
+try:
+    s = json.load(open('$SESSION_SUMMARY_FILE'))
+    task  = s.get('task') or 'unknown'
+    phase = s.get('phase') or 'unknown'
+    skills = s.get('skillsUsed', {})
+    top_skills = sorted(skills.items(), key=lambda x: x[1], reverse=True)[:2]
+    skill_str = ', '.join(k for k, _ in top_skills) if top_skills else 'none'
+    lines = [
+        '\n## Parent Session Context',
+        f'Last task: {str(task)[:150]}',
+        f'Last phase: {phase}',
+        f'Top skills: {skill_str}',
+        'Check .claude/workflow-state.json if resuming existing work.',
+    ]
+    print('\n'.join(lines))
+except Exception as e:
+    sys.stderr.write(f'[SubagentInit] WARNING: Could not read session-summary: {e}\n')
+" 2>/dev/null) || true
+  [ -n "$SUMMARY_CTX" ] && CTX="${CTX}${SUMMARY_CTX}\n"
 fi
 
 # ---------------------------------------------------------------------------

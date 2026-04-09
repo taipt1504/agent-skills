@@ -653,38 +653,8 @@ PROFILEJSON
 fi
 
 pass "project-profile.json written"
-
-# --- Sync detected values into devco-config.json project section ---
-if [ -f "$CONFIG_FILE" ] && command -v python3 &>/dev/null; then
-  python3 -c "
-import json
-
-with open('$CONFIG_FILE', 'r') as f:
-    config = json.load(f)
-
-# Map detected spring type to config project.type
-spring_map = {'webflux': 'spring-webflux', 'mvc': 'spring-mvc', 'unknown': None}
-config.setdefault('project', {})
-config['project']['type'] = spring_map.get('$SPRING_TYPE', None)
-config['project']['useSummer'] = $( [ \"$SUMMER\" = \"true\" ] && echo True || echo False )
-config['project']['stack'] = {
-    'buildTool': '$BUILD_TOOL',
-    'javaVersion': '$JAVA_VERSION',
-    'javaProjectVersion': '$JAVA_PROJECT_VERSION' if '$JAVA_PROJECT_VERSION' else None,
-    'postgresql': $( $HAS_POSTGRES && echo True || echo False ),
-    'mysql': $( $HAS_MYSQL && echo True || echo False ),
-    'redis': $( $HAS_REDIS && echo True || echo False ),
-    'kafka': $( $HAS_KAFKA && echo True || echo False ),
-    'rabbitmq': $( $HAS_RABBITMQ && echo True || echo False ),
-    'docker': $( $HAS_DOCKER && echo True || echo False )
-}
-
-with open('$CONFIG_FILE', 'w') as f:
-    json.dump(config, f, indent=2)
-    f.write('\n')
-"
-  pass "devco-config.json project section synced with detected stack"
-fi
+# Note: project settings are stored exclusively in project-profile.json (v3.3+).
+# devco-config.json no longer contains a project section.
 
 # ---------------------------------------------------------------------------
 # Step 4: Plugin Registration

@@ -34,6 +34,17 @@ You are a behavioral spec writer. Your output is a precise, testable contract th
 
 **After reading the plan, output**: "**Reading plan**: `{plan file path}` — status: approved"
 
+**Multi-service detection (after reading the plan):**
+
+5. Scan the plan for the presence of a `## Service Impact Map` section
+6. If found → set `spec_mode = multi` — this plan spans multiple services
+7. If not found → set `spec_mode = single` — proceed with existing single-service flow unchanged
+
+**Output for multi-service:**
+"**Multi-service plan detected**: {N} services identified — {list service names from Service Impact Map}
+Spec generation order: {provider} (provider) → {consumer} (consumer)
+Will produce {N} coordinated specs."
+
 **CRITICAL**: You MUST read the plan file IN FULL before writing any spec content. The spec is a TRANSLATION of the plan into testable contracts — every plan section must map to a spec section.
 
 ## Process
@@ -53,6 +64,29 @@ Read the approved plan file completely and extract:
 
 Every spec scenario MUST trace back to a plan requirement. If the plan says "add pagination" → spec MUST have a pagination scenario.
 
+### Step 1a: Extract Contract Registry (multi-service mode only)
+
+When `spec_mode = multi`, extract from the plan's cross-service sections:
+
+**From `## Cross-Service Integration Points`:**
+- All API endpoint paths, methods, request/response schemas
+- All event topic names, event class names, payload field names
+- All shared DTO class names and field definitions
+
+**From `## Dependency Direction`:**
+- Provider service(s) → generate their specs FIRST
+- Consumer service(s) → generate their specs SECOND, referencing provider contracts
+
+**Build a Contract Registry (in-memory for this session):**
+
+| Contract Type | Key | Owner | Details |
+|--------------|-----|-------|---------|
+| REST Endpoint | `POST /api/v1/xxx` | service-a | request: {...}, response: {...} |
+| Event | `topic-name` / `XxxEvent` | service-a | payload: {...} |
+| Shared DTO | `XxxDto` | shared | fields: [...] |
+
+This registry is the **single source of truth**. Every spec MUST use values from this registry — no deviation. If the plan specifies a field name, the spec uses that EXACT field name.
+
 ### Step 2: Detect Task Type
 
 | Signal | Type |
@@ -64,6 +98,12 @@ Every spec scenario MUST trace back to a plan requirement. If the plan says "add
 | `@Scheduled`, cron, job, batch, `*Job.java` | Background Job |
 | Multiple signals | Mixed — generate one spec per component |
 
+**Multi-service override:** If `spec_mode = multi`, detect task type **per service** independently using the plan's `## Spec Handoff → Per-Service Spec Scope`. Each service may have a different task type:
+- {service-a}: REST Endpoint (exposes API)
+- {service-b}: Messaging (consumes event)
+
+Process each service through Steps 3-7 independently, in provider-first order from the Dependency Direction.
+
 ### Step 3: Read the Codebase
 
 Before writing specs, grep/read to discover:
@@ -74,6 +114,28 @@ Before writing specs, grep/read to discover:
 - Existing test patterns for naming conventions
 
 Do not invent names. Use what is already in the code.
+
+### Step 3a: Read Related Service Codebases (multi-service mode only)
+
+For each service in the plan's `## Service Impact Map` that is NOT the current project:
+
+**Mandatory reading order (R5 compliance):**
+1. Read **all CLAUDE.md files** — a project may have multiple (`{service-root}/CLAUDE.md`, `{service-root}/.claude/CLAUDE.md`, subdirectory CLAUDE.md files)
+2. Read **only memory-related folders** under `{service-root}/.claude/` — scan for folders whose name contains "memory" (e.g., `memory/`, `agent-memory/`, `project-memory/`). Load all contents of matching folders. Do NOT load other `.claude/` folders.
+3. Read ONLY the source files named in the plan's Integration Points section:
+   - API contract: the specific `*Controller.java` or `*Handler.java`
+   - Event schema: the specific `*Event.java` file
+   - Shared DTOs: the specific record/DTO files
+
+**Hard stops:**
+- NEVER glob or grep across `{service-root}/src/` or any broad directory
+- NEVER read more files than needed to ground the contract in actual types
+- NEVER write to any file in a related service
+- If a file doesn't exist yet (new feature), use Contract Registry values from the plan
+
+**After reading:**
+- Update Contract Registry with actual class names, package paths, exception types
+- Note discrepancies between plan's stated contracts and existing code
 
 ### Step 4: Generate the Spec
 
@@ -311,6 +373,24 @@ On **revise**: Update the SAME file. Add `## Revision History` entry: `- {date}:
 On **approve**: Update `status: approved`, add `approved_at: {date}`.
 On **reject**: Update `status: rejected`. Return to /plan.
 
+**On approve (multi-service):** For each spec:
+1. Update `status: approved` and `approved_at: {date}` in each spec file
+2. Update `workflow-state.json`:
+   - Set `artifacts.spec` to the FIRST spec path (provider spec) — backward compatibility
+   - Set `artifacts.specs` to the ordered array of ALL spec paths:
+     ```json
+     "artifacts": {
+       "spec": ".claude/docs/specs/{feature}-{service-a}.md",
+       "specs": [
+         ".claude/docs/specs/{feature}-{service-a}.md",
+         ".claude/docs/specs/{feature}-{service-b}.md"
+       ]
+     }
+     ```
+   - Add `{"phase": "SPEC", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
+   - Set `phase` to `"SPEC_APPROVED"`
+3. Output: **"All {N} specs approved. Run `/build` to implement {service-a} spec first."**
+
 ```
 SPEC REVIEW
 
@@ -325,6 +405,66 @@ Approve this spec? (approve / revise / reject)
 Do not proceed to BUILD until the user responds with "approve".
 
 **NEVER present a spec without writing it to `.claude/docs/specs/`. This is non-negotiable.**
+
+### Step 8: Multi-Spec Sequential Generation (multi-service mode only)
+
+**For each service in spec_generation_order (provider first):**
+
+1. Execute Steps 3-7 scoped to this service's task type and components
+2. Enhance the spec with these additional sections:
+
+   #### `## Cross-Service Dependencies` (append to every multi-service spec)
+
+   ```markdown
+   ## Cross-Service Dependencies
+
+   ### Provided to other services
+   | Contract | Type | Consumer | Reference |
+   |----------|------|----------|-----------|
+   | `POST /api/v1/xxx` | REST Endpoint | {service-b} | See: integration_ref |
+   | `topic-name` | Kafka Event | {service-b} | Event: XxxEvent |
+
+   ### Required from other services
+   | Contract | Type | Provider | Reference |
+   |----------|------|----------|-----------|
+   | `yyy.events` | Kafka Event | {service-a} | Event: YyyEvent |
+   ```
+
+   #### Frontmatter additions for multi-service specs:
+   ```yaml
+   service: {service-name}
+   integration_ref:
+     - .claude/docs/specs/{feature-name}-{other-service}.md
+   contract_version: v1
+   ```
+
+3. Write the spec to `.claude/docs/specs/{feature-name}-{service-name}.md`
+
+**Cross-Reference Pass (MANDATORY — after all N specs are written):**
+
+1. Read all N spec files just written
+2. For every event topic: verify producer spec and consumer spec use IDENTICAL topic name, event class name, and payload fields
+3. For every endpoint: verify path, method, and response schema match between provider and consumer specs
+4. For every shared DTO: verify field names and types are identical across all specs
+5. If ANY mismatch found: fix it in the affected spec file and log: "**Contract fix**: {spec}: {correction}"
+6. Output: "**Cross-reference pass**: {N} contracts verified, {M} fixes applied"
+
+**Present ALL specs for approval together:**
+
+```
+MULTI-SPEC REVIEW
+
+Specs generated:
+1. .claude/docs/specs/{feature}-{service-a}.md — {service-a} ({task-type})
+2. .claude/docs/specs/{feature}-{service-b}.md — {service-b} ({task-type})
+
+Cross-reference pass: {N} contracts verified, {M} fixes applied.
+
+Approve all specs? (approve / revise [spec-number] / reject)
+- approve  -> all specs approved, proceed to BUILD
+- revise N -> update spec N, re-run cross-reference pass
+- reject   -> return to /plan
+```
 
 ## Quality Checks Before Presenting
 

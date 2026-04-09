@@ -71,15 +71,20 @@ Match file patterns against loaded skill frontmatter descriptions. Each skill's 
 
 ```
 PLAN → SPEC → BUILD (TDD) → VERIFY → REVIEW
+                    ↓              ↓
+             VERIFY_PENDING  REVIEW_PENDING
+             (guard state)   (guard state)
 ```
 
 Phase transitions write to `.claude/workflow-state.json`:
-- `/plan` → phase:PLAN → user approves → remind `/spec`
-- `/spec` → phase:SPEC → user approves → remind `/build`
-- `/build` → phase:BUILD → tests pass → AUTO `/verify` (if config.workflow.autoVerify)
+- `/plan` → phase:PLAN → user approves → phase:PLAN_APPROVED → remind `/spec`
+- `/spec` → phase:SPEC → user approves → phase:SPEC_APPROVED → remind `/build`
+- `/build` → phase:BUILD → tests pass → **hook auto-sets VERIFY_PENDING** → AUTO `/verify` (if config.workflow.autoVerify)
   - **BUILD failure** → Verify/Fix Loop activates → `/build-fix` → re-run `/verify` (max 3 retries)
-- `/verify` → phase:VERIFY → all green → AUTO `/dc-review` (if config.workflow.autoReview)
-- `/dc-review` → phase:REVIEW → 0 CRITICAL → TASK COMPLETE
+- **VERIFY_PENDING** → workflow-gate BLOCKS all src/main/ writes → agent MUST run `/verify`
+- `/verify` → phase:VERIFY → all green → **hook auto-sets REVIEW_PENDING** → AUTO `/dc-review` (if config.workflow.autoReview)
+- **REVIEW_PENDING** → workflow-gate BLOCKS all src/main/ writes → agent MUST run `/dc-review`
+- `/dc-review` → phase:REVIEW → 0 CRITICAL → phase:COMPLETE → TASK COMPLETE
 
 ### workflow-state.json Structure
 
@@ -93,20 +98,31 @@ Phase transitions write to `.claude/workflow-state.json`:
     {"phase": "SPEC", "completedAt": "2026-04-01T10:15:00Z"}
   ],
   "decisions": [],
+  "artifacts": {
+    "plan": ".claude/docs/plans/order-notification.md",
+    "spec": ".claude/docs/specs/order-notification.md"
+  },
   "autoTransition": true,
-  "retryCount": 0
+  "retryCount": 0,
+  "skipCondition": false
 }
 ```
+
+Valid `phase` values: `IDLE`, `PLAN`, `PLAN_APPROVED`, `SPEC`, `SPEC_APPROVED`, `BUILD`, `VERIFY_PENDING`, `VERIFY`, `REVIEW_PENDING`, `REVIEW`, `COMPLETE`
+
+`skipCondition: true` bypasses the workflow-gate for trivial ≤5-line fixes (all 4 skip criteria must be met).
 
 ### Phase Rules
 
 | Phase | Entry | Agent | Exit | Auto-Transition |
 |-------|-------|-------|------|-----------------|
-| **PLAN** | User task or `/plan` | planner | User approves plan | → remind `/spec` |
-| **SPEC** | `/spec` after plan approved | spec-writer | User approves spec | → remind `/build` |
-| **BUILD** | After spec approved | implementer (1 subagent per task) | All tests pass | → AUTO `/verify full` |
-| **VERIFY** | Auto after build or `/verify` | (pipeline) | All checks pass | → AUTO `/dc-review` |
-| **REVIEW** | Auto after verify or `/dc-review` | reviewer | No blocking issues | → TASK COMPLETE |
+| **PLAN** | User task or `/plan` | planner | User approves plan | → PLAN_APPROVED → remind `/spec` |
+| **SPEC** | `/spec` after plan approved | spec-writer | User approves spec | → SPEC_APPROVED → remind `/build` |
+| **BUILD** | After spec approved | implementer (1 subagent per task) | All tests pass | → **VERIFY_PENDING** (hook) → AUTO `/verify full` |
+| **VERIFY_PENDING** | Auto after BUILD success | (guard) | `/verify` invoked | → VERIFY (workflow-gate blocks src/main/ writes) |
+| **VERIFY** | Auto after VERIFY_PENDING or `/verify` | (pipeline) | All checks pass | → **REVIEW_PENDING** (hook) → AUTO `/dc-review` |
+| **REVIEW_PENDING** | Auto after VERIFY success | (guard) | `/dc-review` invoked | → REVIEW (workflow-gate blocks src/main/ writes) |
+| **REVIEW** | Auto after REVIEW_PENDING or `/dc-review` | reviewer | No blocking issues | → COMPLETE |
 
 ### Skip Condition
 
@@ -181,17 +197,93 @@ See `config/defaults.json` for all defaults. Key workflow settings:
 | `workflow.maxIterationsPerPhase` | `10` | Absolute ceiling per phase |
 | `workflow.noProgressThreshold` | `3` | Same error N times → escalate |
 
-## Agent Team Support
+## Multi-Agent Support
 
-Main agent = Team Lead — orchestrates, never implements. PLAN + SPEC always solo.
+Two modes for parallel execution, configured via `team.mode` in `devco-config.json`:
 
-**Spawn conditions** (ALL must be true): `team.enabled`, `project-profile.json` exists, phase = BUILD, spec has ≥2 independent tasks, total change >50 lines, under `maxTeammates`.
+### Mode 1: Subagents (default, stable) — `team.mode: "subagent"`
 
-**Model routing**: planner/spec-writer → opus. implementer/reviewer/tester/build-fixer → sonnet (overridable via config).
+Independent agents with **worktree isolation**. Each agent gets an isolated copy of the repo.
+Best for: independent TDD modules that don't need to coordinate with each other.
 
-**Teammate rules**: TDD first, announce skill, scope-locked files only, no git commits, report completion.
+```
+Agent({
+  description: "Implement: {task title}",
+  prompt: "Implement task from spec at {artifacts.spec}. TDD: RED->GREEN->REFACTOR. Load devco-agent-skills:coding-standards. No .block(), no git commit.",
+  model: "{team.roles.implementer.model}",
+  isolation: "worktree",
+  run_in_background: true
+})
+```
 
-See [references/workflow-details.md](references/workflow-details.md) for spawn matrix, model routing, context injection, and agent×skill×command matrix.
+**Key properties:**
+- `isolation: "worktree"` — safe parallel file edits (each agent has own git worktree)
+- `run_in_background: true` — concurrent execution
+- Agents report results to parent only — **no inter-agent communication**
+- After completion: merge worktree changes -> `/verify full` -> `/dc-review`
+
+### Mode 2: Agent Teams (experimental) — `team.mode: "team"`
+
+Coordinated agents with **shared task list** and **inter-agent messaging**.
+Best for: interdependent work where agents need to negotiate interfaces.
+Requires: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.
+
+```
+# Step 1: Create team
+TeamCreate({ team_name: "build-{feature}", description: "TDD for {feature}" })
+
+# Step 2: Create tasks from spec
+TaskCreate({ subject: "{task title}", description: "{task description}" })
+
+# Step 3: Spawn teammates
+Agent({
+  description: "Implement: {task title}",
+  prompt: "You are a teammate. Read task via TaskGet. TDD. Mark done via TaskUpdate.",
+  team_name: "build-{feature}",
+  name: "impl-{N}",
+  model: "{team.roles.implementer.model}",
+  run_in_background: true
+})
+```
+
+**Key properties:**
+- Shared working directory — **partition files by ownership** (no worktree)
+- Teammates can `SendMessage` to each other for interface negotiation
+- Shared `TaskList` — teammates self-claim available tasks
+- After completion: `/verify full` -> `/dc-review` -> `TeamDelete`
+
+### When to Spawn (ALL must be true)
+
+1. `team.enabled == true` in `devco-config.json`
+2. `project-profile.json` exists
+3. Current phase is BUILD
+4. Spec has >=2 independent tasks
+5. Estimated total change >50 lines
+6. Current agent count < `team.maxTeammates`
+
+### Choosing the Mode
+
+| Scenario | Use | Why |
+|----------|-----|-----|
+| Independent modules (separate packages/files) | `subagent` | Worktree isolation prevents conflicts |
+| Shared domain model (entity + repo + service) | `team` | Agents need to negotiate interfaces |
+| First time / unsure | `subagent` | Stable, safe default |
+
+### Model Routing
+
+| Role | Default | Override |
+|------|---------|---------|
+| planner, spec-writer | opus | `team.costControl.useOpusOnlyFor` |
+| implementer | sonnet | `team.roles.implementer.model` |
+| reviewer | sonnet | `team.roles.reviewer.model` |
+| tester | sonnet | `team.roles.tester.model` |
+
+### After Parallel BUILD Completes
+
+1. Collect/merge results from all agents
+2. Run `/verify full` (covers all agents' work)
+3. Run `/dc-review` (unified review)
+4. Only after REVIEW passes is the task complete
 
 ## Harness Engineering — Operational Awareness
 
@@ -210,6 +302,25 @@ Warnings at 70% / 85% / 95% of budget. Act on warnings promptly — context rot 
 
 On session end, if >20 tool calls AND >3 file changes, a signal file is written to `.claude/instincts/personal/.auto-extract-pending.json`. On next session start, consider running `/meta learn extract` to capture patterns from the productive session.
 
+### Required Skills by Phase
+
+| Phase | Mandatory Skills | Reason |
+|-------|-----------------|--------|
+| PLAN | architecture, api-design | Hexagonal structure, REST contract design |
+| SPEC | testing-workflow, api-design | Test case mapping, endpoint contracts |
+| BUILD | coding-standards, spring-patterns, testing-workflow | Code quality, framework patterns, TDD |
+| VERIFY | (none — pipeline-driven) | Automated checks, no skill needed |
+| REVIEW | coding-standards, spring-patterns + conditional | All quality checklists |
+
+During BUILD, also load domain-specific skills matching files being touched:
+- Database files → database-patterns
+- Messaging files → messaging-patterns
+- Security files → spring-security
+- Redis files → redis-patterns
+- Summer files → summer-core + relevant summer-* sub-skill
+
+**Skill Enforcement Gate**: The hook `skill-router.sh` will BLOCK file edits if the required skill has not been loaded. After loading a skill via the Skill tool, update `.claude/sessions/skills-loaded.json` to acknowledge (append the skill name to the `"skills"` array). This unblocks further edits.
+
 ## Skill Loading Protocol
 
 ```
@@ -220,4 +331,5 @@ On-demand    → load when touching relevant files:
   2. Match file patterns → skill from registry above
   3. Load that skill's SKILL.md (≤800 tokens each)
   4. Load references/*.md ONLY when deep detail needed
+  5. After loading, register in .claude/sessions/skills-loaded.json
 ```
