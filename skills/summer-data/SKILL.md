@@ -1,17 +1,20 @@
 ---
 name: summer-data
-description: Summer Framework data layer — AuditService (builder, annotation, convenience methods), OutboxService (transactional outbox with scheduler and circuit breaker), R2DBC converters, table validators, and DDL scripts for audit_log and outbox_events.
+description: Summer Framework data layer — AuditService (builder, annotation, convenience methods), OutboxService (transactional outbox with scheduler or Debezium CDC, retry + backoff, circuit breaker, KafkaOutboxPublisher), kafka-consumer LSN-watermark idempotency (0.3.1+), R2DBC converters, table validators, and DDL scripts for audit_log and outbox_events.
 triggers:
-  natural: ["audit service", "outbox pattern", "summer audit"]
-  code: ["AuditService", "OutboxService", "f8a.audit"]
+  natural: ["audit service", "outbox pattern", "summer audit", "debezium cdc", "kafka consumer idempotency", "outbox publisher"]
+  code: ["AuditService", "OutboxService", "OutboxEventPublisher", "OutboxConsumerIdempotency", "DebeziumCdcEventDispatcher", "KafkaOutboxPublisher", "f8a.audit", "f8a.outbox", "f8a.kafka.consumer"]
 requires: ["summer-core", "database-patterns"]
 ---
 
 # Summer Data — Audit, Outbox & R2DBC
 
-**Gate:** Verify summer-core is loaded and io.f8a.summer:summer-platform is in build.gradle before proceeding.
+**Gate:** Verify summer-core is loaded and `io.f8a.summer:summer-platform` is in build.gradle before proceeding.
 
-**Modules:** `summer-data-autoconfigure` | `summer-data-audit-autoconfigure` | `summer-data-outbox-autoconfigure`
+**Modules:** `summer-data-autoconfigure` | `summer-data-audit-autoconfigure` | `summer-data-outbox-autoconfigure` | `summer-data-r2dbc` | `summer-kafka-consumer` (0.3.1+) | `summer-kafka-consumer-autoconfigure` (0.3.1+)
+
+**This SKILL.md tracks LATEST stable schema (0.3.2).** For older versions load the matching
+overlay from [references/versions/](references/versions/).
 
 ## AuditService
 
@@ -72,41 +75,115 @@ f8a:
     validate-on-startup: true
 ```
 
-## OutboxService
+## OutboxService (current — 0.3.x canon)
 
-Transactional outbox with scheduled publishing, circuit breaker, and cleanup.
+Transactional outbox with two publish modes — **scheduler** (poll the table) and **CDC**
+(stream WAL via Debezium). Both modes share the same retry+backoff machinery, monitoring, and
+cleanup.
 
 ```java
-// 1. Implement publisher
-@Component
-public class KafkaPublisher implements OutboxEventPublisher {
-    public Mono<Void> publish(OutboxEvent event) { /* send to broker */ }
-    public String getPublisherName() { return "kafka"; }
-}
-
-// 2. Save in business logic
+// 1. Save in your business transaction (R2DBC).
 outboxService.saveEvent("ORDER_CREATED", orderId, payloadJson);
+
+// 2. (Optional) override the built-in publisher.
+@Bean
+OutboxEventPublisher customPublisher() { ... }
 ```
 
-### Config
+### Built-in `KafkaOutboxPublisher` (0.3.1+)
 
-Non-obvious keys (scheduler cron expressions use sensible defaults):
+Auto-wired when `KafkaTemplate` is on the classpath and `f8a.outbox.publisher.queue=kafka`
+(default). Removes ~50 lines of boilerplate from each service. Disable by setting `queue` to any
+non-`kafka` value (or by providing your own `OutboxEventPublisher` bean — auto-config backs off).
 
 ```yaml
 f8a:
   outbox:
-    enabled: true                        # default: true
+    enabled: true                        # default: true; false disables module entirely
     publisher:
-      batch-size: 100                    # events per scheduler run
-    scheduler:
-      cleanup:
-        retention-days: 30               # days to keep published events
-      failed-events:
-        max-retry-threshold: 5           # stop retrying after N failures
+      queue: kafka                       # selects KafkaOutboxPublisher (default)
+      mode: scheduler                    # scheduler | cdc
+      topic-prefix: ""                   # prepended to event topic
+      scheduler:
+        cron: "0/5 * * * * ?"            # poll cadence
+        batch-size: 100
+      cdc:                               # only when mode=cdc
+        bootstrap-servers: ${KAFKA_BOOTSTRAP}    # defaults to spring.kafka.bootstrap-servers
+        offset-storage-topic: debezium.outbox.offsets
+        offset-storage-replication-factor: 3
+        schema-history-topic: debezium.schema.history
+        topic-prefix: ${SVC}             # was database-server-name pre-0.3.1
+        publish-timeout: 30s             # Duration (was *-seconds long pre-0.3.1)
+    retry:
+      max-attempts: 5
+      initial-interval: 1s
+      multiplier: 2.0
+      max-interval: 60s
+      poll-interval: 10s                 # retry-task cadence
+      batch-size: 100
+    cleanup:
+      cron: "0 0 0 * * ?"
+      retention: 30d                     # Duration (was retention-days int pre-0.2.8)
+    monitoring:
+      cron: "0 0 * * * ?"
     circuit-breaker:
-      failure-rate-threshold: 50         # % failures to open circuit
-      wait-duration-seconds: 60          # open→half-open wait
+      failure-rate-threshold: 50
+      minimum-events: 10
+      wait-duration: 60s                 # Duration (was wait-duration-seconds pre-0.2.8)
+      sliding-window-size: 100
 ```
+
+CDC requires `wal_level=logical` on PostgreSQL and Debezium dependencies on the classpath. Only
+one CDC instance per replication slot — use `scheduler` for multi-instance deployments. The CDC
+storage moved JDBC → Kafka in 0.3.1, and (since 0.3.2) inherits SASL/SSL from `spring.kafka.*`.
+
+### Schema columns (0.3.x)
+
+`outbox_events` adds `next_retry_at TIMESTAMPTZ` (0.2.8) and `lsn BIGINT` (0.3.1):
+
+```sql
+ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS lsn BIGINT;
+```
+
+`OutboxRetryTask` re-emits the same `ob.lsn` Kafka header on retry to keep consumer watermarks
+consistent (CDC-mode only). Existing pre-0.3.1 events with `NULL` lsn fall back to old
+epoch-nanos behaviour.
+
+### Kafka header `ob.lsn` is binary (0.3.1+)
+
+Header is 8-byte big-endian binary. Consumers bind `@Header Long lsn` directly via Spring
+Messaging's default `byte[] → Long` converter. Pre-0.3.1 services emitted UTF-8 decimal strings
+and produced wrong values under `@Header Long` — recompile against 0.3.1 to fix.
+
+`OutboxEventPublisher.publish(event, headers)` takes `Map<String, byte[]>` (was
+`Map<String, String>` pre-0.3.1). Custom publishers: drop any `.getBytes(UTF_8)` calls — values
+are already bytes.
+
+## Kafka Consumer Idempotency (0.3.1+)
+
+`summer-kafka-consumer` introduces LSN-watermark-based dedup. Replaces per-event dedup tables
+with a single row per `(consumer_group, topic, partition)` — matches Kafka's native
+offset-tracking granularity, scales with topic-partition count instead of message volume.
+Schema: `outbox_consumer_watermark` (see `docs/HOW_WE_IDEMPOTENCY_ON_CONSUMER.md` in Summer
+docs).
+
+```java
+@KafkaListener(topics = "orders.created")
+Mono<Void> onOrderCreated(OrderCreatedEvent event,
+                           @Header Long lsn,
+                           ConsumerRecord<?, ?> record) {
+    var ctx = consumerCtx.from(record, lsn);
+    return idempotency.isProcessed(ctx)
+        .flatMap(seen -> seen
+            ? Mono.empty()
+            : process(event)
+                .then(idempotency.recordProcessed(ctx)))
+        .as(transactionalOperator::transactional);
+}
+```
+
+Config block `f8a.kafka.consumer.{idempotency.{enabled, validate-on-startup}, retry.{max-attempts, initial-interval, multiplier, max-interval, dlt-suffix}}`.
 
 ## R2DBC Converters
 
@@ -114,9 +191,17 @@ Auto-configured (`SummerR2dbcAutoConfiguration`). Registers R2DBC converters for
 
 ## Version Notes
 
-- **0.2.1:** `auditNonEntity` param order changed: `(intent, action, comment)` -> `(action, intent, comment)`; `auditCustom()` deprecated in favor of `audit(AuditLog)` builder; `@Audit` on Flux now audits once after completion (bug fix); `@Audit` on Mono fixed double-subscribe; `AbstractTableValidator` base class added; embedded Flyway scripts deleted; `BusinessChange` model deleted; `f8a.outbox.validate-schema` / `f8a.audit.validate-schema` removed (auto-detected)
+Headline only — load the matching overlay for full per-version detail:
 
-See `references/ddl-scripts.md` for `audit_log` and `outbox_events` table DDL.
+- **0.3.2** — Debezium Kafka storage inherits SASL/SSL from `spring.kafka.*`; Swagger BOM aligned. See [versions/0.3.2.md](references/versions/0.3.2.md).
+- **0.3.1** — Outbox config reshape (BREAKING): scheduler / CDC nested; Debezium storage JDBC → Kafka (BREAKING); `KafkaOutboxPublisher` auto-wired by default; outbox publish headers `Map<String, byte[]>` (BREAKING); CDC `lsn BIGINT` column preserved across retries; new `summer-kafka-consumer` module — LSN-watermark idempotency. See [versions/0.3.1.md](references/versions/0.3.1.md).
+- **0.2.8** — Outbox `id` UUID → Ufid; Debezium CDC mode added; unified retry+backoff in both modes; `OutboxProperties` redesign (BREAKING — Duration types, scheduler/cleanup/monitoring grouping); `next_retry_at` column. See [versions/0.2.8.md](references/versions/0.2.8.md).
+- **0.2.1** — `auditNonEntity` arg order change (BREAKING); `audit(AuditLog)` builder; `auditCustom()` deprecated; `@Audit` on Flux fix (audit once post-complete); double-subscribe fix on Mono; `AbstractTableValidator` base; embedded Flyway scripts removed (use your own); `BusinessChange` model deleted; `validate-schema` props removed (auto-detected). See [versions/0.2.1.md](references/versions/0.2.1.md).
+
+See [references/ddl-scripts.md](references/ddl-scripts.md) for `audit_log`, `outbox_events`, and
+(0.3.1+) `outbox_consumer_watermark` DDL.
+
+For the full feature × version table see [`summer-core/references/version-matrix.md`](../summer-core/references/version-matrix.md).
 
 ## Rules
 
