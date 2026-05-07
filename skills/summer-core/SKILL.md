@@ -10,7 +10,7 @@ requires: []
 # Summer Core — Gate & Shared Types
 
 Reactive Spring Boot 3.x library (Java 21+) on WebFlux + Reactor Netty.
-**Group:** `io.f8a.summer` | **BOM:** `summer-platform`
+**Group:** `io.f8a.summer` | **BOM:** `summer-platform` | **Latest stable:** 0.3.3 (2026-05-07)
 
 ## Hard Gate
 
@@ -19,27 +19,50 @@ Check `build.gradle` or `pom.xml` for `io.f8a.summer:summer-platform`.
 
 ## Version Detection
 
-1. Read `gradle.properties` → `version=X.Y.Z`
-2. Check `build.gradle` for `summer-platform` version
-3. Pattern detection: `SummerGlobalExceptionHandler` → 0.2.1+ | `RateLimiterService` → 0.2.2+ | `sync-role.enabled` (not
-   `.enable`) → 0.2.3+ | `GroupRoleResolver` or `group-role-authorization` → 0.2.4+
+1. Read `gradle.properties` → `version=X.Y.Z`.
+2. Check `build.gradle` for `summer-platform` version.
+3. Pattern detection — primary signals:
+
+   | Signal | Version |
+   |---|---|
+   | `Provider.issuerUri` config field / `BROADCAST_SCOPE` | 0.3.3+ |
+   | `MultiRealmAuthenticationConverter` / `providers.<id>` schema | 0.3.2+ |
+   | `summer-kafka-consumer` artifact / `KafkaOutboxPublisher` auto-bean | 0.3.1+ |
+   | `JwtBlacklistChecker` / `blacklist-prefix-key` | 0.3.0+ |
+   | `OutboxProperties.Cdc` (nested) / `f8a.outbox.publisher.mode: cdc` | 0.2.8+ |
+   | `@Compact` (not `@Hex`) / `@TX` (not `@TXN`) | 0.2.6+ |
+   | `Ufid` / `summer-payment-sdk` artifact | 0.2.5+ |
+   | `GroupRoleResolver` / `group-role-authorization` | 0.2.4+ |
+   | `keycloak.*` shared block (not under `sync-role.*`) | 0.2.4+ |
+   | `sync-role.enabled` (not `.enable`) | 0.2.3+ |
+   | `RateLimiterService` | 0.2.2+ |
+   | `SummerGlobalExceptionHandler` / `summer-jwt-resource-server` | 0.2.1+ |
+
 4. If unclear → ask the user. Never guess.
 
-## Module Overview
+When the detected version is older than the latest stable, load the matching
+`<skill>/references/versions/<version>.md` overlay alongside the canonical `SKILL.md`. See
+[references/version-matrix.md](references/version-matrix.md) for the full feature × version table.
 
-| Module                             | Config Prefix                                                  | Activation [^1]                                  |
-|------------------------------------|----------------------------------------------------------------|--------------------------------------------------|
-| `summer-rest-autoconfigure`        | `f8a.common`                                                   | Auto                                             |
-| `summer-data-autoconfigure`        | —                                                              | Auto                                             |
-| `summer-data-audit-autoconfigure`  | `f8a.audit`                                                    | Auto                                             |
-| `summer-data-outbox-autoconfigure` | `f8a.outbox`                                                   | `f8a.outbox.enabled=true` (default)              |
-| `summer-security-autoconfigure`    | `f8a.security.apisix.resource-server`                          | `enabled=true` (default since 0.2.3)             |
-| `summer-ratelimit-autoconfigure`   | `f8a.rate-limiter`                                             | Auto (0.2.2+ only)                               |
-| `summer-keycloak` (client)         | —                                                              | Manual bean creation                             |
-| `summer-keycloak` (role sync)      | `f8a.security.apisix.resource-server.sync-role`                | When `keycloak.server-url` is non-blank (0.2.4+) |
-| `summer-keycloak` (group-role)     | `f8a.security.apisix.resource-server.group-role-authorization` | `enabled=true` (0.2.4+)                          |
+## Module Overview (current — 0.3.x)
+
+| Module                             | Config Prefix                                                                    | Activation [^1]                                  |
+|------------------------------------|----------------------------------------------------------------------------------|--------------------------------------------------|
+| `summer-rest-autoconfigure`        | `f8a.common`                                                                     | Auto                                             |
+| `summer-data-autoconfigure`        | —                                                                                | Auto                                             |
+| `summer-data-audit-autoconfigure`  | `f8a.audit`                                                                      | Auto                                             |
+| `summer-data-outbox-autoconfigure` | `f8a.outbox.publisher.{queue, scheduler.*, cdc.*}` (0.3.1+)                      | `f8a.outbox.enabled=true` (default)              |
+| `summer-kafka-consumer-autoconfigure` (0.3.1+) | `f8a.kafka.consumer.{idempotency.*, retry.*}`                        | Auto when `summer-kafka-consumer` on classpath   |
+| `summer-security-autoconfigure`    | `f8a.security.apisix.resource-server.providers.<id>` (0.3.0+)                    | `enabled=true` (default since 0.2.3)             |
+| `summer-ratelimit-autoconfigure`   | `f8a.rate-limiter`                                                               | Auto (0.2.2+ only)                               |
+| `summer-keycloak` (client)         | —                                                                                | Manual bean creation                             |
+| `summer-keycloak` (role sync)      | `f8a.security.apisix.resource-server.sync-role: <provider-id>` (0.3.2+)          | When `sync-role` points to a provider (0.3.2+)   |
+| `summer-keycloak` (group-role)     | per-provider `group-role-authorization: true` + global `group-role-authorization.*` (0.3.2+) | `true` on a provider (0.3.2+)         |
 
 [^1]: "Auto" means Spring Boot auto-configuration activates when the required dependency is on the classpath (Spring Boot for REST, R2DBC for data modules).
+
+For 0.2.x schemas (single `keycloak.*` block, single `sync-role.enabled`, top-level
+`group-role-authorization.enabled`) load the matching `<skill>/references/versions/0.2.x.md`.
 
 ## Gradle Setup
 
@@ -90,6 +113,10 @@ Every summer sub-skill MUST verify this gate was loaded. If a sub-skill is trigg
 ## References
 
 - **[references/summer-types.md](references/summer-types.md)** — Full usage: Member, CallerAware, Password, PhoneNumber, ViewableException, JsonErrorResponse, CommonExceptions
+- **[references/version-matrix.md](references/version-matrix.md)** — Feature × version matrix for every Summer module + pattern detection signals.
+- **[references/versions/](references/versions/)** — Per-version notes for cross-cutting changes (UFID introduction, exception handler rewrite, etc.). Sub-skills carry their own version dirs.
+- **[references/migrations/](references/migrations/)** — Step-by-step migration guides between major schema/version transitions.
+- **[references/versioning-workflow.md](references/versioning-workflow.md)** — How to add a new Summer release to this repo (audience: maintainers).
 
 ## Related Skills
 
