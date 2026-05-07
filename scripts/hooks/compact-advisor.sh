@@ -35,12 +35,19 @@ echo "$COUNT" > "$COUNTER_FILE"
 # ---------------------------------------------------------------------------
 # Token Budget Estimation (replaces pure proxy metric)
 #
-# Estimates context token usage from known sources:
-#   - Bootstrap skill: ~1500 tokens (always loaded)
-#   - CLAUDE.md: ~400 tokens
-#   - Rules: ~500 tokens each × loaded count
-#   - Domain skills: ~800 tokens each × loaded count
-#   - Conversation history: ~50 tokens per tool call (rough estimate)
+# Empirical baseline (measured 2026-04-24 with claude -p smoke test on
+# spring-petclinic, --plugin-dir vs no-plugin delta):
+#   - Plugin auto-load delta: ~2,458 tokens
+#     (bootstrap/SKILL.md injection ~2,300 + project-profile/config render ~150)
+#   - CLAUDE.md (plugin root) does NOT auto-load via --plugin-dir;
+#     it reaches context only after `bash scripts/setup.sh` injects it into
+#     `.claude/CLAUDE.md`, which Claude Code's native loader then picks up
+#     (~1,000 additional tokens when present).
+#   - Rules (.claude/rules/*.md): NOT auto-loaded by any hook. Whether
+#     Claude Code natively scans .claude/rules/ depends on host version;
+#     when it does, ~500 tokens per file.
+#   - Domain skills (lazy via Skill tool): ~800 tokens each
+#   - Conversation history: ~50 tokens per tool call (rough)
 #
 # Warning thresholds (of ~200K context budget):
 #   70% (~140K): ADVISORY — suggest unloading meta skills
@@ -54,8 +61,11 @@ RULES_DIR="$PROJECT_ROOT/.claude/rules"
 RULES_COUNT=0
 [ -d "$RULES_DIR" ] && RULES_COUNT=$(find "$RULES_DIR" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
 
-# Estimate from tool calls + known baseline
-BASELINE_TOKENS=2600  # bootstrap(1700) + CLAUDE.md(400) + memory(500)
+# Empirical baseline (calibrated 2026-04-24):
+#   2500 = bootstrap(~2300) + injection wrappers(~150) + project-profile JSON(~50)
+#   +1000 if .claude/CLAUDE.md exists (setup.sh-installed plugin CLAUDE.md)
+BASELINE_TOKENS=2500
+[ -f "$PROJECT_ROOT/.claude/CLAUDE.md" ] && BASELINE_TOKENS=$((BASELINE_TOKENS + 1000))
 RULES_TOKENS=$((RULES_COUNT * 500))
 SKILLS_ESTIMATE=$((COUNT / 8))  # rough: 1 new skill per 8 tool calls
 [ "$SKILLS_ESTIMATE" -gt 10 ] && SKILLS_ESTIMATE=10

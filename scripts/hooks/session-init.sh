@@ -9,9 +9,57 @@
 source "$(dirname "$0")/run-with-flags.sh" "session-init" || exit 0
 
 log() { echo "[SessionInit] $*" >&2; }
+warn() { echo "[SessionInit] ⚠️  $*" >&2; }
 safe() { "$@" 2>/dev/null || true; }
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
+# ---------------------------------------------------------------------------
+# Manifest validation (R4) — detect malformed hooks.json early, fail loudly.
+# Without this, a corrupted hooks.json silently breaks plugin enforcement
+# and Claude Code burns budget retrying without a clear error.
+# ---------------------------------------------------------------------------
+HOOKS_JSON="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/../..}/hooks/hooks.json"
+if [ -f "$HOOKS_JSON" ] && command -v python3 &>/dev/null; then
+  if ! python3 -c "import json; json.load(open('$HOOKS_JSON'))" 2>/dev/null; then
+    warn "hooks.json is malformed JSON ($HOOKS_JSON). Run: bash scripts/ci/validate-hooks.sh"
+    warn "Plugin hooks may not be loaded for this session. Skill enforcement disabled."
+    # Continue session; let Claude Code start without crashing.
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Required hook script presence check (R5) — warn if any wired hook script
+# is missing. Silent-skip is the Claude Code default but loses enforcement.
+# ---------------------------------------------------------------------------
+HOOKS_DIR="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/../..}/scripts/hooks"
+REQUIRED_HOOKS="session-init.sh subagent-init.sh workflow-gate.sh skill-router.sh \
+                compact-advisor.sh git-guard.sh quality-gate.sh build-checkpoint.sh \
+                memory-gate.sh workflow-phase-lock.sh workflow-tracker.sh \
+                verify-fix-loop.sh team-spawn-evaluator.sh observability-trace.sh \
+                pre-compact.sh post-compact.sh session-save.sh run-with-flags.sh"
+for h in $REQUIRED_HOOKS; do
+  if [ ! -f "$HOOKS_DIR/$h" ]; then
+    warn "missing hook script: $HOOKS_DIR/$h — enforcement may be partial"
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# Project root detection (R7) — walk up from CWD to find nearest build file.
+# Falls back to git root, then PWD. Fixes monorepo subdirectory case where
+# `git rev-parse --show-toplevel` returns the monorepo root instead of the
+# active subproject.
+# ---------------------------------------------------------------------------
+_find_project_root() {
+  local d="$PWD"
+  while [ "$d" != "/" ] && [ -n "$d" ]; do
+    if [ -f "$d/build.gradle" ] || [ -f "$d/build.gradle.kts" ] || [ -f "$d/pom.xml" ]; then
+      echo "$d"
+      return 0
+    fi
+    d="$(dirname "$d")"
+  done
+  return 1
+}
+PROJECT_ROOT="$(_find_project_root)" || PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT" 2>/dev/null || true
 PROJECT_NAME="$(basename "$(pwd)")"
 
@@ -427,13 +475,56 @@ if [ -n "$PROFILE_CTX" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Reset skills-loaded registry (tracks which skills agent has loaded this session)
-# skill-router.sh checks this file before blocking on skill load enforcement.
-# Reset here ensures every new session starts clean — no stale carry-over.
+# Skills-loaded registry - pre-populated with auto-detected likely skills (R1)
+#
+# skill-router.sh blocks file edits when the matching skill is NOT in
+# skills-loaded.json. In non-interactive mode (claude -p), the agent cannot
+# get user approval to update this file, causing 100% write-task failure
+# (see plugin-review-agent-skills/benchmark_results.md - 12/12 blocked).
+#
+# Fix: pre-populate at session start with skills the project profile suggests
+# will be needed. The agent still loads the skill via the Skill tool at edit
+# time; this just stops the soft-block from being a hard fail in -p mode.
+#
+# Disable via env: DEVCO_PREPOPULATE_SKILLS=0
 # ---------------------------------------------------------------------------
+mkdir -p "${PROJECT_ROOT}/.claude/sessions" 2>/dev/null || true
 SKILLS_LOADED="${PROJECT_ROOT}/.claude/sessions/skills-loaded.json"
-echo "{\"skills\":[],\"resetAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$SKILLS_LOADED" 2>/dev/null || true
-log "Skills-loaded registry reset \u2713 \u2192 $SKILLS_LOADED"
+
+PREPOP=""
+if [ "${DEVCO_PREPOPULATE_SKILLS:-1}" = "1" ]; then
+  if [ "$BUILD_TOOL" != "unknown" ]; then
+    PREPOP="$PREPOP coding-standards testing-workflow architecture api-design"
+  fi
+  case "$SPRING_TYPE" in
+    *WebFlux*|*MVC*|*Servlet*) PREPOP="$PREPOP spring-patterns" ;;
+  esac
+  if [ "$DEP_POSTGRESQL" = "true" ] || [ "$DEP_MYSQL" = "true" ]; then
+    PREPOP="$PREPOP database-patterns"
+  fi
+  if [ "$DEP_KAFKA" = "true" ] || [ "$DEP_RABBITMQ" = "true" ]; then
+    PREPOP="$PREPOP messaging-patterns"
+  fi
+  [ "$DEP_REDIS" = "true" ] && PREPOP="$PREPOP redis-patterns"
+  if [ "$SUMMER_DETECTED" = "true" ]; then
+    PREPOP="$PREPOP summer-core summer-rest summer-data summer-security summer-test"
+  fi
+fi
+
+# Render dedup'd JSON array of skill names
+SKILLS_JSON=$(printf '%s' "$PREPOP" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | python3 -c "
+import sys, json
+skills = [line.strip() for line in sys.stdin if line.strip()]
+print(json.dumps(skills))
+" 2>/dev/null)
+[ -z "$SKILLS_JSON" ] && SKILLS_JSON="[]"
+
+SKILLS_COUNT=$(printf '%s' "$PREPOP" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | wc -l | tr -d ' ')
+
+cat > "$SKILLS_LOADED" <<SKILLS_EOF
+{"skills":${SKILLS_JSON},"resetAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","prepopulated":true}
+SKILLS_EOF
+log "Skills-loaded pre-populated -> $SKILLS_LOADED (${SKILLS_COUNT} skills auto-acknowledged)"
 
 # Output
 printf '%b' "$CONTEXT" 2>/dev/null || true
