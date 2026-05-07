@@ -139,39 +139,21 @@ THEN → BUILD directly (skip PLAN + SPEC)
 - **Stopping after BUILD without running VERIFY + REVIEW → FORBIDDEN**
 - **Plan/Spec without document file → FORBIDDEN** — plans MUST be written to `.claude/docs/plans/`, specs to `.claude/docs/specs/`
 
-### Circuit Breakers (Non-Negotiable)
+### Circuit Breakers, Verify/Fix Loop, Checkpoint-Resume
 
-| Component | Mechanism | Default |
-|-----------|-----------|---------|
-| No-progress | Same normalized error 3 consecutive times → escalate to user | `noProgressThreshold: 3` |
-| Max iterations | Absolute ceiling per phase → force exit | `maxIterationsPerPhase: 10` |
-| Max retries | Verify failures before force-accept with warning | `maxRetryOnFail: 3` |
-| Context budget | >95% context utilization → force exit | Hardcoded |
+These three safety mechanisms are summarized here; full mechanism + state-file
+schemas are in `references/workflow-details.md`:
 
-When a circuit breaker trips: log the reason, preserve state in `workflow-state.json`, escalate to user with full context.
-
-### Verify/Fix Loop (Ralph Pattern)
-
-When BUILD or VERIFY fails (gradle test/build returns error):
-
-```
-1. Hook detects failure → extracts normalized error signature
-2. Error count < noProgressThreshold AND attempt < maxRetryOnFail:
-   → Emit: "Run /build-fix with error context, then re-run /verify"
-   → Agent executes fix cycle automatically
-3. Same error >= noProgressThreshold (3):
-   → ESCALATE to user — no more auto-retry
-4. Total attempts >= maxRetryOnFail (3):
-   → FORCE_ACCEPT with warning — move to REVIEW with known issues
-```
-
-State persists in `.claude/verify-fix-state.json` (disk, not context).
-**Never trust self-assessment** — only external verification (tests, compile, lint) determines pass/fail.
-
-### BUILD Checkpoint-Resume
-
-During BUILD, every file edit is tracked in `.claude/sessions/build-checkpoint.json`.
-If context resets mid-BUILD: read checkpoint → see which files were already modified → resume from last completed sub-task instead of restarting.
+- **Circuit breakers**: no-progress (same error 3× → escalate), max-iterations
+  (10/phase ceiling), max-retries (3 verify failures → force-accept), context
+  budget (>95% → force exit). State preserved in `workflow-state.json`.
+- **Verify/Fix Loop (Ralph Pattern)**: hook detects gradle failure, normalizes
+  error, retries `/build-fix` + `/verify` up to `maxRetryOnFail`. Never trust
+  self-assessment — only external checks pass/fail. State in
+  `.claude/verify-fix-state.json`.
+- **BUILD Checkpoint-Resume**: every Edit during BUILD is tracked in
+  `.claude/sessions/build-checkpoint.json`; on context reset, read it to skip
+  already-completed sub-tasks.
 
 ### Workflow Completion Rule (CRITICAL)
 
@@ -197,93 +179,23 @@ See `config/defaults.json` for all defaults. Key workflow settings:
 | `workflow.maxIterationsPerPhase` | `10` | Absolute ceiling per phase |
 | `workflow.noProgressThreshold` | `3` | Same error N times → escalate |
 
-## Multi-Agent Support
+## Multi-Agent Support — Summary
 
-Two modes for parallel execution, configured via `team.mode` in `devco-config.json`:
+Two modes via `team.mode` in `devco-config.json`:
 
-### Mode 1: Subagents (default, stable) — `team.mode: "subagent"`
+| Mode | When | Coordination |
+|------|------|--------------|
+| `subagent` (default, stable) | Independent modules, separate files | Worktree isolation, no inter-agent comm |
+| `team` (experimental) | Interdependent work (entity+repo+service) | Shared TaskList, `SendMessage` between agents — needs `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` |
 
-Independent agents with **worktree isolation**. Each agent gets an isolated copy of the repo.
-Best for: independent TDD modules that don't need to coordinate with each other.
+**Spawn conditions (ALL true)**: `team.enabled`, current phase = BUILD, spec has ≥2 independent tasks, total change >50 lines, current count < `team.maxTeammates`.
 
-```
-Agent({
-  description: "Implement: {task title}",
-  prompt: "Implement task from spec at {artifacts.spec}. TDD: RED->GREEN->REFACTOR. Load devco-agent-skills:coding-standards. No .block(), no git commit.",
-  model: "{team.roles.implementer.model}",
-  isolation: "worktree",
-  run_in_background: true
-})
-```
+**Model routing default**: planner/spec-writer = opus; implementer/reviewer/tester = sonnet.
 
-**Key properties:**
-- `isolation: "worktree"` — safe parallel file edits (each agent has own git worktree)
-- `run_in_background: true` — concurrent execution
-- Agents report results to parent only — **no inter-agent communication**
-- After completion: merge worktree changes -> `/verify full` -> `/dc-review`
+**After parallel BUILD**: merge results → `/verify full` → `/dc-review` → COMPLETE.
 
-### Mode 2: Agent Teams (experimental) — `team.mode: "team"`
-
-Coordinated agents with **shared task list** and **inter-agent messaging**.
-Best for: interdependent work where agents need to negotiate interfaces.
-Requires: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.
-
-```
-# Step 1: Create team
-TeamCreate({ team_name: "build-{feature}", description: "TDD for {feature}" })
-
-# Step 2: Create tasks from spec
-TaskCreate({ subject: "{task title}", description: "{task description}" })
-
-# Step 3: Spawn teammates
-Agent({
-  description: "Implement: {task title}",
-  prompt: "You are a teammate. Read task via TaskGet. TDD. Mark done via TaskUpdate.",
-  team_name: "build-{feature}",
-  name: "impl-{N}",
-  model: "{team.roles.implementer.model}",
-  run_in_background: true
-})
-```
-
-**Key properties:**
-- Shared working directory — **partition files by ownership** (no worktree)
-- Teammates can `SendMessage` to each other for interface negotiation
-- Shared `TaskList` — teammates self-claim available tasks
-- After completion: `/verify full` -> `/dc-review` -> `TeamDelete`
-
-### When to Spawn (ALL must be true)
-
-1. `team.enabled == true` in `devco-config.json`
-2. `project-profile.json` exists
-3. Current phase is BUILD
-4. Spec has >=2 independent tasks
-5. Estimated total change >50 lines
-6. Current agent count < `team.maxTeammates`
-
-### Choosing the Mode
-
-| Scenario | Use | Why |
-|----------|-----|-----|
-| Independent modules (separate packages/files) | `subagent` | Worktree isolation prevents conflicts |
-| Shared domain model (entity + repo + service) | `team` | Agents need to negotiate interfaces |
-| First time / unsure | `subagent` | Stable, safe default |
-
-### Model Routing
-
-| Role | Default | Override |
-|------|---------|---------|
-| planner, spec-writer | opus | `team.costControl.useOpusOnlyFor` |
-| implementer | sonnet | `team.roles.implementer.model` |
-| reviewer | sonnet | `team.roles.reviewer.model` |
-| tester | sonnet | `team.roles.tester.model` |
-
-### After Parallel BUILD Completes
-
-1. Collect/merge results from all agents
-2. Run `/verify full` (covers all agents' work)
-3. Run `/dc-review` (unified review)
-4. Only after REVIEW passes is the task complete
+Full call signatures, key properties, and lifecycle details are in
+`references/workflow-details.md` § "Multi-Agent Modes (Subagent vs Team)".
 
 ## Harness Engineering — Operational Awareness
 

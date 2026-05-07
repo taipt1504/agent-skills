@@ -16,7 +16,7 @@ Built on **Harness Engineering** principles: Agent = Model + Harness. The plugin
 ### Step 2 — Setup project (one-time per project, lead dev)
 
 ```
-/setup
+/dc-setup
 ```
 
 Interactive setup walks you through mode selection (standard/yolo/strict), workflow options (auto-verify, auto-review, max retries), and team features. Or use `--mode standard` to skip prompts.
@@ -34,6 +34,53 @@ Teammates clone → run `claude` → auto-prompted to install plugin. Zero setup
 ```
 /plan    # for any non-trivial task
 ```
+
+---
+
+## Developing the plugin
+
+When iterating on plugin code (skills, hooks, agents), bypass the
+`/plugin install` round-trip and load directly from your working tree:
+
+```bash
+# In your test repo (e.g., a Spring project):
+claude --plugin-dir /path/to/agent-skills
+
+# Or in non-interactive mode for CI / smoke tests:
+claude -p \
+  --plugin-dir /path/to/agent-skills \
+  --model sonnet \
+  --output-format json \
+  --dangerously-skip-permissions \
+  --no-session-persistence \
+  "Trace the flow of POST /owners/new"
+```
+
+`--plugin-dir <path>` (Claude Code 2.x) loads any directory with a
+`.claude-plugin/plugin.json` manifest as a plugin for the current session
+only. Skills, agents, commands, and hooks all resolve via `${CLAUDE_PLUGIN_ROOT}`,
+which Claude Code sets to the directory you pass.
+
+### Non-interactive mode (`claude -p`)
+
+Tasks that write files in `claude -p --dangerously-skip-permissions` need
+`skills-loaded.json` pre-populated so `skill-router.sh` doesn't block edits
+the agent can't approve. Session-init does this automatically (see
+`scripts/hooks/session-init.sh` "Skills-loaded registry"). To disable
+the pre-population (interactive mode preferred), set
+`DEVCO_PREPOPULATE_SKILLS=0`.
+
+### Reproducing the v3.3 audit benchmark
+
+The audit produced reusable infrastructure under `plugin-review-agent-skills/`:
+
+```bash
+bash plugin-review-agent-skills/scripts/run-benchmark.sh
+python3 plugin-review-agent-skills/scripts/summarize-benchmark.py
+```
+
+Cost ≈ $8–10 for the full 60-run benchmark. Edit `task_prompt()` and
+`task_budget()` in `run-benchmark.sh` to test custom prompts.
 
 ---
 
@@ -450,7 +497,7 @@ python3 evals/scripts/aggregate-scores.py --results-dir evals/results/
 ```bash
 /plugin marketplace add taipt1504/agent-skills
 /plugin install devco-agent-skills
-/setup                  # interactive: choose mode, workflow options, team features
+/dc-setup               # interactive: choose mode, workflow options, team features
 git add .claude/ && git commit -m "chore: add Claude Code project context"
 # Optional: cp templates/PROJECT_GUIDELINES_TEMPLATE.md ./PROJECT_GUIDELINES.md
 ```
@@ -472,6 +519,37 @@ Java 17+ · Spring Boot 3.x · Spring WebFlux · Spring MVC · R2DBC · JPA/Hibe
 ---
 
 ## Changelog
+
+### v3.3.1 (2026-05-07)
+
+**Patch release** — fixes from v3.3.0 audit benchmark, hardening for non-interactive mode, hook validation, doc trim.
+
+#### Non-Interactive Mode Fix (audit regression)
+
+- **session-init.sh**: pre-populates `.claude/sessions/skills-loaded.json` with skills the project profile suggests are likely needed (e.g., MVC → spring-patterns + coding-standards + testing-workflow + architecture; PostgreSQL/MySQL → database-patterns; Summer → summer-core + variants). Prevents `skill-router.sh` from soft-blocking writes in `claude -p --dangerously-skip-permissions` where the agent cannot get user approval to update the file (12/12 write-tasks blocked in v3.3.0 audit). Disable via `DEVCO_PREPOPULATE_SKILLS=0`.
+- **scripts/ci/test-non-interactive.sh** (NEW): opt-in CI regression test that exercises a write-task in `claude -p` mode against an ephemeral Spring repo. Run with `SKIP_NONINTERACTIVE=0 bash scripts/ci/run-all.sh`.
+
+#### Hook Hardening (R4/R5/R7)
+
+- **session-init.sh**: validates `hooks/hooks.json` is well-formed JSON at session start; warns loudly if malformed (R4).
+- **session-init.sh**: checks all 17 wired hook scripts are present; warns per missing file instead of silently degrading enforcement (R5).
+- **session-init.sh**: project-root detection now walks up from CWD to find the nearest `build.gradle`/`build.gradle.kts`/`pom.xml`. Fixes monorepo subdirectory case where `git rev-parse --show-toplevel` returned the monorepo root instead of the active subproject (R7).
+
+#### Empirical Baseline Calibration
+
+- **compact-advisor.sh**: rewrote token-baseline estimation with measured deltas from spring-petclinic smoke test (`--plugin-dir` vs no-plugin). Plugin auto-load = ~2,458 tokens (bootstrap injection ~2,300 + project-profile/config ~150). `.claude/CLAUDE.md` adds ~1,000 tokens when present (only after `setup.sh` installs it). Replaces older guesses (1,500/400) with documented measurements.
+
+#### Documentation
+
+- **skills/bootstrap/SKILL.md**: trimmed from 335 → 247 lines (~88 lines moved). Multi-agent call signatures, verify/fix loop mechanism, and BUILD checkpoint-resume schema moved to `skills/bootstrap/references/workflow-details.md` (loaded on demand). Reduces always-on bootstrap injection.
+- **README.md**: new "Developing the plugin" section documents `claude --plugin-dir <path>` for iterating on plugin code without reinstalling, plus non-interactive mode notes and audit benchmark reproduction steps.
+- **hooks/README.md**: hook inventory updated to 17 hooks (from 13), each row tagged sync/async with block authority. Adds "Non-Interactive Mode" subsection covering skills-loaded pre-population.
+- **/setup** → **/dc-setup**: command rename reflected in README quick-start blocks.
+
+#### CI
+
+- **scripts/ci/run-all.sh**: wires `validate-skill-triggers.sh` and `test-non-interactive.sh` (opt-in).
+- **scripts/ci/validate-agents.sh**: skips files prefixed with `_` (shared agent partials) so they don't fail frontmatter validation.
 
 ### v3.3.0 (2026-04-10)
 

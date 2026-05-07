@@ -15,8 +15,12 @@ echo "Validating agents in $AGENTS_DIR..."
 
 for agent_file in "$AGENTS_DIR"/*.md; do
   [ -f "$agent_file" ] || continue
-  CHECKED=$((CHECKED + 1))
   filename="$(basename "$agent_file")"
+  # Skip shared partials (filenames starting with underscore)
+  case "$filename" in
+    _*) continue ;;
+  esac
+  CHECKED=$((CHECKED + 1))
 
   # Check YAML frontmatter exists (starts with ---)
   if ! head -1 "$agent_file" | grep -q '^---$'; then

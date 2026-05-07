@@ -200,3 +200,102 @@ Each teammate is assigned specific files from the spec's task decomposition.
 A teammate MUST NOT modify files outside its assigned scope.
 If a teammate needs to touch a shared file, it must message the team lead.
 Scope violations are flagged during the 2-stage review after each task.
+
+---
+
+## Multi-Agent Modes (Subagent vs Team)
+
+Two modes for parallel execution, configured via `team.mode` in `devco-config.json`:
+
+### Mode 1: Subagents (default, stable) — `team.mode: "subagent"`
+
+Independent agents with **worktree isolation**. Each agent gets an isolated copy of the repo. Best for: independent TDD modules that don't need to coordinate with each other.
+
+```
+Agent({
+  description: "Implement: {task title}",
+  prompt: "Implement task from spec at {artifacts.spec}. TDD: RED->GREEN->REFACTOR. Load devco-agent-skills:coding-standards. No .block(), no git commit.",
+  model: "{team.roles.implementer.model}",
+  isolation: "worktree",
+  run_in_background: true
+})
+```
+
+**Key properties:**
+- `isolation: "worktree"` — safe parallel file edits (each agent has own git worktree)
+- `run_in_background: true` — concurrent execution
+- Agents report results to parent only — no inter-agent communication
+- After completion: merge worktree changes -> `/verify full` -> `/dc-review`
+
+### Mode 2: Agent Teams (experimental) — `team.mode: "team"`
+
+Coordinated agents with **shared task list** and **inter-agent messaging**. Best for: interdependent work where agents need to negotiate interfaces. Requires: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.
+
+```
+TeamCreate({ team_name: "build-{feature}", description: "TDD for {feature}" })
+TaskCreate({ subject: "{task title}", description: "{task description}" })
+Agent({
+  description: "Implement: {task title}",
+  prompt: "You are a teammate. Read task via TaskGet. TDD. Mark done via TaskUpdate.",
+  team_name: "build-{feature}",
+  name: "impl-{N}",
+  model: "{team.roles.implementer.model}",
+  run_in_background: true
+})
+```
+
+**Key properties:**
+- Shared working directory — partition files by ownership (no worktree)
+- Teammates can `SendMessage` to each other for interface negotiation
+- Shared `TaskList` — teammates self-claim available tasks
+- After completion: `/verify full` -> `/dc-review` -> `TeamDelete`
+
+### Choosing the Mode
+
+| Scenario | Use | Why |
+|----------|-----|-----|
+| Independent modules (separate packages/files) | `subagent` | Worktree isolation prevents conflicts |
+| Shared domain model (entity + repo + service) | `team` | Agents need to negotiate interfaces |
+| First time / unsure | `subagent` | Stable, safe default |
+
+### Model Routing
+
+| Role | Default | Override |
+|------|---------|---------|
+| planner, spec-writer | opus | `team.costControl.useOpusOnlyFor` |
+| implementer | sonnet | `team.roles.implementer.model` |
+| reviewer | sonnet | `team.roles.reviewer.model` |
+| tester | sonnet | `team.roles.tester.model` |
+
+### After Parallel BUILD Completes
+
+1. Collect/merge results from all agents
+2. Run `/verify full` (covers all agents' work)
+3. Run `/dc-review` (unified review)
+4. Only after REVIEW passes is the task complete
+
+---
+
+## Verify/Fix Loop (Ralph Pattern)
+
+When BUILD or VERIFY fails (gradle test/build returns error):
+
+```
+1. Hook detects failure → extracts normalized error signature
+2. Error count < noProgressThreshold AND attempt < maxRetryOnFail:
+   → Emit: "Run /build-fix with error context, then re-run /verify"
+   → Agent executes fix cycle automatically
+3. Same error >= noProgressThreshold (3):
+   → ESCALATE to user — no more auto-retry
+4. Total attempts >= maxRetryOnFail (3):
+   → FORCE_ACCEPT with warning — move to REVIEW with known issues
+```
+
+State persists in `.claude/verify-fix-state.json` (disk, not context).
+**Never trust self-assessment** — only external verification (tests, compile, lint) determines pass/fail.
+
+---
+
+## BUILD Checkpoint-Resume
+
+During BUILD, every file edit is tracked in `.claude/sessions/build-checkpoint.json`. If context resets mid-BUILD: read checkpoint → see which files were already modified → resume from last completed sub-task instead of restarting.

@@ -34,6 +34,9 @@ run_validator "Agent Definitions" "$SCRIPT_DIR/validate-agents.sh"
 run_validator "Skill Directories" "$SCRIPT_DIR/validate-skills.sh"
 run_validator "Command Files"     "$SCRIPT_DIR/validate-commands.sh"
 run_validator "Hook Configuration" "$SCRIPT_DIR/validate-hooks.sh"
+run_validator "Skill Trigger Coverage" "$SCRIPT_DIR/validate-skill-triggers.sh"
+# Non-interactive integration test (opt-in: SKIP_NONINTERACTIVE=0)
+run_validator "Non-Interactive Mode" "$SCRIPT_DIR/test-non-interactive.sh"
 
 echo ""
 echo "================================================================"
