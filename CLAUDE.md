@@ -82,3 +82,9 @@ After BUILD: VERIFY runs automatically → if fail, verify/fix loop retries → 
 - **Context budget** is monitored. Act on compact-advisor warnings promptly.
 - **State lives on disk**, not in context: `workflow-state.json`, `verify-fix-state.json`, `build-checkpoint.json`, `session-metrics.json`. Read from disk when resuming.
 - **Verification is external**: tests, compile, lint determine pass/fail. Never trust self-assessment.
+
+## Repo Scripts — Required Prompts
+
+Some scripts in `scripts/` rely on paths outside this repo. Before invoking them, ASK the user for the path instead of trusting built-in auto-detect fallbacks (those assume one developer's checkout layout and produce misleading results elsewhere).
+
+- `scripts/ci/check-summer-version-coverage.sh` — ask: "Which Summer CHANGELOG should I use? (path, or `auto` for fallback)". Pass via `--changelog PATH`. Auto-detect fallback only if user explicitly opts in.
