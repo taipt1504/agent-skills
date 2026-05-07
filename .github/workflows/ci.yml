@@ -59,7 +59,7 @@ jobs:
         run: |
           echo "Checking required files..."
           MISSING=0
-          for f in CLAUDE.md QUICKSTART.md .claude-plugin/plugin.json .claude-plugin/marketplace.json config/defaults.json hooks/README.md; do
+          for f in CLAUDE.md .claude-plugin/plugin.json .claude-plugin/marketplace.json config/defaults.json hooks/README.md; do
             if [ ! -f "$f" ]; then
               echo "MISSING: $f"
               MISSING=$((MISSING + 1))
