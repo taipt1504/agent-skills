@@ -13,8 +13,11 @@ requires: ["summer-core", "database-patterns"]
 
 **Modules:** `summer-data-autoconfigure` | `summer-data-audit-autoconfigure` | `summer-data-outbox-autoconfigure` | `summer-data-r2dbc` | `summer-kafka-consumer` (0.3.1+) | `summer-kafka-consumer-autoconfigure` (0.3.1+)
 
-**This SKILL.md tracks LATEST stable schema (0.3.2).** For older versions load the matching
+**This SKILL.md tracks LATEST stable schema (0.3.5).** For older versions load the matching
 overlay from [references/versions/](references/versions/).
+
+> `summer-kafka-consumer` listener wiring (idempotency, retry, DLT) now lives in **summer-kafka**.
+> This skill keeps the producer-side outbox + audit + R2DBC story.
 
 ## AuditService
 
@@ -77,9 +80,16 @@ f8a:
 
 ## OutboxService (current — 0.3.x canon)
 
-Transactional outbox with two publish modes — **scheduler** (poll the table) and **CDC**
-(stream WAL via Debezium). Both modes share the same retry+backoff machinery, monitoring, and
-cleanup.
+Transactional outbox with two publish modes — **CDC** (stream WAL via Debezium, preferred for
+production) and **scheduler** (poll the table, single-process or multi-instance fallback). Both
+modes share the same retry+backoff machinery, monitoring, and cleanup.
+
+> **Recommended default: `mode: cdc`.** Core-ledger-ms and payment-orchestrator-ms ship CDC as the
+> production default — sub-second latency, no polling load, native ordering by PostgreSQL LSN. The
+> Summer framework's internal default is still `scheduler` (safer for first boot without WAL setup);
+> services should explicitly set `mode: cdc` once the PG prereqs in [`references/ddl-scripts.md`](references/ddl-scripts.md)
+> are in place. Use `scheduler` only for multi-instance deployments (one CDC instance per replication
+> slot) or environments without WAL access.
 
 ```java
 // 1. Save in your business transaction (R2DBC).
@@ -96,24 +106,41 @@ Auto-wired when `KafkaTemplate` is on the classpath and `f8a.outbox.publisher.qu
 (default). Removes ~50 lines of boilerplate from each service. Disable by setting `queue` to any
 non-`kafka` value (or by providing your own `OutboxEventPublisher` bean — auto-config backs off).
 
+### Recommended CDC-mode config (production default — mirrors core-ledger-ms)
+
 ```yaml
 f8a:
   outbox:
     enabled: true                        # default: true; false disables module entirely
     publisher:
       queue: kafka                       # selects KafkaOutboxPublisher (default)
-      mode: scheduler                    # scheduler | cdc
-      topic-prefix: ""                   # prepended to event topic
-      scheduler:
-        cron: "0/5 * * * * ?"            # poll cadence
+      mode: ${OUTBOX_PUBLISHER_MODE:cdc} # cdc | scheduler — default CDC in this service
+      topic-prefix: ${OUTBOX_PUBLISHER_TOPIC_PREFIX:<svc>.}   # prepended to outbound Kafka topic
+                                                              # (DIFFERENT from cdc.topic-prefix below)
+      cdc:
+        # --- Debezium source DB connection (the connector reads PostgreSQL WAL) ---
+        connector-name: <svc>-outbox-connector
+        url:      ${SPRING_FLYWAY_URL}                       # jdbc:postgresql://host:5432/<db>
+        username: ${SPRING_FLYWAY_USERNAME}
+        password: ${SPRING_FLYWAY_PASSWORD}
+        # --- WAL / replication wiring ---
+        slot-name: <svc>_cdc_slot                            # Debezium replication slot (pgoutput)
+        plugin-name: pgoutput                                # default; rarely changed
+        table-include-list: "<schema>\\.outbox_events"       # regex; e.g. "ledger\\.outbox_events"
+        # schema-include-list:                               # optional regex filter
+        # --- Kafka storage for Debezium internal state (moved JDBC → Kafka in 0.3.1) ---
+        offset-storage-topic:    "<svc>.outbox.offsets"
+        offset-storage-partitions: 1
+        offset-storage-replication-factor: 3                 # raise to ≥3 for production
+        schema-history-topic:    "<svc>.schema.history"
+        # --- Source-side server name (Debezium "database.server.name"; default "outbox-server") ---
+        # topic-prefix: <svc>                                # optional; default is fine for most setups
+        # --- Publish behavior ---
+        publish-timeout: 30s
+        skip-already-published: true
+      scheduler:                         # retained as retry fallback even under mode=cdc
+        cron: "${OUTBOX_PUBLISHER_CRON:*/5 * * * * *}"
         batch-size: 100
-      cdc:                               # only when mode=cdc
-        bootstrap-servers: ${KAFKA_BOOTSTRAP}    # defaults to spring.kafka.bootstrap-servers
-        offset-storage-topic: debezium.outbox.offsets
-        offset-storage-replication-factor: 3
-        schema-history-topic: debezium.schema.history
-        topic-prefix: ${SVC}             # was database-server-name pre-0.3.1
-        publish-timeout: 30s             # Duration (was *-seconds long pre-0.3.1)
     retry:
       max-attempts: 5
       initial-interval: 1s
@@ -122,20 +149,36 @@ f8a:
       poll-interval: 10s                 # retry-task cadence
       batch-size: 100
     cleanup:
-      cron: "0 0 0 * * ?"
-      retention: 30d                     # Duration (was retention-days int pre-0.2.8)
+      cron: "0 0 3 * * ?"                # off-peak
+      retention: 14d                     # Duration (was retention-days int pre-0.2.8)
     monitoring:
       cron: "0 0 * * * ?"
     circuit-breaker:
+      enabled: true
       failure-rate-threshold: 50
       minimum-events: 10
       wait-duration: 60s                 # Duration (was wait-duration-seconds pre-0.2.8)
       sliding-window-size: 100
 ```
 
-CDC requires `wal_level=logical` on PostgreSQL and Debezium dependencies on the classpath. Only
-one CDC instance per replication slot — use `scheduler` for multi-instance deployments. The CDC
-storage moved JDBC → Kafka in 0.3.1, and (since 0.3.2) inherits SASL/SSL from `spring.kafka.*`.
+Concrete reference: `core-ledger-ms/src/main/resources/application.yml` ships exactly this shape
+(`mode: ${OUTBOX_PUBLISHER_MODE:cdc}`, `slot-name: ledger_cdc_slot`, `table-include-list: "ledger\\.outbox_events"`).
+Copy it as the starting point for any new service that owns its own PostgreSQL.
+
+### Scheduler-mode variant (multi-instance / no WAL access)
+
+Override at deploy time with `OUTBOX_PUBLISHER_MODE=scheduler` — same YAML, no other changes
+needed. The `scheduler.*` block is already present, the CDC block becomes inert. Use this when
+you run more than one app instance per database (one CDC instance per replication slot is the
+hard limit) or in test environments without WAL configured.
+
+**`f8a.outbox.publisher.cdc.bootstrap-servers` was dropped in 0.3.2** — CDC storage always lives on the cluster defined by `spring.kafka.bootstrap-servers`. Configure Kafka once at `spring.kafka.*` (SASL/SSL included); Debezium's internal clients inherit it since 0.3.2.
+
+**CDC prereqs (PostgreSQL) — required before first boot with `mode: cdc`:** `wal_level=logical`, the connector DB user has `REPLICATION`, a publication exists for `outbox_events`, and the table has `REPLICA IDENTITY DEFAULT` (uses PK) or `FULL`. See [`references/ddl-scripts.md`](references/ddl-scripts.md) §"PostgreSQL prereqs for CDC mode" for the exact SQL and slot-plugin recovery steps. Only one CDC instance per replication slot — fall back to `mode: scheduler` for multi-instance deployments.
+
+**Mode override pattern.** `mode: ${OUTBOX_PUBLISHER_MODE:cdc}` makes CDC the in-config default while letting any environment downgrade to scheduler by setting the env var. CI / local-dev that hasn't run `make cdc-setup-full` (or equivalent) sets `OUTBOX_PUBLISHER_MODE=scheduler`; production keeps the default.
+
+**Note: `publisher.topic-prefix` ≠ `publisher.cdc.topic-prefix`.** The publisher one is prepended to the **outbound Kafka topic** name (e.g. `ledger.` + `order.created` → `ledger.order.created`). The cdc one is Debezium's `database.server.name` — the **source identifier** for replication-slot offsets and schema history. Both are independent strings; setting them to the same value is fine, but they serve different purposes.
 
 ### Schema columns (0.3.x)
 
@@ -187,12 +230,49 @@ Config block `f8a.kafka.consumer.{idempotency.{enabled, validate-on-startup}, re
 
 ## R2DBC Converters
 
-Auto-configured (`SummerR2dbcAutoConfiguration`). Registers R2DBC converters for `Password` and `PhoneNumber` value objects defined in summer-core (see summer-core Shared Types).
+Auto-configured (`SummerR2dbcAutoConfiguration`). Registers R2DBC converters for `Password`, `PhoneNumber`, `Ufid`, and (0.3.5+) `Txid` value objects defined in summer-core (see [summer-core Shared Types](../summer-core/references/summer-types.md)).
+
+### `Txid` converters (0.3.5+) — write side is exclusive
+
+Two converters ship together; the writer side is gated by a property:
+
+- `TxidConverter` — `Long ↔ Txid` for **`BIGINT`** columns. Preferred for new schemas (4× smaller index entries, native int comparison).
+- `TxidUuidConverter` — `UUID ↔ Txid` for **`UUID`** columns. For legacy schemas standardized on UUID PKs.
+
+**Reads are always unambiguous** — the R2DBC driver yields `Long` for BIGINT and `UUID` for UUID, so both `Reading` converters are always registered and the matching one is selected by source type.
+
+**Writes are exclusive.** Spring Data R2DBC's `MappingR2dbcConverter` resolves writers by the property's Java type (no SQL-type hint), so registering both writers leaves the choice to registration order and silently writes the wrong SQL type. Exactly one writer is registered, selected by `SummerR2dbcProperties.txidColumnType` (typed `@ConfigurationProperties("summer.r2dbc")` bean, enum `TxidColumnType` — `UUID` or `BIGINT`):
+
+```yaml
+summer:
+  r2dbc:
+    txid-column-type: uuid       # default — registers TxidUuidConverter.Writing only
+    # txid-column-type: bigint   # new greenfield schemas — registers TxidConverter.Writing only
+```
+
+Spring binds the enum value case-insensitively. Any value outside `UUID` / `BIGINT` fails at context start with a `BindException` chain that names both the property and the offending value.
+
+**Default is `uuid`** because most eWallet services already standardize on UUID PKs (saga ids, account ids, hold ids, va ids). Flipping to `bigint` for a single column kind is rare; greenfield schemas that want the BIGINT space-savings opt in by setting the property. Mixing BIGINT and UUID `Txid` columns in the same app is supported on the read side but **not on the write side** — standardize on one per app.
+
+```java
+@Table("transactions")
+public record Transaction(
+    @Id Txid txid,             // BIGINT or UUID, matches summer.r2dbc.txid-column-type
+    Ufid customerId,           // UUID (canonical key)
+    BigDecimal amount,
+    Instant createdAt) {}
+```
+
+Source layout:
+- `io.f8a.summer.data.r2dbc.config.SummerR2dbcProperties` — the `@ConfigurationProperties` bean (in `summer-data-r2dbc`, same module as the converters).
+- `io.f8a.summer.data.r2dbc.config.TxidColumnType` — the enum.
+- `SummerR2dbcAutoConfiguration` enables it via `@EnableConfigurationProperties(SummerR2dbcProperties.class)` and switches on `properties.getTxidColumnType()` to pick the writer.
 
 ## Version Notes
 
 Headline only — load the matching overlay for full per-version detail:
 
+- **0.3.5** (2026-05-10) — R2DBC `TxidConverter` / `TxidUuidConverter` auto-registered; writer side gated by `summer.r2dbc.txid-column-type` (`uuid` default, `bigint` for greenfield). See [versions/0.3.5.md](references/versions/0.3.5.md).
 - **0.3.2** — Debezium Kafka storage inherits SASL/SSL from `spring.kafka.*`; Swagger BOM aligned. See [versions/0.3.2.md](references/versions/0.3.2.md).
 - **0.3.1** — Outbox config reshape (BREAKING): scheduler / CDC nested; Debezium storage JDBC → Kafka (BREAKING); `KafkaOutboxPublisher` auto-wired by default; outbox publish headers `Map<String, byte[]>` (BREAKING); CDC `lsn BIGINT` column preserved across retries; new `summer-kafka-consumer` module — LSN-watermark idempotency. See [versions/0.3.1.md](references/versions/0.3.1.md).
 - **0.2.8** — Outbox `id` UUID → Ufid; Debezium CDC mode added; unified retry+backoff in both modes; `OutboxProperties` redesign (BREAKING — Duration types, scheduler/cleanup/monitoring grouping); `next_retry_at` column. See [versions/0.2.8.md](references/versions/0.2.8.md).

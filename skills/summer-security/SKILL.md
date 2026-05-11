@@ -13,8 +13,8 @@ requires: ["summer-core", "spring-security"]
 
 **Modules:** `summer-security-autoconfigure` | `summer-keycloak` | `summer-apisix-resource-server` | `summer-jwt-resource-server` | `summer-apikey-resource-server`
 
-**This SKILL.md tracks the LATEST stable schema (0.3.3).** For older versions load the matching
-overlay from [references/versions/](references/versions/).
+**This SKILL.md tracks the LATEST stable schema (0.3.4).** For older versions load the matching
+overlay from [references/versions/](references/versions/). 0.3.5 made no security changes.
 
 ## APISIX Auth Integration
 
@@ -187,6 +187,88 @@ publishes `<scope>:<group>`. Both ride the same Redis channel
 When `scopeKey` doesn't match any registered resolver, the listener logs at DEBUG and drops the
 message. Use the wildcard form when the publisher can't (or shouldn't) map realm → provider id.
 
+## Server-Sent Events Auth (0.3.4+)
+
+Browsers' `EventSource` API can't send custom headers, so SSE endpoints authenticate via `?token=<jwt>` in the URL. Summer 0.3.4 ships `SseQueryParamTokenFilter` — services that had drifted copies under `config/sse/` should **delete the local copy** and declare an `SseAuthCustomizer` bean.
+
+### Wiring
+
+Auto-configured as a `WebFilter` bean by `ReactiveApisixResourceServerAutoConfiguration` at order `-100` (runs before the APISIX `AuthenticationWebFilter`). With **no** `SseAuthCustomizer` bean, the filter has zero rules and is a no-op — services opt in by registering a customizer.
+
+```java
+@Bean
+SseAuthCustomizer sseRoutes() {
+  return reg -> reg
+      .pathStartsWith("/api/v1/public/sse/admin/", "bo")        // only 'bo' tokens
+      .pathStartsWith("/api/v1/public/sse/",       "end-user")  // only 'end-user' tokens
+      .acceptEventStream("end-user");                            // any other SSE → end-user
+}
+```
+
+Rules are tested in registration order; first match wins. If no rule matches, the request bypasses the SSE filter and downstream auth still runs.
+
+### Routing model — by provider key, not by `iss`
+
+Rules carry a **provider key** (one of `f8a.security.apisix.resource-server.providers.<id>`), not an issuer URL. The auto-config builds the `ReactiveJwtDecoder` against that provider's `issuerUri()`; the decoder enforces `iss` natively, so a token issued by a **different** registered provider can never authenticate on a path bound to another provider.
+
+### Fail-fast at startup
+
+- Customizer rule references a provider id not in `providers.<id>` → `IllegalStateException` listing the known ids. Catches typos before they 401 every SSE request silently.
+- `SseQueryParamTokenFilter.MatchRule` constructor rejects `null`/blank `providerId` and `null` `matcher`.
+
+### Public API
+
+| Type | Package |
+|---|---|
+| `SseQueryParamTokenFilter` | `io.f8a.summer.security.apisix.server.resource.web.server.filter` |
+| `SseQueryParamTokenFilter.MatchRule` | nested record `(Predicate<ServerWebExchange> matcher, String providerId)` |
+| `SseAuthCustomizer` | `io.f8a.summer.autoconfigure.security.apisix.resource.reactive` (functional, single `customize`) |
+| `SseAuthCustomizer.Registration` | inner class with `matcher`, `pathStartsWith`, `pathContains`, `acceptEventStream` builders |
+
+### Per-request flow
+
+```
+SSE request → first matching rule → providerId
+            → decoderResolver.apply(providerId)
+            → decoder.decode(token)            // verifies signature + iss
+            → MultiRealmAuthenticationConverter.convert(oidcIdToken)
+            → ReactiveSecurityContextHolder.withAuthentication(auth)
+            → continue chain
+```
+
+The filter reuses the existing `MultiRealmAuthenticationConverter`, so the post-decode role/userinfo mapping is identical to non-SSE routes.
+
+### Keep `permitAll()` on SSE paths
+
+```java
+.pathMatchers(HttpMethod.GET, "/api/v1/public/sse/**").permitAll()
+```
+
+The SSE filter populates the security context before the APISIX filter ever sees the request, but `permitAll()` is what lets the request through `authorizeExchange()` for token-based auth via the SSE path.
+
+## `ProviderJwtDecoderResolver` (0.3.4+)
+
+`Function<String, ReactiveJwtDecoder>` extracted from the SSE auto-config so anything that needs `provider key → ReactiveJwtDecoder` can inject it.
+
+**Package:** `io.f8a.summer.security.apisix.server.resource.authentication.ProviderJwtDecoderResolver`
+
+- Decoders are built **lazily** on first lookup via `ReactiveJwtDecoders.fromIssuerLocation(provider.issuerUri())` (synchronous HTTP fetch of `.well-known/openid-configuration`). Lazy-init means an unreachable OIDC server doesn't block app startup.
+- Cached in a `ConcurrentHashMap` keyed by provider id.
+- Returns `null` when the provider id is not in the map. Callers should treat null as a misconfiguration — auto-config validates rule provider ids at startup, so production hits are unexpected.
+
+Override by declaring your own `ProviderJwtDecoderResolver` bean (e.g. for tests with a static decoder map). Auto-configured by `ReactiveApisixResourceServerAutoConfiguration` with `@ConditionalOnMissingBean`.
+
+## `KeycloakRoleSynchronizer` — no more null bean (0.3.4+)
+
+Previously the bean method returned `null` when `sync-role` wasn't configured, registering a `NullBean` placeholder in the application context. `@Autowired KeycloakRoleSynchronizer` (required) blew up with NPE-flavoured errors later.
+
+**Now:** the bean is conditionally created via `@ConditionalOnExpression("!'${f8a.security.apisix.resource-server.sync-role:}'.trim().isEmpty()")` — when `sync-role` is unset the bean is **not registered at all**. Plus `@ConditionalOnMissingBean` so consumers can override.
+
+- `@Autowired(required = false)` / `ObjectProvider<KeycloakRoleSynchronizer>` — same observable behaviour (null when unsatisfied).
+- `@Autowired` (required, sync disabled) — was: `NullBean` injected → NPE later. Now: clean `NoSuchBeanDefinitionException` at startup.
+
+The `"sync-role not configured — role synchronization disabled"` info log is gone. Absence of `"Role synchronization will run against provider..."` at startup is now the signal that sync is off.
+
 ## ReactiveKeycloakClient
 
 Resource-based API mirroring keycloak-admin-client SPI. Auto-configured per provider that has
@@ -215,6 +297,7 @@ attribute), custom attributes to Keycloak. Runs against the provider named by to
 
 Headline only — for full per-version detail load the matching overlay:
 
+- **0.3.4** (2026-05-08) — `SseQueryParamTokenFilter` + `SseAuthCustomizer` (delete service-local SSE filters); `ProviderJwtDecoderResolver` reusable bean; `KeycloakRoleSynchronizer` no longer a null bean. See [versions/0.3.4.md](references/versions/0.3.4.md).
 - **0.3.3** (2026-05-07) — optional `provider.issuer-uri`; broadcast `GroupRoleInvalidator.invalidate(groupName)` + `BROADCAST_SCOPE = "*"`. See [versions/0.3.3.md](references/versions/0.3.3.md).
 - **0.3.2** — multi-realm via `providers.<id>` (BREAKING vs 0.3.0); `MultiRealmAuthenticationConverter`; `sync-role` is now a top-level provider-id pointer; group-role cache scoped by provider id. See [versions/0.3.2.md](references/versions/0.3.2.md).
 - **0.3.0** — JWT blacklist via Redis (`blacklist-prefix-key`); `JwtBlacklistChecker` strategy interface; `ApisixAuthenticationManager` 3-arg constructor (BREAKING for direct instantiation). See [versions/0.3.0.md](references/versions/0.3.0.md).
@@ -232,7 +315,8 @@ For the full feature × version table see [`summer-core/references/version-matri
 - Always use Vietnamese for `@ResourceDef(name)` and `@FeatureDef(name)`. `code` stays English kebab-case.
 - Always use `@PreAuthorize("hasAnyRole(@roles.XXX)")` for endpoint authorization — path matchers alone are not enough.
 - Never expose Keycloak client secrets in `application.yml` — use environment variables or Vault.
-- Always check Summer version before suggesting features (group-role: 0.2.4+; multi-realm `providers.*`: 0.3.0+; JWT blacklist: 0.3.0+; broadcast invalidator: 0.3.3+).
+- Always check Summer version before suggesting features (group-role: 0.2.4+; multi-realm `providers.*`: 0.3.0+; JWT blacklist: 0.3.0+; broadcast invalidator: 0.3.3+; SSE filter + `ProviderJwtDecoderResolver`: 0.3.4+).
+- For 0.3.4+ services with SSE endpoints, **never** ship a service-local `SseQueryParamTokenFilter` — register a `SseAuthCustomizer` bean against Summer's auto-wired filter. A duplicate `@Component` either collides or silently shadows the Summer one.
 - For 0.3.0+ projects, never write the legacy single-`keycloak.*` block — that schema is removed. Use `providers.<id>:` always.
 - Multi-realm projects: assign each provider a stable `id` and reuse it as the `scopeKey` for invalidation calls — never invent ad-hoc scope strings.
 

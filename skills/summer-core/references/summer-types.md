@@ -109,3 +109,60 @@ Auto-serialized by `SummerGlobalExceptionHandler`. The `details` field is a `Map
 | `INTERNAL_SERVER_ERROR` | 500 |
 | `SERVICE_UNAVAILABLE` | 503 |
 | `TIMEOUT` | 504 |
+
+## Identifier Types — `Ufid` vs `Txid`
+
+Two distinct identifier needs, two distinct value types. Treat them as different domain concepts; the type system enforces it.
+
+| | `Ufid` (0.2.5+) | `Txid` (0.3.5+) |
+|---|---|---|
+| **Width** | 128-bit | 59-bit (fits 18 decimal digits) |
+| **Use for** | Internal canonical keys: account ids, wallet ids, party ids, saga executions, journal entries | Human-facing reference numbers: transaction receipts, support-call quotables |
+| **Mint via** | `Ufid.generate()` (any host) | `TxidGenerator.next()` (one bean per JVM) |
+| **Display format** | UUID (`@JsonValue`) or 26-char Crockford Base32 (`@Compact`) or prefixed (`@JE` / `@TX` / `@SE` / `@UfidPrefix`) | 18-digit zero-padded decimal |
+| **DB column** | `UUID` (standard) | `BIGINT` (greenfield) or `UUID` with MSB=0 (legacy) — controlled by `summer.r2dbc.txid-column-type` |
+| **TigerBeetle wire** | u128 little-endian | u128 little-endian, **upper 8 bytes always zero** |
+| **Sortable by mint time** | No (random) | Yes (timestamp in high bits) |
+| **Collision space** | 128 bits | 4096 IDs/ms/machine × 64 machines = 262k/ms cluster-wide |
+| **Header used** | n/a | `Txid.getMachineId()` — 0..63 by default |
+
+### `Txid` quick reference
+
+```java
+// Mint
+Txid txid = txidGen.next();
+
+// Display
+String display = txid.toString();         // "000123456789012345"
+String json   = txid.toJsonValue();       // same
+
+// Encodings
+long  asBigInt  = txid.toLong();          // BIGINT column
+UUID  asUuid    = txid.toUUID();          // UUID column (MSB = 0)
+byte[] tbId     = txid.as16Bytes();       // TigerBeetle u128 (LE, high 8 bytes = 0)
+
+// Decode for debugging
+Instant when    = txid.getInstant();
+int  machineId  = txid.getMachineId();    // 0..63
+int  sequence   = txid.getSequence();     // 0..4095
+
+// Parse — both padded and unpadded accepted
+Txid parsed = Txid.fromString("000123456789012345");
+Txid parsed = Txid.fromString("123456");
+```
+
+### When `Txid.from*` throws
+
+Every `from*` constructor throws `IllegalArgumentException` if the upper 64 bits of the source value are non-zero. A `Txid` minted by `TxidGenerator` always has the upper half zero, so a non-zero half means the value came from elsewhere (legacy data, manual insert, foreign service) — surface the bug rather than silently truncating.
+
+### `TxidGenerator` wiring patterns
+
+| Environment | Identity source | Wiring |
+|---|---|---|
+| Kubernetes StatefulSet | Pod ordinal from `HOSTNAME=<svc>-<n>` | `new TxidGenerator(MachineIdResolver.resolve())` |
+| Deployment with stable per-pod config | `SUMMER_TXID_MACHINE_ID` env / `summer.txid.machine-id` system property | `new TxidGenerator(MachineIdResolver.resolve())` |
+| Deployment (autoscaled), Cloud Run | Redis slot lease (self-healing) | `new TxidGenerator(redisMachineIdReservation)` (the reservation is a `Supplier<Long>`) |
+
+`MachineIdResolver.resolve()` **throws** if no static source is set — never silently hashes the hostname. Two pods with the same machineId is silent ID corruption.
+
+`RedisMachineIdReservation` re-acquires a fresh slot atomically if its TTL ever lapses (GC pause, network partition, Redis restart). The generator picks up the new id on its next `next()` call without a pod restart. Use `isHealthy()` as a Kubernetes liveness probe.
