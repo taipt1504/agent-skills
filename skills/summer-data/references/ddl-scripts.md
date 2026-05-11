@@ -112,12 +112,12 @@ auditService.findByIntent("order.placed", PageRequest.of(0, 50))
     .collectList();
 ```
 
-## outbox_events Table
+## outbox_events Table (0.3.1+ shape)
 
 ```sql
 CREATE TABLE outbox_events
 (
-    id            UUID PRIMARY KEY,
+    id            UUID PRIMARY KEY,                                  -- Ufid stored as UUID
     aggregate_id  VARCHAR(255) NOT NULL,
     event_type    VARCHAR(255) NOT NULL,
     payload       JSONB        NOT NULL,
@@ -125,16 +125,85 @@ CREATE TABLE outbox_events
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
     published_at  TIMESTAMPTZ,
     retry_count   INTEGER      NOT NULL DEFAULT 0,
-    error_message TEXT
+    error_message TEXT,
+    next_retry_at TIMESTAMPTZ,                                       -- 0.2.8+ — used by OutboxRetryTask
+    lsn           BIGINT                                              -- 0.3.1+ — preserved across CDC retries for consumer watermark
 );
 
-CREATE INDEX idx_outbox_unpublished ON outbox_events (published, created_at)
+-- Essential: serves the scheduler publisher (retry_count=0) and monitoring
+CREATE INDEX idx_outbox_unpublished ON outbox_events (created_at)
     WHERE published = FALSE;
+
+-- Essential: serves OutboxRetryTask — partial index keeps it tiny
+CREATE INDEX idx_outbox_retry ON outbox_events (next_retry_at)
+    WHERE published = FALSE AND retry_count > 0;
+
+-- Optional: history lookups by aggregate / type
 CREATE INDEX idx_outbox_aggregate ON outbox_events (aggregate_id, created_at DESC);
-CREATE INDEX idx_outbox_type ON outbox_events (event_type, created_at DESC);
+CREATE INDEX idx_outbox_type      ON outbox_events (event_type,   created_at DESC);
 ```
 
-**9 columns.** `OutboxTableValidator` validates column names and types on startup.
+**11 columns.** `OutboxTableValidator` validates column names and types on startup.
+
+### Adding the 0.2.8 / 0.3.1 columns to an existing table
+
+```sql
+ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;     -- 0.2.8
+ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS lsn           BIGINT;          -- 0.3.1
+CREATE INDEX IF NOT EXISTS idx_outbox_retry ON outbox_events (next_retry_at)
+    WHERE published = FALSE AND retry_count > 0;
+```
+
+`OutboxRetryTask` re-emits the same `ob.lsn` Kafka header on retry to keep consumer watermarks consistent (CDC-mode only). Existing pre-0.3.1 rows with `NULL lsn` fall back to the old epoch-nanos behaviour.
+
+## outbox_consumer_watermark Table (0.3.1+)
+
+For services that consume Summer outbox events with LSN-watermark idempotency. Column names are validated literally by `ConsumerWatermarkValidator` — using `lsn` / `updated_at` here will fail boot.
+
+```sql
+CREATE TABLE outbox_consumer_watermark
+(
+    consumer_group  VARCHAR(255) NOT NULL,
+    topic           VARCHAR(255) NOT NULL,
+    partition       INTEGER      NOT NULL,
+    last_lsn        BIGINT       NOT NULL,
+    last_event_id   UUID,                                            -- debug/audit only
+    last_updated_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    PRIMARY KEY (consumer_group, topic, partition)
+);
+```
+
+Storage cost: O(groups × topics × partitions) — typically under a few hundred rows per service, regardless of message volume.
+
+See [`summer-kafka`](../../summer-kafka/SKILL.md) for the consumer-side listener wiring.
+
+## PostgreSQL prereqs for CDC mode
+
+Required when `f8a.outbox.publisher.mode=cdc`. No effect under `mode=scheduler`.
+
+```sql
+-- 1. wal_level must be 'logical' (set in postgresql.conf or via docker -c wal_level=logical)
+SHOW wal_level;                                      -- must return 'logical'
+
+-- 2. The DB user the connector authenticates as needs REPLICATION
+ALTER ROLE <db_user> WITH REPLICATION;
+
+-- 3. The outbox table needs REPLICA IDENTITY DEFAULT (uses PK) or FULL
+ALTER TABLE outbox_events REPLICA IDENTITY DEFAULT;  -- DEFAULT uses primary key (id)
+
+-- 4. Create a filtered publication for the outbox table only
+--    (publication.autocreate.mode is typically 'disabled' so the publication must exist before connector startup)
+DROP PUBLICATION IF EXISTS dbz_<svc>_outbox;
+CREATE PUBLICATION dbz_<svc>_outbox FOR TABLE public.outbox_events;
+```
+
+The replication slot itself (`slot.name` in the connector config) is created automatically by Debezium on first connect, with `pgoutput` plugin. If the slot already exists with a different plugin, drop it before the connector starts:
+
+```sql
+SELECT pg_drop_replication_slot('<slot_name>') WHERE EXISTS (
+    SELECT 1 FROM pg_replication_slots WHERE slot_name = '<slot_name>' AND plugin <> 'pgoutput'
+);
+```
 
 ## OutboxService Implementation
 

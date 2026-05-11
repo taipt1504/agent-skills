@@ -10,7 +10,8 @@ requires: []
 # Summer Core — Gate & Shared Types
 
 Reactive Spring Boot 3.x library (Java 21+) on WebFlux + Reactor Netty.
-**Group:** `io.f8a.summer` | **BOM:** `summer-platform` | **Latest stable:** 0.3.3 (2026-05-07)
+**Group:** `io.f8a.summer` | **BOM:** `summer-platform` | **Latest stable:** 0.3.5 (2026-05-10)
+**Note:** `summer-payment-sdk` is versioned independently (`paymentSdkVersion`); BOM pins a known-good value per Summer release (since 0.3.3).
 
 ## Hard Gate
 
@@ -25,6 +26,8 @@ Check `build.gradle` or `pom.xml` for `io.f8a.summer:summer-platform`.
 
    | Signal | Version |
    |---|---|
+   | `Txid` / `TxidGenerator` / `MachineIdResolver` / `summer-file` artifact | 0.3.5+ |
+   | `SseQueryParamTokenFilter` / `SseAuthCustomizer` / `ProviderJwtDecoderResolver` | 0.3.4+ |
    | `Provider.issuerUri` config field / `BROADCAST_SCOPE` | 0.3.3+ |
    | `MultiRealmAuthenticationConverter` / `providers.<id>` schema | 0.3.2+ |
    | `summer-kafka-consumer` artifact / `KafkaOutboxPublisher` auto-bean | 0.3.1+ |
@@ -49,7 +52,7 @@ When the detected version is older than the latest stable, load the matching
 | Module                             | Config Prefix                                                                    | Activation [^1]                                  |
 |------------------------------------|----------------------------------------------------------------------------------|--------------------------------------------------|
 | `summer-rest-autoconfigure`        | `f8a.common`                                                                     | Auto                                             |
-| `summer-data-autoconfigure`        | —                                                                                | Auto                                             |
+| `summer-data-autoconfigure`        | `summer.r2dbc.txid-column-type` (0.3.5+)                                         | Auto                                             |
 | `summer-data-audit-autoconfigure`  | `f8a.audit`                                                                      | Auto                                             |
 | `summer-data-outbox-autoconfigure` | `f8a.outbox.publisher.{queue, scheduler.*, cdc.*}` (0.3.1+)                      | `f8a.outbox.enabled=true` (default)              |
 | `summer-kafka-consumer-autoconfigure` (0.3.1+) | `f8a.kafka.consumer.{idempotency.*, retry.*}`                        | Auto when `summer-kafka-consumer` on classpath   |
@@ -58,6 +61,8 @@ When the detected version is older than the latest stable, load the matching
 | `summer-keycloak` (client)         | —                                                                                | Manual bean creation                             |
 | `summer-keycloak` (role sync)      | `f8a.security.apisix.resource-server.sync-role: <provider-id>` (0.3.2+)          | When `sync-role` points to a provider (0.3.2+)   |
 | `summer-keycloak` (group-role)     | per-provider `group-role-authorization: true` + global `group-role-authorization.*` (0.3.2+) | `true` on a provider (0.3.2+)         |
+| `summer-file` (0.3.5+)             | —                                                                                | Manual — no Spring auto-config                   |
+| `summer-payment-sdk`               | —                                                                                | Manual — wire DTOs only; independent version axis |
 
 [^1]: "Auto" means Spring Boot auto-configuration activates when the required dependency is on the classpath (Spring Boot for REST, R2DBC for data modules).
 
@@ -82,6 +87,11 @@ implementation platform('io.f8a.summer:summer-platform:<version>')
 | `PhoneNumber` | `core` | Value object; validate with `@ValidPhoneNumber` |
 | `ViewableException` | `core.exception` | Base HTTP exception with `.detail()` fluent builder |
 | `JsonErrorResponse` | `core.exception` | Error response DTO: code, message, traceId, timestamp, details |
+| `Ufid` | `core.domain.types.ufid` | 128-bit sortable canonical key (0.2.5+). Crockford Base32 display (0.2.6+); UUID-storable. |
+| `Txid` (0.3.5+) | `core.domain.types.txid` | Snowflake-style 59-bit transaction reference. 18-digit zero-padded decimal on wire; fits BIGINT. **Distinct from `Ufid`** — `Ufid` is internal canonical, `Txid` is human-facing receipt number. |
+| `TxidGenerator` (0.3.5+) | `core.domain.types.txid` | Synchronized monotonic generator (4096 IDs/ms/machine). Constructed with a fixed `machineId` or a `Supplier<Long>` re-evaluated per call. |
+| `MachineIdResolver` (0.3.5+) | `core.domain.types.txid` | Resolves machineId from `SUMMER_TXID_MACHINE_ID` env / `summer.txid.machine-id` system property / Kubernetes StatefulSet ordinal. Throws if none set — never silently hashes hostname. |
+| `RedisMachineIdReservation` (0.3.5+) | `core.domain.types.txid` | Self-healing distributed slot lease (`Closeable + Supplier<Long>`). Use when StatefulSet ordinals aren't available (vanilla Deployment, Cloud Run, autoscaled fleets). |
 
 ## CommonExceptions Enum
 
@@ -94,10 +104,13 @@ Usage: `throw CommonExceptions.RESOURCE_NOT_FOUND.toException().detailValue("id"
 | Context | Load |
 |---|---|
 | Handler, controller, WebClient, Jackson, exception handling | **summer-rest** |
-| Audit, outbox, R2DBC converters, DDL | **summer-data** |
-| APISIX auth, @AuthRoles, Keycloak client, role sync | **summer-security** |
+| Audit, outbox, R2DBC converters, DDL, Txid R2DBC converters | **summer-data** |
+| APISIX auth, @AuthRoles, Keycloak client, role sync, SSE auth (0.3.4+) | **summer-security** |
 | Rate limiting (0.2.2+) | **summer-ratelimit** |
 | Tests, WireMock, Testcontainers, blackbox | **summer-test** |
+| `@KafkaListener` idempotency, DLT, error handler (0.3.1+) | **summer-kafka** |
+| Streaming zip / xlsx exports (0.3.5+) | **summer-file** |
+| Payment event DTOs, prefix annotations, producer-routing (0.3.3+) | **summer-payment-sdk** |
 
 ## Sub-Skill Gate Verification
 
@@ -107,8 +120,9 @@ Every summer sub-skill MUST verify this gate was loaded. If a sub-skill is trigg
 
 - Never guess the Summer version — detect from gradle.properties or pattern matching, ask if unclear.
 - Never load summer sub-skills without confirming the gate.
-- Always check version compatibility before suggesting features (e.g., rate limiting requires 0.2.2+).
+- Always check version compatibility before suggesting features (e.g., rate limiting requires 0.2.2+; `Txid` and `summer-file` require 0.3.5+; SSE filter and `ProviderJwtDecoderResolver` require 0.3.4+).
 - Always use `ViewableException` (not generic RuntimeException) for HTTP error responses.
+- **`Ufid` ≠ `Txid`.** `Ufid` is the 128-bit canonical key (joinable, immutable, collision-safe). `Txid` is the 59-bit human-facing transaction reference (sortable by mint time, fits BIGINT). They are not interchangeable — `Ufid` is wrong for new wallet/payment receipt numbers, and `Txid` cannot hold pre-2026 ids.
 
 ## References
 
@@ -121,7 +135,10 @@ Every summer sub-skill MUST verify this gate was loaded. If a sub-skill is trigg
 ## Related Skills
 
 - **summer-rest** — Handlers, ResponseFactory, WebClientBuilderFactory
-- **summer-data** — AuditService, OutboxService, R2DBC converters
-- **summer-security** — APISIX auth, @AuthRoles, Keycloak
+- **summer-data** — AuditService, OutboxService, R2DBC converters (incl. Txid converters, 0.3.5+)
+- **summer-security** — APISIX auth, @AuthRoles, Keycloak, SSE filter (0.3.4+)
 - **summer-ratelimit** — Rate limiting (0.2.2+)
 - **summer-test** — PostgresTestContainer, WireMock, blackbox
+- **summer-kafka** — `@KafkaListener` LSN-watermark idempotency, DLT (0.3.1+)
+- **summer-file** — Streaming zip/xlsx exporter (0.3.5+)
+- **summer-payment-sdk** — Shared event DTOs, prefix annotations, producer-routing vocabulary
