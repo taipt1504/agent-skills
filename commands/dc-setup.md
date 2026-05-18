@@ -7,14 +7,13 @@ description: Install devco-agent-skills into the current project. Interactive wi
 
 ## CRITICAL RULE: Always Ask, Never Force Defaults
 
-You MUST ask the user for their preferences before configuring ANYTHING.
-Never auto-apply defaults. Never skip user choices. The user decides everything.
+MUST ask user for preferences before configuring ANYTHING. Never auto-apply defaults. Never skip user choices. User decides everything.
 
 ## Setup Flow
 
 ### Phase 1: Ask User Preferences (MANDATORY — before any script runs)
 
-Use the **AskUserQuestion** tool to gather all preferences FIRST:
+Use **AskUserQuestion** tool to gather all preferences FIRST:
 
 **Question 1 — Development Mode:**
 
@@ -44,7 +43,7 @@ Which would you like to install? (select all that apply)
 
 ### Phase 2: Run Project Detection
 
-Detect the project stack FIRST (before config) so you can show the user what was detected:
+Detect project stack FIRST (before config) to show user what was detected:
 
 ```bash
 PLUGIN_DIR="$(find "$HOME/.claude/plugins" -maxdepth 4 -name "setup-kit.sh" \
@@ -86,11 +85,11 @@ echo "Build tool: $BUILD_TOOL"
 echo "Spring type: $SPRING_TYPE"
 ```
 
-**Present detection results to user** and ask if they want to adjust anything before proceeding.
+**Present detection results to user** and ask if they want to adjust before proceeding.
 
 ### Phase 3: Run Setup with User's Choices
 
-ONLY after getting ALL user preferences, run setup-kit.sh with the appropriate flags:
+ONLY after ALL user preferences gathered, run setup-kit.sh with appropriate flags:
 
 ```bash
 # Build the command based on user choices
@@ -105,13 +104,13 @@ eval "$CMD"
 
 Based on user's MCP selections from Phase 1 Question 3:
 
-- ONLY install the MCPs the user explicitly chose
-- For each selected MCP, run `claude mcp add` with the appropriate config
-- Show the user what was installed and ask if they want to adjust
+- ONLY install MCPs user explicitly chose
+- For each selected MCP, run `claude mcp add` with appropriate config
+- Show user what was installed and ask to adjust
 
 ### Phase 5: Verify & Show Summary
 
-Show the user what was configured and ask if everything looks correct:
+Show user what was configured and ask if correct:
 
 ```
 Setup Summary:
@@ -127,10 +126,18 @@ Does this look correct? Any changes needed?
 
 ## Important Notes
 
-- **Hooks are auto-registered** by the Claude Code plugin system from `hooks/hooks.json`. Do NOT copy hooks into `.claude/settings.json` — the plugin system handles this.
-- **Config separation (v3.3+)**: Project detection results (build tool, Spring type, dependencies, Summer version, Java version) are written exclusively to `project-profile.json`. Plugin behavior settings (mode, workflow, team) are written exclusively to `devco-config.json`. Do NOT write project detection data into `devco-config.json`.
-- **project-profile.json** is the single source of truth for project context. All downstream hooks (quality-gate, skill-router, subagent-init) read from it. The `project.*` block in `devco-config.json` has been removed in v3.3.
+- **Hooks are auto-registered** by Claude Code plugin system from `hooks/hooks.json`. Do NOT copy hooks into `.claude/settings.json`.
+- **Config separation (v3.3+)**: Project detection results (build tool, Spring type, dependencies, Summer version, Java version) written exclusively to `project-profile.json`. Plugin behavior settings (mode, workflow, team) written exclusively to `devco-config.json`. Do NOT write project detection data into `devco-config.json`.
+- **project-profile.json** is single source of truth for project context. All downstream hooks (quality-gate, skill-router, subagent-init, preflight-discovery) read from it.
+- **Conditional rule loading (v4.0)**: `rules/summer/` enumerated by `preflight-discovery.sh` ONLY when `project-profile.json` shows `summer: true`. Same principle as `summer-*` skills — load only when project uses io.f8a.summer library.
 - **Safe to re-run** — setup-kit.sh is idempotent, won't overwrite user customizations.
+- **Optional rules symlink (v4.1)**: `/dc-setup --link-rules <profile>` symlinks plugin rule subset into project `.claude/rules/` for Claude Code native auto-load. Profiles:
+  - `--link-rules common` — symlinks `rules/common/*.md` (lanes, spec-driven, skill-enforcement, etc.)
+  - `--link-rules java-webflux` — common + `rules/java/{coding-style,reactive,api-design,security,testing,observability,migration}.md`
+  - `--link-rules java-mvc` — common + java/* minus reactive
+  - `--link-rules summer` — adds `rules/summer/*.md` to whichever java profile
+  - Default OFF — preserves pre-flight discipline (rules loaded explicitly per gate by plugin agents)
+  - Trade-off: symlinking → Claude Code auto-loads at every session (~5-10K tokens); no symlink → plugin agents read on-demand per pre-flight artifact
 
 ## Quick Re-run (after plugin update)
 

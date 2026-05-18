@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# skill-router.sh — PreToolUse Skill Router (v3.2)
+# skill-router.sh — PreToolUse Skill Hint Router (v4.0 — announcement-only)
 # =============================================================================
-# Checks file→skill mapping before file operations, enforces skill loading.
+# Hints at the skill that matches the file being edited. Does NOT block.
 # Uses: filename patterns → directory patterns → file content → NL triggers.
 # Fires on: PreToolUse (Edit|Write|MultiEdit)
 #
-# Behavior:
-#   - If skill matched AND skill NOT in skills-loaded.json → exit 2 (block)
-#   - If skill matched AND skill already loaded → exit 0 (pass through)
-#   - If no skill matched → exit 0 (pass through)
+# Behavior (v4.0):
+#   - Skill matched → emit stderr announcement, exit 0 (pass through)
+#   - No match → exit 0 (pass through)
 #
-# Registry: .claude/sessions/skills-loaded.json
-#   Updated by: session-init.sh (reset on session start)
-#   The agent's Skill tool usage is tracked externally; agents should update
-#   skills-loaded.json after loading a skill, or the next hook call will
-#   block again. This creates a soft-block loop that enforces skill loading.
+# Rationale: skills-loaded.json gate caused multi-agent dispatch failures
+# (see REFACTOR_PLAN.md §3.6.1 Stage 2). Replaced with announcement contract
+# per superpowers pattern: agent announces loaded skills in chat, no file gate.
+# Pre-flight discovery (preflight-gate.sh) handles enforcement now.
 # =============================================================================
 
 source "$(dirname "$0")/run-with-flags.sh" "skill-router" || exit 0
@@ -43,7 +41,7 @@ SKILL=""
 # Route based on file patterns
 case "$FILENAME" in
   *Controller.java|*Handler.java|*Router.java)
-    SKILL="spring-patterns" ;;
+    SKILL="spring-webflux-patterns" ;;
   *SecurityConfig*|*AuthConfig*)
     SKILL="spring-security" ;;
   *Repository.java|*Entity.java)
@@ -59,7 +57,7 @@ esac
 if [ -z "$SKILL" ]; then
   LOWER_DIR="$(echo "$FILE_PATH" | tr '[:upper:]' '[:lower:]')"
   if echo "$LOWER_DIR" | grep -qE '/controller/|/handler/'; then
-    SKILL="spring-patterns"
+    SKILL="spring-webflux-patterns"
   elif echo "$LOWER_DIR" | grep -qE '/security/'; then
     SKILL="spring-security"
   elif echo "$LOWER_DIR" | grep -qE '/repository/|/entity/'; then
@@ -81,7 +79,7 @@ if [ -z "$SKILL" ] && [ -f "$FILE_PATH" ]; then
   elif grep -q '@PreAuthorize\|SecurityWebFilterChain\|SecurityFilterChain' "$FILE_PATH" 2>/dev/null; then
     SKILL="spring-security"
   elif grep -q 'Mono\.\|Flux\.\|StepVerifier' "$FILE_PATH" 2>/dev/null; then
-    SKILL="spring-patterns"
+    SKILL="spring-webflux-patterns"
   fi
 fi
 
@@ -123,11 +121,11 @@ if [ -z "$SKILL" ]; then
   # Hardcoded natural language trigger lookup (avoids reading 18 SKILL.md files)
   # Format: "trigger phrase|skill-name"
   NL_TRIGGERS=(
-    "rest endpoint|spring-patterns"
-    "api handler|spring-patterns"
-    "pagination|spring-patterns"
-    "web filter|spring-patterns"
-    "webclient|spring-patterns"
+    "rest endpoint|spring-webflux-patterns"
+    "api handler|spring-webflux-patterns"
+    "pagination|spring-webflux-patterns"
+    "web filter|spring-webflux-patterns"
+    "webclient|spring-webflux-patterns"
     "jwt auth|spring-security"
     "cors config|spring-security"
     "security filter|spring-security"
@@ -202,31 +200,12 @@ fi
 
 if [ -n "$SKILL" ]; then
   SKILL_PATH="skills/$SKILL/SKILL.md"
-
-  # --- Check loaded-skills registry ---
-  # skills-loaded.json is reset by session-init.sh on session start.
-  # Agents should update this file after loading a skill to avoid repeated blocks.
-  SKILLS_LOADED_FILE="${PROJECT_ROOT}/.claude/sessions/skills-loaded.json"
-  ALREADY_LOADED=false
-  if [ -f "$SKILLS_LOADED_FILE" ]; then
-    if grep -q "\"$SKILL\"" "$SKILLS_LOADED_FILE" 2>/dev/null; then
-      ALREADY_LOADED=true
-    fi
-  fi
-
-  if [ "$ALREADY_LOADED" = true ]; then
-    # Skill already loaded — pass through, no interruption
-    printf '%s' "$DATA"
-    exit 0
-  fi
-
-  # Skill NOT loaded — soft-block: require the agent to load the skill first
-  BLOCK_MSG="BLOCKED: Load skill '${SKILL}' before editing ${FILENAME}. Use Skill tool: devco-agent-skills:${SKILL} (path: ${SKILL_PATH}). After loading, update .claude/sessions/skills-loaded.json to acknowledge."
-  printf '{"decision":"block","reason":"%s"}' \
-    "$(printf '%s' "$BLOCK_MSG" | sed 's/"/\\"/g')"
-  exit 2
+  # Announcement only — non-blocking. Agent announces skill loaded in chat per
+  # the rules/common/skill-enforcement.md 1% rule. Pre-flight is the gate now.
+  printf '[skill-router] Suggested skill for %s: %s (path: %s)\n' \
+    "$FILENAME" "$SKILL" "$SKILL_PATH" >&2
 fi
 
-# No skill match — pass through original data
+# Always pass through — no blocking
 printf '%s' "$DATA"
 exit 0

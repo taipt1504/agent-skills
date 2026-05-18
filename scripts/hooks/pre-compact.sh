@@ -17,13 +17,12 @@ cd "$PROJECT_ROOT" 2>/dev/null || true
 PROJECT_NAME="$(basename "$PROJECT_ROOT")"
 
 SESSIONS_DIR=".claude/sessions"
-COMPACTION_LOG="$SESSIONS_DIR/compaction-log.txt"
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
 mkdir -p "$SESSIONS_DIR"
 
-# Log compaction event
-echo "[$TIMESTAMP] Context compaction triggered" >> "$COMPACTION_LOG"
+# compaction-log.txt writer REMOVED in v4.0 per REFACTOR_PLAN.md §3.6.1 Stage 1
+# (timestamps-only file with no consumer). Recovery JSON below is the durable record.
 
 # Find active session
 ACTIVE_SESSION=$(find "$SESSIONS_DIR" -name "*.tmp" -type f 2>/dev/null | sort -r | head -1)

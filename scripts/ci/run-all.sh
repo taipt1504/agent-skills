@@ -13,13 +13,22 @@ RESULTS=""
 run_validator() {
   local name="$1"
   local script="$2"
+  shift 2
+  local args=("$@")
 
   echo ""
   echo "================================================================"
   echo "  $name"
   echo "================================================================"
 
-  if bash "$script"; then
+  local ret=0
+  if [ ${#args[@]} -gt 0 ]; then
+    bash "$script" "${args[@]}" || ret=$?
+  else
+    bash "$script" || ret=$?
+  fi
+
+  if [ $ret -eq 0 ]; then
     PASS=$((PASS + 1))
     RESULTS="${RESULTS}\n  PASS  $name"
   else
@@ -35,6 +44,7 @@ run_validator "Skill Directories" "$SCRIPT_DIR/validate-skills.sh"
 run_validator "Command Files"     "$SCRIPT_DIR/validate-commands.sh"
 run_validator "Hook Configuration" "$SCRIPT_DIR/validate-hooks.sh"
 run_validator "Skill Trigger Coverage" "$SCRIPT_DIR/validate-skill-triggers.sh"
+run_validator "Plan/Spec Template Conformance" "$SCRIPT_DIR/validate-plan-spec-templates.sh" "--all"
 # Non-interactive integration test (opt-in: SKIP_NONINTERACTIVE=0)
 run_validator "Non-Interactive Mode" "$SCRIPT_DIR/test-non-interactive.sh"
 

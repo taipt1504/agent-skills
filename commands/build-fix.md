@@ -9,44 +9,24 @@ Incrementally fix Java/Gradle build and compilation errors for Spring Boot (MVC 
 
 ## Subagent Context (pass to spawned agent)
 
-When invoking the **build-fixer** agent, include in its prompt:
-
-- **Phase**: You are in the **BUILD** phase (exception path) of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
-- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
-- **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first
+- **Phase**: BUILD (exception path) of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+- **Skill protocol**: Load `devco-agent-skills:bootstrap` first. Announce skill before every file operation.
+- **Summer check**: Scan `build.gradle` for `io.f8a.summer` → load `devco-agent-skills:summer-core` first
 - **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
-- **Exception path**: Build-fix is an exception path — PLAN/SPEC gates do not apply. Fix errors only, no architecture changes.
-- **Suggested skill**: `devco-agent-skills:coding-standards` for Java patterns and import conventions
+- **Exception path**: Fix errors only, no architecture changes. PLAN/SPEC gates do not apply.
+- **Suggested skill**: `devco-agent-skills:coding-standards` for Java patterns/imports
 
 ## Instructions
 
-1. **Run build:**
-   ```bash
-   ./gradlew clean build 2>&1 | tee build-output.log
-   ```
+1. **Run build:** `./gradlew clean build 2>&1 | tee build-output.log`
 
-2. **Parse error output:**
-    - Group by file
-    - Sort by severity (compilation > runtime > warnings)
-    - Identify error category
+2. **Parse errors:** group by file, sort by severity (compilation > runtime > warnings), identify category
 
-3. **For each error:**
-    - Show error context (5 lines before/after)
-    - Explain the issue
-    - Propose minimal fix
-    - Apply fix
-    - Re-run build
-    - Verify error resolved
+3. **Per error:** show context (5 lines before/after), explain, propose minimal fix, apply, re-run, verify
 
-4. **Stop if:**
-    - Fix introduces new errors
-    - Same error persists after 3 attempts
-    - User requests pause
+4. **Stop if:** fix introduces new errors, same error after 3 attempts, user requests pause
 
-5. **Show summary:**
-    - Errors fixed
-    - Errors remaining
-    - New errors introduced (if any)
+5. **Summary:** errors fixed, remaining, new errors introduced
 
 Fix one error at a time for safety!
 
@@ -126,19 +106,9 @@ Fix one error at a time for safety!
 
 ## Fix Strategy
 
-### Priority Order
+**Priority:** Compilation → Spring context → Database/migration → Runtime warnings
 
-1. **Compilation errors first** - Code won't run without these
-2. **Spring context errors** - Bean wiring issues
-3. **Database/migration errors** - Data layer issues
-4. **Runtime warnings** - Less critical
-
-### Minimal Diff Approach
-
-- Change only what's necessary
-- Don't refactor while fixing
-- Keep existing code style
-- Add imports, not rewrite classes
+**Minimal diff:** change only what's necessary, no refactor, match existing style, add imports not rewrite classes
 
 ## Output Format
 

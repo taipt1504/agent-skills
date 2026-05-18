@@ -1,16 +1,43 @@
 ---
 name: plan
-description: Restate requirements, assess risks, and create step-by-step implementation plan. WAIT for user CONFIRM before touching any code.
+description: Decompose chosen solution into vertical slices with dependency graph. Reads Align + Brainstorm artifacts. Blocks for high-stakes lane without brainstorm artifact. WAIT for user CONFIRM before any code.
 ---
 
-# /plan -- Start Planning Phase
+# /plan — Slice Decomposition Gate
 
 ## First Action (MANDATORY)
 
-Before anything else, update the workflow state:
-
 ```bash
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+LANE_FILE="$PROJECT_ROOT/.claude/memory/state/current-triage.json"
+ALIGN_DIR="$PROJECT_ROOT/.claude/memory/align-artifacts"
+BRAINSTORM_DIR="$PROJECT_ROOT/.claude/memory/brainstorm-artifacts"
+PREFLIGHT_DIR="$PROJECT_ROOT/.claude/memory/preflight"
+
+# 1. Lane check
+LANE="standard"
+[ -f "$LANE_FILE" ] && LANE=$(grep -o '"lane"[[:space:]]*:[[:space:]]*"[^"]*"' "$LANE_FILE" | sed 's/.*"\([^"]*\)"$/\1/' | head -1)
+
+# 2. Trivial bypass
+if [ "$LANE" = "trivial" ]; then
+  echo "Trivial lane — /plan skipped. Proceed to direct Execute."
+  exit 0
+fi
+
+# 3. High-stakes brainstorm precondition
+if [ "$LANE" = "high-stakes" ]; then
+  if ! ls "$BRAINSTORM_DIR"/*.md 2>/dev/null | grep -q .; then
+    echo "BLOCKED: high-stakes lane requires brainstorm artifact. Run /brainstorm first."
+    exit 2
+  fi
+fi
+
+# 4. Pre-flight 2 (plan-prep) precondition
+if ! ls "$PREFLIGHT_DIR"/plan-*.md 2>/dev/null | grep -q .; then
+  echo "WARN: no pre-flight artifact for plan gate. Pre-flight hook will produce it."
+fi
+
+# 5. Update workflow-state
 mkdir -p "$PROJECT_ROOT/.claude"
 python3 -c "
 import json, datetime, os
@@ -25,69 +52,89 @@ state.setdefault('startedAt', now)
 state.setdefault('phaseHistory', [])
 state.setdefault('decisions', [])
 state.setdefault('artifacts', {})
+state['lane'] = os.environ.get('LANE', 'standard')
 state['autoTransition'] = True
 state.setdefault('retryCount', 0)
 with open(path, 'w') as f:
     json.dump(state, f, indent=2)
     f.write('\n')
-print('workflow-state.json updated: phase=PLAN')
+print(f'workflow-state.json: phase=PLAN lane={state[\"lane\"]}')
 " 2>/dev/null || echo "workflow-state.json update skipped"
 ```
 
-This command invokes the **planner** agent to create a comprehensive implementation plan before writing any code.
+Then:
+1. Load `.claude/memory/align-artifacts/<latest>.md` (requirements + assumptions)
+2. Load `.claude/memory/brainstorm-artifacts/<latest>.md` (chosen solution + rejected alternatives)
+3. Load `.claude/memory/preflight/plan-<latest>.md` (applicable skills + rules)
+4. CONTEXT.md vocabulary
+5. **Decide slice count** — threshold rule (HARD BLOCK):
+   - ≤2 slices → use `templates/PLAN_TEMPLATE.md` (single-file at `.claude/docs/plans/<feature>.md`)
+   - 3+ slices → use `templates/PLAN_INDEX_TEMPLATE.md` + `templates/PLAN_SLICE_TEMPLATE.md` (split at `.claude/docs/plans/<feature>/`)
+6. Load matching template(s). Copy structure verbatim. Fill from Align + Brainstorm.
+7. Split shape: write `index.md` + one `slices/<NN>-<slug>.md` per slice. IDs zero-padded (`01`, `02`). Slug = kebab-case of slice title.
+8. Validate before user approval:
+   - Single-file: `bash scripts/ci/validate-plan-spec-templates.sh --plan .claude/docs/plans/<feature>.md`
+   - Split: `bash scripts/ci/validate-plan-spec-templates.sh --plan .claude/docs/plans/<feature>/`
+9. Update `workflow-state.json` `artifacts`:
+   - Single-file: `artifacts.plan = "<path>.md"`
+   - Split: `artifacts.plan_index = "<path>/index.md"` (NO `artifacts.plan` for split)
 
-## What This Command Does
+Invokes **planner** agent. Decomposes chosen solution into vertical slices.
 
-1. **Restate Requirements** - Clarify what needs to be built
-2. **Identify Risks** - Surface potential issues and blockers
-3. **Create Step Plan** - Break down implementation into phases
-4. **Wait for Confirmation** - MUST receive user approval before proceeding
+## What this command does
 
-## When to Use
+1. Read Align artifact (requirements)
+2. Read Brainstorm artifact (chosen solution)
+3. Decompose into vertical slices (each independently testable)
+4. Build dependency graph
+5. Risk assessment per slice
+6. Wait for user CONFIRM
 
-Use `/plan` when:
+## When to use
 
-- Starting a new feature
-- Making significant architectural changes
-- Working on complex refactoring
-- Multiple files/components will be affected
-- Requirements are unclear or ambiguous
+- Starting feature (after Align ± Brainstorm)
+- Architectural change (high-stakes lane, after mandatory Brainstorm)
+- Refactor touching ≥2 files
+- Bug fix needing spec + scenarios
 
-## Skip Conditions
-
-Skip `/plan` only when ALL are true:
+## Skip conditions (= trivial lane)
 
 | Condition | Example |
-|-----------|---------|
-| Change is 5 lines or fewer | Fix null check, update constant |
-| Single file affected | One config file, one typo |
-| No new observable behavior | Rename, reformat, comment fix |
-| No architectural impact | No new dependencies, no schema change |
+|---|---|
+| ≤5 lines change | Fix null check |
+| Single file | One config tweak |
+| No behavior change | Rename, reformat |
+| No new dep / schema / API | Comment fix |
 
-## Subagent Context (pass to spawned agent)
+Triage decides — `/plan` First Action enforces.
 
-When invoking the **planner** agent, include in its prompt:
+## Subagent Context (pass to planner agent)
 
-- **Phase**: You are in the **PLAN** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
-- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
-- **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first
-- **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
-- **Do not write code** — PLAN phase produces a plan document only
-- **Suggested skill**: `devco-agent-skills:architecture` for hexagonal structure and solution design
-- **Service scope detection**: Before exploring the codebase, determine if the task is single-service or multi-service using the Service Scope Detection heuristic. If multi-service, execute the Cross-Service Context Protocol BEFORE any planning steps.
-- **Related service exploration**: If multi-service, gather related service info from the user (name, repo path, description), then read ALL their CLAUDE.md files (root + .claude/ + subdirectories) + only `.claude/` folders whose name contains "memory" (e.g., `memory/`, `agent-memory/`) + ONLY relevant source files (API/event/DTO). NEVER glob/grep related service source trees.
-- **R5 hard block**: You MUST NOT modify any file in a related service repository. You MUST NOT run find/glob/grep across any related service source tree.
+Include in planner prompt:
 
-## How It Works
+- **Phase:** PLAN gate of 5-layer workflow (after Align + Brainstorm, before Spec)
+- **Pre-flight artifact:** `.claude/memory/preflight/plan-<latest>.md` (skills + rules to apply)
+- **Align input:** `.claude/memory/align-artifacts/<latest>.md` (requirements + assumptions)
+- **Brainstorm input:** `.claude/memory/brainstorm-artifacts/<latest>.md` (chosen solution, rejected alternatives, ADR if high-stakes)
+- **Skill protocol:** Bootstrap auto-loaded. Announce skills used. Pre-flight enumerates ALL skills/rules per 1% rule.
+- **Summer check:** Scan `build.gradle` for `io.f8a.summer` → if found, also load `summer-core`
+- **Hard blocks:** No `.block()` in reactive src/main/. No commit/push. No code without approved plan+spec.
+- **No code writes in PLAN gate** — produce plan document only.
+- **Output:** vertical slices + dependency graph + risk register (see `agents/planner.md`)
+- **Multi-service:** task spans services → run Cross-Service Context Protocol first; gather repo paths from user; read related CLAUDE.md + memory/; never glob/grep related service trees
+- **R5 hard block:** NEVER modify related service repos. NEVER find/glob/grep their source trees.
 
-The planner agent will:
+## How it works
 
-1. **Analyze the request** and restate requirements in clear terms
-2. **Break down into phases** with specific, actionable steps
-3. **Identify dependencies** between components
-4. **Assess risks** and potential blockers
-5. **Estimate complexity** (High/Medium/Low)
-6. **Present the plan** and WAIT for your explicit confirmation
+Planner agent:
+
+1. **Read Align + Brainstorm artifacts** — already-agreed requirements + chosen solution
+2. **Decompose into vertical slices** — each independently testable (2-5 min each)
+3. **Build dependency graph** — slice X blocks slice Y means Y waits
+4. **Identify risk per slice** — flag high-risk slices (auth, persistence, perf-critical)
+5. **Order slices** — dependencies first, high-risk early
+6. **Estimate complexity** per slice (S/M/L)
+7. **Present plan** + WAIT for user CONFIRM
 
 ## Example Usage
 
@@ -145,28 +192,27 @@ Agent (planner):
 
 ## Document Persistence (MANDATORY)
 
-The plan MUST be written to a file — not just presented in conversation:
+Plan MUST be written to file — not just presented in conversation:
 
-- **Location**: `.claude/docs/plans/{feature-name}.md`
+- **Location**: `.claude/docs/plans/{feature-name}.md` (matches plan filename)
 - **On draft**: Written when first presented
 - **On revision**: Same file updated with revision history
 - **On approval**: `status: approved` updated in frontmatter
 
-The spec-writer will READ this file in the next phase. If no file exists, the workflow breaks.
+Spec-writer reads this file next phase. No file = workflow breaks.
 
 ## Approval Protocol
 
-**CRITICAL**: The planner agent will **NOT** write any code until you explicitly confirm the plan with "yes" or "proceed" or similar affirmative response.
+**CRITICAL**: Planner agent will NOT write any code until explicit confirm ("yes", "proceed", or similar).
 
-If you want changes, respond with:
-
-- "modify: [your changes]" → plan document updated with revision history
-- "different approach: [alternative]" → plan document rewritten
-- "skip phase 2 and do phase 3 first" → plan document adjusted
+Modify responses:
+- "modify: [changes]" → plan updated with revision history
+- "different approach: [alternative]" → plan rewritten
+- "skip phase 2 and do phase 3 first" → plan adjusted
 
 ## Workflow State Tracking
 
-When this command runs, **create or update** `.claude/workflow-state.json`:
+On run, create or update `.claude/workflow-state.json`:
 
 ```json
 {
@@ -181,20 +227,20 @@ When this command runs, **create or update** `.claude/workflow-state.json`:
 }
 ```
 
-When the user **approves** the plan:
+On user **approval**:
 1. Update `workflow-state.json`:
    - Add `{"phase": "PLAN", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
    - Set `phase` to `"PLAN_APPROVED"`
-   - **Set `artifacts.plan` to the plan file path** (e.g., `".claude/docs/plans/order-notification.md"`)
-   - If multi-service plan (plan contains `## Service Impact Map`): **Set `artifacts.spec_count`** to the number of services in the Service Impact Map table
-2. Output to user: **"Plan approved and saved to: `.claude/docs/plans/{feature-name}.md`"**
+   - **Set `artifacts.plan`** to plan file path (e.g., `".claude/docs/plans/order-notification.md"`)
+   - Multi-service plan (contains `## Service Impact Map`): **set `artifacts.spec_count`** to service count
+2. Output: **"Plan approved and saved to: `.claude/docs/plans/{feature-name}.md`"**
 3. Output: **"Run `/spec` to define behavioral contracts — it will read from this plan file."**
-3. If multi-service: Output: **"Multi-service plan: {N} specs will be generated by `/spec` — one per service."**
+4. Multi-service: Output: **"Multi-service plan: {N} specs will be generated by `/spec` — one per service."**
 
-**CRITICAL**: The `artifacts.plan` field in workflow-state.json is how `/spec` finds the correct plan. Without it, the spec-writer cannot link to the plan.
+**CRITICAL**: `artifacts.plan` in workflow-state.json is how `/spec` finds the correct plan.
 
 ## After Planning
 
 - Run `/spec` to define behavioral contracts (reads from `.claude/docs/plans/`)
-- Run `/build` to start the TDD implementation cycle
+- Run `/build` to start TDD implementation cycle
 - Use `/build-fix` if build errors occur during implementation

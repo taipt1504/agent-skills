@@ -1,21 +1,21 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "devco-agent-skills",
-  "description": "Lightweight, context-efficient Claude Code plugin for Java Spring backend — hook-bootstrapped skills, 3-tier organization, lazy loading",
+  "description": "Adaptive 5-layer workflow Claude Code plugin for Java Spring backend — 1% pre-flight discovery, triage routing, two-stage review, subagent dispatch, auto-evolution",
   "owner": {
     "name": "TaiPT",
     "email": "taipt1504@gmail.com"
   },
   "metadata": {
-    "description": "Context-efficient Claude Code plugin for Java/Spring Boot backend — 3-tier skill system (bootstrap + generic + summer), 8 agents, hook-bootstrapped workflow, lazy loading, ≤5K auto-loaded tokens"
+    "description": "v4.0 adaptive 5-layer workflow for Java Spring backend — triage routes to trivial / standard / high-stakes lanes; 1% pre-flight discovery before every gate; subagent isolation per slice; two-stage review; auto-evolution to skills"
   },
   "plugins": [
     {
       "name": "devco-agent-skills",
       "source": "./",
       "npmPackage": "@devco/agent-skills",
-      "description": "Lightweight Claude Code plugin for Java Spring backend — bootstrap skill enforcement, 10 generic skills, 6 Summer Framework skills, 8 specialized agents, 12 commands, 9 rules, 6 hooks with 3 profiles",
-      "version": "3.3.1",
+      "description": "Adaptive 5-layer workflow plugin for Java Spring backend — 31+ skills, 9 agents, 17 commands, 14 rules (common + java split), 22 hooks. Triage routing, pre-flight discovery, subagent dispatch, two-stage review, auto-evolution.",
+      "version": "4.0.0-beta",
       "author": {
         "name": "TaiPT",
         "email": "taipt1504@gmail.com"

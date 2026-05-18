@@ -1,24 +1,85 @@
 ---
 name: meta
-description: Observable learning commands — view what agents have learned, extract session patterns, generate learning reports.
+description: Umbrella for learning, evolution, ADR generation, and architecture review. Subcommands cover the Learn layer of the workflow (Layer 5) plus on-demand maintenance gates.
 ---
 
-# /meta -- Observable Learning & Skill Creation
+# /meta — Learning, Evolution, ADR, Architecture Review
+
+> **Decision (REFACTOR_PLAN §6.7):** `/meta` is the umbrella. Workflow gates (`/triage`, `/align`, `/brainstorm`, `/plan`, `/spec`, `/build`, `/verify`, `/dc-review`) stay top-level. Learning + maintenance live here as subcommands.
 
 ## Usage
 
 ```
-/meta learn status       -> show learning dashboard (memories + knowledge graph + instincts)
-/meta learn extract      -> distill current session into learnings + instinct files
-/meta learn report       -> weekly learning summary + instinct trends
-/meta evolve             -> cluster instincts and suggest promotions
-/meta evolve --generate  -> write evolved skills from clusters
-/meta evolve --promote   -> promote instincts to global scope
-/meta prune              -> remove stale instincts
-/meta prune --dry-run    -> preview what would be pruned
-/meta prune --archive    -> archive instead of delete
-/meta create-skill       -> create new skill from repo patterns
+# Learning + memory
+/meta learn status        -> learning dashboard (memories + knowledge graph + instincts)
+/meta learn extract       -> distill current session into learnings + instinct files
+/meta learn report        -> weekly learning summary + instinct trends
+
+# Evolution (Phase 4 auto-promotion)
+/meta evolve              -> review promotion candidates from evolution-check.sh
+/meta evolve promote <id> -> force-promote a specific instinct
+/meta evolve --generate   -> write evolved skills from candidates
+/meta evolve --auto       -> promote all candidates meeting thresholds (confidence ≥ 0.8, ≥3 occ, ≥2 sessions, ≥2 projects)
+
+# Pruning
+/meta prune               -> remove stale instincts (confidence < 0.2 or 30 days idle)
+/meta prune --dry-run     -> preview what would be pruned
+/meta prune --archive     -> archive instead of delete
+
+# Skill scaffolding
+/meta create-skill        -> create new skill from repo patterns (skill-creator template)
+
+# ADR (Phase 4 — high-stakes lane assist)
+/meta adr                 -> generate ADR from latest brainstorm artifact
+/meta adr <decision-name> -> create ADR with given title
+/meta adr list            -> list all ADRs
+
+# Architecture review (Phase 4)
+/meta improve-architecture        -> run periodic architectural review (commands/meta improve-architecture subcommand)
+/meta improve-architecture --quick -> single-package scan (faster, narrower)
 ```
+
+## Auto-promotion threshold (Phase 4)
+
+`scripts/hooks/evolution-check.sh` runs at every session end. Writes promotion candidates to `.claude/memory/promotion-candidates.md` when instinct meets:
+
+- Confidence ≥ 0.8
+- Occurrences ≥ 3
+- Distinct sessions ≥ 2
+- Distinct projects ≥ 2
+
+`/meta evolve` reads that file and walks user through each candidate. See `commands/meta.md §"/meta evolve" + Claude native /memory` §"Auto-Evolution Policy" for full process.
+
+## ADR subcommand (Phase 4)
+
+`scripts/hooks/auto-adr.sh` (Stop hook) prompts user when high-stakes lane completes without ADR.
+
+`/meta adr` then:
+1. Reads latest brainstorm artifact at `.claude/memory/brainstorm-artifacts/`
+2. Copies `docs/adr/0000-template.md` to `docs/adr/<NNNN>-<decision-slug>.md`
+3. Pre-fills:
+   - Status: Proposed
+   - Date: today
+   - Lane: high-stakes
+   - Context: from align artifact
+   - Decision: chosen option from brainstorm
+   - Considered alternatives: rejected options from brainstorm with rationale
+4. Opens for user to fill in Consequences + Reversibility + When to revisit
+
+## Improve-architecture subcommand (Phase 4)
+
+`/meta improve-architecture` invokes `commands/meta.md §"/meta improve-architecture"`. Four phases:
+
+1. **Survey** — read CONTEXT.md, ADRs, package structure, recent commits
+2. **Detect smells** — module-level, class-level, naming, coupling
+3. **Propose improvements** — severity-tagged, cross-check against existing ADRs
+4. **Prioritize** — ranked list, user picks 1-3 to act on
+
+Output to `.claude/memory/improve-architecture-<date>.md`. Picked items trigger fresh `/triage` → likely high-stakes.
+
+Recommended cadence: every 2 weeks per project, or after large feature merge.
+
+---
 
 ---
 
@@ -28,7 +89,7 @@ Show what has been learned across native memory and MCP knowledge graph.
 
 ### Process
 
-1. **Read native memories**: List files in the project's memory directory, categorize by type (user/feedback/project/reference)
+1. **Read native memories**: List files in project's memory directory, categorize by type (user/feedback/project/reference)
 2. **Query knowledge graph**: Use `mcp__memory__read_graph` to get all entities and relations
 3. **Present dashboard**:
 
@@ -64,18 +125,18 @@ Stale (>30 days, consider pruning):
 
 ## /meta learn extract
 
-Distill the current session into reusable knowledge and instinct files.
+Distill current session into reusable knowledge and instinct files.
 
 ### Process
 
-1. Review the conversation for high-value patterns:
-   - User corrections (things the agent got wrong → feedback memory)
+1. Review conversation for high-value patterns:
+   - User corrections (agent got wrong → feedback memory)
    - Architectural decisions (why X over Y → project memory + MCP entity)
    - Bug resolutions (error → fix pattern → MCP entity with observation)
    - New conventions discovered (naming, patterns → project memory)
 
-2. For each pattern found, determine storage:
-   - Qualitative (preferences, corrections): suggest user runs `/remember` to save as native memory
+2. For each pattern, determine storage:
+   - Qualitative (preferences, corrections): suggest user runs `/remember`
    - Structured (entities, decisions, relations): create MCP knowledge graph entries directly
 
 3. Report extraction results:
@@ -102,7 +163,7 @@ Extracted 4 learnings:
    - Corrections made (user said "no, do X instead")
    - Approaches that worked well (user confirmed or accepted)
    - Repeated patterns (same type of change done 3+ times)
-5. For each pattern, create an instinct file at `.claude/instincts/personal/`:
+5. For each pattern, create instinct file at `.claude/instincts/personal/`:
 
 ```yaml
 ---
@@ -136,7 +197,7 @@ Weekly summary of learning activity.
 3. Identify trends:
    - Most frequently queried entities (popular knowledge)
    - Stale entities (not referenced in 30+ days)
-   - Feedback memories (user corrections — are they decreasing over time?)
+   - Feedback memories (user corrections — decreasing over time?)
 
 ```
 WEEKLY LEARNING REPORT (2026-03-18 to 2026-03-25)
@@ -208,7 +269,7 @@ Write evolved skills from instinct clusters.
 
 ### Process
 
-1. Read cluster suggestions from the most recent `/meta evolve` output
+1. Read cluster suggestions from most recent `/meta evolve` output
 2. For each suggested skill: create `.claude/skills/learned/{skill-name}/SKILL.md`
 3. SKILL.md generated from cluster's instinct content with:
    - Merged triggers from cluster's normalized triggers
@@ -265,7 +326,7 @@ Removing 5 instincts. Run `/meta prune --dry-run` to preview.
 
 ## /meta create-skill
 
-Analyze the repository's git history to extract coding patterns and generate SKILL.md files.
+Analyze repo's git history to extract coding patterns and generate SKILL.md files.
 
 ### Usage
 

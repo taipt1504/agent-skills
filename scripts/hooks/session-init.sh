@@ -446,9 +446,9 @@ try:
     lines.append('### Skill Loading Hints (from profile)')
     spring_type = p.get('springType', 'unknown')
     if spring_type == 'webflux':
-        lines.append('- Load **spring-patterns** (WebFlux mode — use Mono/Flux, StepVerifier, NEVER .block())')
+        lines.append('- Load **spring-webflux-patterns** (WebFlux mode — use Mono/Flux, StepVerifier, NEVER .block())')
     elif spring_type == 'mvc':
-        lines.append('- Load **spring-patterns** (MVC mode — use RestTemplate, MockMvc, synchronous patterns)')
+        lines.append('- Load **spring-webflux-patterns** (MVC mode — use RestTemplate, MockMvc, synchronous patterns)')
     if p.get('summerFramework'):
         lines.append('- Load **summer-core** + summer sub-skills (Summer Framework detected)')
     else:
@@ -475,59 +475,45 @@ if [ -n "$PROFILE_CTX" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Skills-loaded registry - pre-populated with auto-detected likely skills (R1)
+# Skill-loaded registry \u2014 REMOVED in v4.0 per REFACTOR_PLAN.md \u00a73.6.1 Stage 2.
 #
-# skill-router.sh blocks file edits when the matching skill is NOT in
-# skills-loaded.json. In non-interactive mode (claude -p), the agent cannot
-# get user approval to update this file, causing 100% write-task failure
-# (see plugin-review-agent-skills/benchmark_results.md - 12/12 blocked).
+# The skills-loaded.json gate caused multi-agent dispatch failures
+# (subagent couldn't see main agent's loaded set). Replaced with:
+#   - Pre-flight discovery enumerates skills/rules per gate (1% rule)
+#   - skill-router.sh emits announcement-only stderr hints (no blocking)
+#   - Agent announces "Skills loaded: <list>" in chat per skill-enforcement rule
 #
-# Fix: pre-populate at session start with skills the project profile suggests
-# will be needed. The agent still loads the skill via the Skill tool at edit
-# time; this just stops the soft-block from being a hard fail in -p mode.
-#
-# Disable via env: DEVCO_PREPOPULATE_SKILLS=0
+# Likely-skills hint for context-injection only (NOT a gate):
 # ---------------------------------------------------------------------------
-mkdir -p "${PROJECT_ROOT}/.claude/sessions" 2>/dev/null || true
-SKILLS_LOADED="${PROJECT_ROOT}/.claude/sessions/skills-loaded.json"
-
-PREPOP=""
-if [ "${DEVCO_PREPOPULATE_SKILLS:-1}" = "1" ]; then
-  if [ "$BUILD_TOOL" != "unknown" ]; then
-    PREPOP="$PREPOP coding-standards testing-workflow architecture api-design"
-  fi
-  case "$SPRING_TYPE" in
-    *WebFlux*|*MVC*|*Servlet*) PREPOP="$PREPOP spring-patterns" ;;
-  esac
-  if [ "$DEP_POSTGRESQL" = "true" ] || [ "$DEP_MYSQL" = "true" ]; then
-    PREPOP="$PREPOP database-patterns"
-  fi
-  if [ "$DEP_KAFKA" = "true" ] || [ "$DEP_RABBITMQ" = "true" ]; then
-    PREPOP="$PREPOP messaging-patterns"
-  fi
-  [ "$DEP_REDIS" = "true" ] && PREPOP="$PREPOP redis-patterns"
-  if [ "$SUMMER_DETECTED" = "true" ]; then
-    PREPOP="$PREPOP summer-core summer-rest summer-data summer-security summer-test"
-  fi
+LIKELY_SKILLS=""
+if [ "$BUILD_TOOL" != "unknown" ]; then
+  LIKELY_SKILLS="$LIKELY_SKILLS coding-standards testing-workflow architecture api-design"
+fi
+case "$SPRING_TYPE" in
+  *WebFlux*) LIKELY_SKILLS="$LIKELY_SKILLS spring-webflux-patterns" ;;
+  *MVC*|*Servlet*) LIKELY_SKILLS="$LIKELY_SKILLS spring-mvc-patterns" ;;
+esac
+if [ "$DEP_POSTGRESQL" = "true" ] || [ "$DEP_MYSQL" = "true" ]; then
+  LIKELY_SKILLS="$LIKELY_SKILLS database-patterns"
+fi
+if [ "$DEP_KAFKA" = "true" ] || [ "$DEP_RABBITMQ" = "true" ]; then
+  LIKELY_SKILLS="$LIKELY_SKILLS messaging-patterns"
+fi
+[ "$DEP_REDIS" = "true" ] && LIKELY_SKILLS="$LIKELY_SKILLS redis-patterns"
+if [ "$SUMMER_DETECTED" = "true" ]; then
+  LIKELY_SKILLS="$LIKELY_SKILLS summer-core summer-rest summer-data summer-security summer-test"
 fi
 
-# Render dedup'd JSON array of skill names
-SKILLS_JSON=$(printf '%s' "$PREPOP" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | python3 -c "
-import sys, json
-skills = [line.strip() for line in sys.stdin if line.strip()]
-print(json.dumps(skills))
-" 2>/dev/null)
-[ -z "$SKILLS_JSON" ] && SKILLS_JSON="[]"
-
-SKILLS_COUNT=$(printf '%s' "$PREPOP" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | wc -l | tr -d ' ')
-
-cat > "$SKILLS_LOADED" <<SKILLS_EOF
-{"skills":${SKILLS_JSON},"resetAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","prepopulated":true}
-SKILLS_EOF
-log "Skills-loaded pre-populated -> $SKILLS_LOADED (${SKILLS_COUNT} skills auto-acknowledged)"
+LIKELY_DEDUP=$(printf '%s' "$LIKELY_SKILLS" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | paste -sd ',' -)
+if [ -n "$LIKELY_DEDUP" ]; then
+  CONTEXT="${CONTEXT}\n**Likely skills (project profile):** ${LIKELY_DEDUP}"
+  CONTEXT="${CONTEXT}\n_(Pre-flight will enumerate ALL skills regardless; this is a hint.)_\n"
+fi
 
 # Output
-printf '%b' "$CONTEXT" 2>/dev/null || true
+# v4.1 — cap output per DEVCO_SESSION_START_MAX_CHARS env var
+CAPPED_CONTEXT=$(cap_context "$CONTEXT" 8000 "DEVCO_SESSION_START_MAX_CHARS" 2>/dev/null || echo "$CONTEXT")
+printf '%b' "$CAPPED_CONTEXT" 2>/dev/null || true
 
 log "Session initialized \u2713"
 exit 0

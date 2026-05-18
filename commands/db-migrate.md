@@ -9,10 +9,10 @@ Create and validate a Flyway database migration for schema changes.
 
 ## SDD Notice
 
-Schema changes are a **spec-required task type** per the SDD workflow. For non-trivial migrations (new tables, column type changes, data migrations):
-- Run `/plan` first to analyze impact
-- Run `/spec` to define the migration spec (DDL, zero-downtime strategy, rollback)
-- Exception: Simple column additions with NULL default can skip SDD
+Schema changes are **spec-required** per SDD. For non-trivial migrations (new tables, type changes, data migrations):
+- `/plan` first to analyze impact
+- `/spec` for migration spec (DDL, zero-downtime strategy, rollback)
+- Exception: Simple nullable column additions can skip SDD
 
 ## Instructions
 
@@ -26,14 +26,14 @@ find src/main/resources/db/migration -name "V*.sql" | sort -V | tail -5
 git diff --name-only HEAD -- '*.java' | grep -i "entity\|model\|domain"
 ```
 
-2. Determine the next migration version:
-   - Find the highest version number in `src/main/resources/db/migration/`
-   - Increment by 1 for the next migration
-   - Format: `V{number}__{description}.sql` -- two underscores, snake_case description
+2. Determine next migration version:
+   - Highest version in `src/main/resources/db/migration/`
+   - Increment by 1
+   - Format: `V{number}__{description}.sql` — two underscores, snake_case
 
-3. Ask the user what schema change is needed if not obvious from context.
+3. Ask user what schema change is needed if not obvious.
 
-4. Create the migration file following these rules:
+4. Create migration file following these rules:
 
 ### MySQL Migration Rules
 
@@ -87,7 +87,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);
 -- NEVER: ALTER COLUMN type that requires table rewrite without maintenance window
 ```
 
-5. Validate the migration:
+5. Validate:
 
 ```bash
 # Run Flyway validate
@@ -100,17 +100,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);
 ./gradlew compileJava 2>/dev/null || ./mvnw compile 2>/dev/null
 ```
 
-6. Safety checklist before finalizing:
+6. Safety checklist:
 
-**CRITICAL checks:**
-- [ ] Migration is forward-only
-- [ ] Adding NOT NULL column? Has DEFAULT value or populates data first
-- [ ] Dropping column? Confirmed code no longer references it
-- [ ] Large table index? Uses CONCURRENTLY (PostgreSQL) or ALGORITHM=INPLACE (MySQL 8)
-- [ ] Migration filename has double underscore: `V3__add_column.sql`
-- [ ] No Java-side changes needed for the new column/table?
+- [ ] Forward-only migration
+- [ ] NOT NULL column? Has DEFAULT or populates data first
+- [ ] Dropping column? Code no longer references it
+- [ ] Large table index? `CONCURRENTLY` (PG) or `ALGORITHM=INPLACE` (MySQL 8)
+- [ ] Filename: double underscore `V3__add_column.sql`
+- [ ] Java-side changes needed?
 
-7. Suggest corresponding entity update if needed:
+7. Suggest entity update if needed:
 
 ```java
 // If adding 'phone_number' column to users table, update User entity:

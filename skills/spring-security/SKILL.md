@@ -4,6 +4,22 @@ description: Spring Security patterns — authentication, authorization, JWT, CO
 triggers:
   natural: ["jwt auth", "cors config", "security filter", "oauth", "authentication"]
   code: ["SecurityConfig", "@PreAuthorize", "JWT", "@AuthRoles"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*SecurityConfig*.java", "**/*AuthConfig*.java", "**/*JwtConfig*.java", "**/*CorsConfig*.java"]
+    code_patterns: ["SecurityFilterChain", "SecurityWebFilterChain", "@PreAuthorize", "@EnableReactiveMethodSecurity", "@EnableMethodSecurity", "PasswordEncoder"]
+    task_keywords: ["security", "auth", "OAuth", "JWT", "CORS", "CSRF", "Keycloak", "SAML", "RBAC", "authorization"]
+    related_rules:
+      - rules/common/security.md
+      - rules/java/security.md
+      - rules/java/reactive.md
+relevance_assessment: |
+  HIGH 90%+: SecurityFilterChain edit OR auth flow change OR @PreAuthorize add
+  HIGH 80%+: CORS allowlist OR JWT config tweak
+  MEDIUM 40-79%: endpoint added to existing auth scheme
+  LOW 1-39%: caller of secured method, no auth change
+  ZERO: no Spring Security dep (verify build.gradle)
 ---
 
 # Spring Security
@@ -25,18 +41,18 @@ triggers:
 
 ## Security Config
 
-**MVC** -- `SecurityFilterChain` with `HttpSecurity`, custom `OncePerRequestFilter` for JWT, `@EnableWebSecurity`, `@EnableMethodSecurity`.
+**MVC** — `SecurityFilterChain`, `HttpSecurity`, `OncePerRequestFilter` for JWT, `@EnableWebSecurity`, `@EnableMethodSecurity`.
 
-**WebFlux** -- `SecurityWebFilterChain` with `ServerHttpSecurity`, `@EnableWebFluxSecurity`, `@EnableReactiveMethodSecurity`, `oauth2ResourceServer` with JWT converter.
+**WebFlux** — `SecurityWebFilterChain`, `ServerHttpSecurity`, `@EnableWebFluxSecurity`, `@EnableReactiveMethodSecurity`, `oauth2ResourceServer` with JWT converter.
 
-Both: disable CSRF for stateless APIs, stateless sessions, explicit CORS origins (never `*`), BCrypt cost >= 12.
+Both: CSRF disabled (stateless), stateless sessions, explicit CORS origins (never `*`), BCrypt >= 12.
 
 ## Secrets Management
 
-- `@ConfigurationProperties` with `@Validated` -- map `${ENV_VAR}` references
+- `@ConfigurationProperties` with `@Validated` — map `${ENV_VAR}` references
 - Never hardcode secrets; never commit `application-local.yml`
 - `.gitignore`: `.env`, `*.pem`, `*.key`, `application-local.yml`, `application-secret.yml`
-- Production: Vault / AWS Secrets Manager / K8s secrets
+- Production: Vault / AWS Secrets Manager / K8s Secrets
 
 ## Pre-Deployment Checklist
 
@@ -75,17 +91,15 @@ return new ErrorResponse(ex.getMessage(), ex.getStackTrace());
 
 ## References
 
-Load as needed:
-
-- **[references/jwt-auth.md](references/jwt-auth.md)** — JWT filter (MVC), SecurityFilterChain, SecurityWebFilterChain, JWT token provider, method security
-- **[references/oauth2-oidc.md](references/oauth2-oidc.md)** — OAuth2 resource server, client credentials, custom principal extraction, Spring Security 6.x migration notes, testing with mockJwt()
-- **[references/cors-headers.md](references/cors-headers.md)** — CORS configuration (MVC + WebFlux), security headers filter
-- **[references/security-testing.md](references/security-testing.md)** — Security testing (MockMvc + WebTestClient), OWASP dependency scanning
-- **[references/file-upload-secrets.md](references/file-upload-secrets.md)** — File upload validation, path traversal prevention, secrets management
+- **[references/jwt-auth.md](references/jwt-auth.md)** — JWT filter (MVC), SecurityFilterChain, SecurityWebFilterChain, token provider, method security
+- **[references/oauth2-oidc.md](references/oauth2-oidc.md)** — OAuth2 resource server, client credentials, principal extraction, Spring Security 6.x migration, mockJwt()
+- **[references/cors-headers.md](references/cors-headers.md)** — CORS (MVC + WebFlux), security headers filter
+- **[references/security-testing.md](references/security-testing.md)** — MockMvc + WebTestClient security tests, OWASP dep scanning
+- **[references/file-upload-secrets.md](references/file-upload-secrets.md)** — File upload validation, path traversal, secrets management
 
 ## Related Skills
 
 - **redis-patterns** — Redis-based rate limiting
-- **spring-patterns** — Resilience4j rate limiting, WebFilter setup
+- **spring-webflux-patterns** — Resilience4j rate limiting, WebFilter setup
 - **pentest** — Security scanning, OWASP Top 10 assessment
 - **summer-security** — APISIX auth, Keycloak integration (Summer projects)

@@ -1,20 +1,28 @@
 ---
 name: grpc-patterns
-description: >
-  gRPC patterns for Java Spring Boot — proto file design, grpc-spring-boot-starter integration,
-  server/client implementation, reactive gRPC (reactor-grpc), error handling with StatusException,
-  interceptors, all 4 streaming patterns, TLS/JWT security, InProcessServer testing, and
-  Micrometer monitoring. Use when creating .proto files, implementing @GrpcService endpoints,
-  building gRPC clients, adding streaming, or testing gRPC services.
+description: gRPC patterns Java Spring Boot. CONDITIONAL — loads only if project has grpc-spring-boot-starter in build.gradle.
 triggers:
-  natural: ["grpc", "protobuf", "proto file", "rpc service", "grpc streaming"]
+  natural: ["grpc", "protobuf", "rpc service", "grpc streaming"]
   code: ["@GrpcService", "@GrpcClient", ".proto", "StreamObserver", "ManagedChannel"]
-requires: ["spring-patterns"]
+applicability:
+  always: false
+  triggers:
+    project_profile: ["grpc:true"]
+    files_match: ["**/*.proto", "**/*GrpcService*.java", "**/*GrpcClient*.java"]
+    code_patterns: ["@GrpcService", "@GrpcClient", "StreamObserver", "grpc.netty"]
+    task_keywords: ["gRPC", "protobuf", "stream", "bidirectional"]
+    related_rules:
+      - rules/java/api-design.md
+      - rules/java/security.md
+relevance_assessment: |
+  HIGH 100%: project has grpc dep (verified grpc-spring-boot-starter in build.gradle) AND code touches @GrpcService/@GrpcClient/.proto
+  MEDIUM 40-79%: project has grpc dep, tangential touch
+  ZERO: no grpc dep (verify: grep grpc-spring-boot build.gradle = 0 results) — skip entirely
 ---
 
 # gRPC Patterns for Spring Boot
 
-Production-ready gRPC patterns for Java 17+ / Spring Boot 3.x.
+gRPC patterns for Java 17+ / Spring Boot 3.x.
 
 ## Dependencies
 
@@ -258,9 +266,7 @@ grpc:
 
 ## References
 
-Load as needed:
-
-- **[references/proto-streaming.md](references/proto-streaming.md)** — Full proto design rules, proto best practices (backward compatibility, field numbering), all 4 streaming patterns with examples
-- **[references/reactive-advanced.md](references/reactive-advanced.md)** — Full reactor-grpc examples, deadline/timeout management, load balancing, health checks
-- **[references/security-interceptors.md](references/security-interceptors.md)** — TLS setup, JWT auth interceptor with Context propagation, client-side interceptors (logging, metrics, retry)
+- **[references/proto-streaming.md](references/proto-streaming.md)** — Proto design rules, backward compatibility, field numbering, all 4 streaming patterns
+- **[references/reactive-advanced.md](references/reactive-advanced.md)** — reactor-grpc examples, deadline/timeout, load balancing, health checks
+- **[references/security-interceptors.md](references/security-interceptors.md)** — TLS, JWT auth interceptor, Context propagation, client-side interceptors
 - **[references/testing-monitoring.md](references/testing-monitoring.md)** — InProcessServer tests, mock stubs, Micrometer gRPC metrics, anti-patterns

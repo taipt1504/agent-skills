@@ -9,11 +9,23 @@ description: >
 triggers:
   natural: ["db migration", "jpa entity", "connection pool", "query optimization", "r2dbc"]
   code: ["*Repository.java", "*Entity.java", "*.sql", "@Query"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*Repository.java", "**/*Entity.java", "**/db/migration/**/*.sql", "**/*Migration.java"]
+    code_patterns: ["@Entity", "@Repository", "JpaRepository", "ReactiveCrudRepository", "R2dbcRepository", "@Table", "@Column"]
+    task_keywords: ["entity", "repository", "JPA", "R2DBC", "Hibernate", "schema", "migration", "Flyway", "Liquibase", "N+1", "HikariCP"]
+    related_rules:
+      - rules/java/security.md
+      - rules/java/observability.md
+relevance_assessment: |
+  HIGH 80%+: new @Entity OR new repository OR new query OR schema migration
+  MEDIUM 40-79%: existing repo modification (e.g., add finder method) OR connection pool config
+  LOW 1-39%: service that uses repository, no DB code change
+  ZERO: project has no JPA / R2DBC (verify build.gradle)
 ---
 
 # Database Patterns
-
-Production-ready database patterns for Java 17+ / Spring Boot 3.x.
 
 ## Stack Decision
 
@@ -41,22 +53,22 @@ Production-ready database patterns for Java 17+ / Spring Boot 3.x.
 
 ## Critical Rules (Both Engines)
 
-1. **`@SQLRestriction` not `@Where`** -- Hibernate 6+
-2. **`FetchType.LAZY` always** -- JOIN FETCH / `@EntityGraph` at call site
-3. **No `.block()` in reactive** -- use R2DBC on WebFlux
-4. **`open-in-view: false`** -- always disable
-5. **Parameterized queries only** -- never concatenate user input
+1. **`@SQLRestriction` not `@Where`** — Hibernate 6+
+2. **`FetchType.LAZY` always** — JOIN FETCH / `@EntityGraph` at call site
+3. **No `.block()` in reactive** — use R2DBC on WebFlux
+4. **`open-in-view: false`** — always disable
+5. **Parameterized queries only** — never concatenate user input
 6. **Index all FK columns**
-7. **Pool size = `vCPU * 2 + 1`** (SSD); smaller pools outperform oversized ones
-8. **DTO projections for read-only** -- skip entity lifecycle overhead
+7. **Pool size = `vCPU * 2 + 1`** (SSD); smaller pools outperform oversized
+8. **DTO projections for read-only** — skip entity lifecycle overhead
 
 ## Migration Safety (Expand-Contract)
 
-1. **Expand** -- add nullable column; deploy new code writing to both old+new
-2. **Migrate** -- backfill in batches (1000 rows), not single UPDATE
-3. **Contract** -- add NOT NULL / drop old column in separate deployment
+1. **Expand** — add nullable column; code writes both old+new
+2. **Migrate** — backfill in batches (1000 rows), not single UPDATE
+3. **Contract** — add NOT NULL / drop old column in separate deploy
 
-**Always safe**: add nullable column, add index (CONCURRENTLY/INPLACE), add table.
+**Always safe**: add nullable column, index (CONCURRENTLY/INPLACE), add table.
 **Never in prod**: DROP without expand-contract, ALTER to smaller type, TRUNCATE.
 
 ## Verification Checklist
@@ -83,6 +95,6 @@ Production-ready database patterns for Java 17+ / Spring Boot 3.x.
 ## Related Skills
 
 - **summer-data** — R2DBC converters, audit_log/outbox_events DDL, AuditTableValidator
-- **spring-patterns** — JPA (MVC) or R2DBC (WebFlux) stack selection
+- **spring-webflux-patterns** — JPA (MVC) or R2DBC (WebFlux) stack selection
 - **redis-patterns** — Cache-aside to reduce DB load
 - **testing-workflow** — Testcontainers for DB integration tests, @DataR2dbcTest/@DataJpaTest

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # =============================================================================
-# workflow-gate.sh — PreToolUse Workflow Entry Guard (v3.3)
+# workflow-gate.sh — PreToolUse Workflow Entry Guard (v4.0 — lane-aware)
 # =============================================================================
 # Blocks production code writes (src/main/) when workflow phase is not BUILD
-# or IDLE. Prevents agents from writing code before PLAN and SPEC are approved.
+# or IDLE. Lane-aware: trivial lane bypasses entirely.
 # Fires on: PreToolUse (Edit|Write|MultiEdit) — sync, must complete in <5s
+#
+# Lane rules (v4.0):
+#   trivial lane     → pass through (skip Align/Brainstorm/Plan/Spec per lanes rule)
+#   standard/high-stakes → enforce phase rules below
 #
 # Phase rules:
 #   IDLE           → allow (first-time edit before workflow starts)
@@ -15,10 +19,7 @@
 #   VERIFY, REVIEW → BLOCK src/main/ (not in implementation phase)
 #   COMPLETE       → allow (post-completion fixes)
 #
-# Skip conditions:
-#   - skipCondition: true in workflow-state.json (trivial ≤5-line fixes)
-#   - File is in src/test/ (always allowed)
-#   - File is not a Java source file
+# Additional check (high-stakes): block /plan invocation without brainstorm artifact.
 # =============================================================================
 
 source "$(dirname "$0")/run-with-flags.sh" "workflow-gate" || exit 0
@@ -43,6 +44,16 @@ fi
 # Locate workflow-state.json in the target project
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 WORKFLOW_FILE="$PROJECT_ROOT/.claude/workflow-state.json"
+
+# v4.0 — trivial lane bypass: read current-triage.json, allow all if lane=trivial
+TRIAGE_FILE="$PROJECT_ROOT/.claude/memory/state/current-triage.json"
+if [ -f "$TRIAGE_FILE" ]; then
+  LANE=$(grep -o '"lane"[[:space:]]*:[[:space:]]*"[^"]*"' "$TRIAGE_FILE" | head -1 | sed 's/.*: *"//' | sed 's/".*//')
+  if [ "$LANE" = "trivial" ]; then
+    printf '%s' "$DATA"
+    exit 0
+  fi
+fi
 
 # No workflow file → IDLE state, allow edit
 if [ ! -f "$WORKFLOW_FILE" ]; then

@@ -9,6 +9,19 @@ description: >
 triggers:
   natural: ["structured logging", "metrics", "distributed tracing", "health check", "alerting"]
   code: ["Micrometer", "@Timed", "MeterRegistry", "logback", "MDC"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*Metrics*.java", "**/*HealthCheck*.java", "**/*Tracing*.java", "**/logback*.xml", "**/*Trace*.java"]
+    code_patterns: ["MeterRegistry", "@Observed", "Tracer", "MDC.put", "LogstashEncoder", "@Timed", "@Counted"]
+    task_keywords: ["metrics", "logging", "tracing", "MDC", "Micrometer", "Prometheus", "OpenTelemetry", "health check", "alerting"]
+    related_rules:
+      - rules/java/observability.md
+relevance_assessment: |
+  HIGH 80%+: new metric / log / trace / health probe OR alert rule
+  MEDIUM 40-79%: production code that should emit telemetry but currently doesn't
+  LOW 1-39%: existing instrumented code minor change
+  ZERO: trivial fix, no production code, no SLO impact
 ---
 
 # Observability Patterns for Spring Boot
@@ -38,9 +51,9 @@ triggers:
 
 ### Rules
 
-- Use SLF4J placeholders: `log.info("Order created orderId={}", order.id())` — never concatenation.
+- SLF4J placeholders: `log.info("Order created orderId={}", order.id())` — never concatenation.
 - MDC for context: `MDC.put("orderId", id)`. Clear in `finally`.
-- Never log PII (card numbers, passwords). Log identifiers only.
+- Never log PII. Log identifiers only.
 
 ## Reactive Context Propagation
 
@@ -69,14 +82,14 @@ management:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
 ```
 
-Create custom spans for meaningful operations with `tracer.nextSpan().name("order.enrich").tag(...)`. Use `WebClient.builder().observationRegistry(registry)` for automatic trace propagation.
+Custom spans: `tracer.nextSpan().name("order.enrich").tag(...)`. Use `WebClient.builder().observationRegistry(registry)` for automatic trace propagation.
 
 ## Custom Metrics
 
-- **Counter**: `Counter.builder("orders.created.total").register(meterRegistry)` — totals.
-- **Timer**: `Timer.builder("orders.creation.duration").register(meterRegistry).record(() -> work())` — latency.
-- **Gauge**: `Gauge.builder("orders.pending.count", this, s -> s.count()).register(meterRegistry)` — current value.
-- **@Timed** on controllers, **@Observed** on business methods.
+- **Counter**: `Counter.builder("orders.created.total").register(meterRegistry)` — totals
+- **Timer**: `Timer.builder("orders.creation.duration").register(meterRegistry).record(() -> work())` — latency
+- **Gauge**: `Gauge.builder("orders.pending.count", this, s -> s.count()).register(meterRegistry)` — current value
+- **@Timed** on controllers, **@Observed** on business methods
 
 ### Prometheus Config
 
@@ -115,7 +128,7 @@ readinessProbe:
   failureThreshold: 3
 ```
 
-Liveness = app alive (restart if fails). Readiness = can accept traffic (include db, redis checks).
+Liveness = app alive (restart if fails). Readiness = can accept traffic (db, redis).
 
 ## Alerting Thresholds
 
@@ -131,10 +144,10 @@ Liveness = app alive (restart if fails). Readiness = can accept traffic (include
 
 ## Rules
 
-- Never log PII — mask emails, never log passwords/tokens/credentials.
-- Always use SLF4J placeholders (`log.info("x={}", x)`) — never string concatenation.
-- Always clear MDC in reactive `doFinally` blocks to prevent context leakage.
-- Always set timeouts on health check external calls (2-5s) to prevent probe hangs.
+- Never log PII — mask emails, never log passwords/tokens/credentials
+- SLF4J placeholders (`log.info("x={}", x)`) — never string concatenation
+- Clear MDC in reactive `doFinally` blocks — prevent context leakage
+- Set timeouts on health check external calls (2-5s) — prevent probe hangs
 
 ## References
 
@@ -144,6 +157,6 @@ Liveness = app alive (restart if fails). Readiness = can accept traffic (include
 
 ## Related Skills
 
-- **spring-patterns** — WebFilter setup, production actuator defaults
+- **spring-webflux-patterns** — WebFilter setup, production actuator defaults
 - **pentest** — PII logging detection (OWASP A09)
 - **testing-workflow** — Verification pipeline includes observability checks

@@ -1,59 +1,124 @@
-# Shared Agent Protocol
+# Shared Agent Protocol (v4.0)
 
-> This file defines the common protocol that ALL agents follow.
-> Agent-specific `.md` files reference this via: `protocol: _shared-protocol.md`
-> The SubagentStart hook (`subagent-init.sh`) injects this protocol automatically.
+> Common protocol ALL agents follow. Referenced via `protocol: _shared-protocol.md` frontmatter.
+> SubagentStart hook (`subagent-init.sh`) injects this protocol + pre-flight artifact + cross-cutting (split shape) automatically.
 
 ---
 
 ## First Action (MANDATORY — before any work)
 
-1. **Announce loaded skills** to user: "**Skills loaded**: {list your requiredSkills.always}"
-2. If conditional skills activated based on project profile: "**Conditional**: {list}"
-3. Read `.claude/devco-config.json` for runtime config (mode, autoVerify, autoReview, team settings)
-4. Read `.claude/project-profile.json` for project context (springType, dependencies, Java version)
+1. **Read pre-flight** at `.claude/memory/preflight/<gate>-<latest>.md` (variant per gate). Apply 1% rule.
+2. **Read lane** from `.claude/memory/state/current-triage.json` → adapt behavior per lane.
+3. **Announce skills loaded** (pre-flight APPLY list + requiredSkills):
+   `Skills loaded: <comma-separated>`
+4. **Conditional skills** per project profile:
+   `Conditional: <list>`
+5. Read `.claude/devco-config.json` — runtime config (mode, autoVerify, autoReview, team settings)
+6. Read `.claude/project-profile.json` — project context (springType, dependencies, summer flag)
 
-## Loaded Skills (auto-injected by SubagentStart hook)
+## 1% Rule (every gate — non-negotiable)
 
-The following skills have been pre-loaded based on your role and project profile.
-You MUST apply their patterns in every file operation.
+Before EVERY gate (Triage, Align, Brainstorm, Plan, Spec, Execute, Review):
 
-### Skill Usage Protocol (MANDATORY — no exceptions)
+- Enumerate ALL skills + rules with ≥1% relevance
+- Score each (90-100% / 60-89% / 30-59% / 1-29% / 0%)
+- APPLY or SKIP per item
+- SKIP requires concrete evidence (grep result, file path, missing dep — NOT "not relevant")
+- Over-enumerate: false positive << false negative cost
 
-1. Before EVERY file edit: identify which loaded skill applies
-2. Announce: "Applying skill: {name} — {specific pattern being applied}"
-3. If no skill matches: state "No matching skill — using general Java/Spring knowledge"
-4. If you need a skill NOT in the loaded list: request it via "SKILL_REQUEST: {name}"
+`scripts/hooks/preflight-discovery.sh` enumerates filesystem. `rules/summer/*` loaded only if `summer:true` in project-profile.json.
 
-## Skill Usage Report (MANDATORY — output at task end)
+## Skill Announcement Contract
 
-Before completing, output this table filled with actual usage:
+Applying skill/rule:
+1. Announce: `Applying skill: <name> — <pattern>` OR `Apply rule: <path> — <reason>`
+2. Cite in result summary
+3. No `skills-loaded.json` gate (removed v4.0) — announcement IS the contract
+
+No match: `No matching skill — using general Java/Spring knowledge`.
+Need skill not in pre-flight APPLY: `SKILL_REQUEST: <name>` + justification.
+
+## Plan/Spec Shape Awareness (HARD BLOCK)
+
+Single-file (≤2 slices) or split (3+). Templates: `templates/{PLAN,SPEC}_{TEMPLATE,INDEX_TEMPLATE,SLICE_TEMPLATE}.md`.
+
+Before executing:
+
+1. **Validate conformance** — `bash scripts/ci/validate-plan-spec-templates.sh --plan <path> --spec <path>`
+2. Fails → STOP, route back to planner/spec-writer
+3. **Split:** read ONLY assigned slice + `spec_index §1` cross-cutting. No other slice files (context pollution).
+4. **Cross-cutting override** in slice → forbidden without ADR
+
+## Workflow Context (5-Layer Adaptive)
+
+```
+REQ → BOOT → PREFLIGHT0 → TRIAGE
+                            ├── trivial → EXECUTE (light) → REVIEW (S2) → COMMIT
+                            └── standard / high-stakes →
+                                ALIGN → BRAINSTORM (if needed) → PLAN → SPEC →
+                                EXECUTE (subagent per slice) → REVIEW (S1+S2) → LEARN → COMMIT
+```
+
+Your phase declared in agent frontmatter. Stay within phase responsibilities. Pre-flight runs before every gate.
+
+## Skill Usage Report (MANDATORY at task end)
 
 | Skill | Times Applied | Key Patterns Used |
-|-------|--------------|-------------------|
-| {skill} | {count} | {patterns} |
+|---|---|---|
+| <skill> | <count> | <patterns> |
+
+| Rule | Applied? | Evidence |
+|---|---|---|
+| <rule> | yes/no | <one-line> |
 
 ## Memory (Automatic Learning)
 
-**Before work**: `mcp__memory__search_nodes` for entities related to files/services you'll work with.
-**After work**: `mcp__memory__create_entities` for new decisions/patterns discovered. `mcp__memory__add_observations` to update existing entities with new evidence.
+- **Native auto-memory (primary):** Claude writes to `~/.claude/projects/<project>/memory/MEMORY.md`. Cap: 200 lines/25KB auto-loaded; topic files load on-demand via Read.
+- **MCP memory (optional):** `mcp__memory__search_nodes` before work + `mcp__memory__create_entities` after. Degrades to filesystem-only if absent.
+- **Pattern observations:** appended to `.claude/memory/shared/pattern-observations.jsonl` during session
+- **Session end:** `evolution-check.sh` → promotion candidates in `.claude/memory/shared/promotion-candidates.md` → `/meta evolve` OR `remember: <pattern>`
 
-Entity naming: PascalCase for services/tech (e.g., OrderService, PostgreSQL), kebab-case for decisions/patterns (e.g., chose-cqrs-over-crud, n-plus-one-fix).
+Entity naming: PascalCase (OrderService, PostgreSQL); kebab-case for decisions (chose-cqrs-over-crud, n-plus-one-fix).
 
-## Workflow Context
+## Hard Rules (apply to ALL agents — match CLAUDE.md hard blocks)
 
-All agents operate within the 5-phase SDD workflow: **PLAN → SPEC → BUILD → VERIFY → REVIEW**.
-Your phase is declared in your agent frontmatter. Stay within your phase's responsibilities.
+1. NEVER `.block()` in reactive code → CRITICAL
+2. NEVER `@Autowired` field injection — use `@RequiredArgsConstructor`
+3. NEVER expose entities in API — use record DTOs
+4. NEVER log sensitive data (PII, credentials, tokens)
+5. NEVER commit secrets to git
+6. NEVER skip input validation at API boundaries
+7. NEVER `SELECT *` — explicit columns
+8. NEVER commit to git — only user commits (CLAUDE.md hard block #9)
+9. NEVER stop at BUILD — drive to VERIFY + REVIEW
+10. NEVER self-assess — only external verification (tests, compile, lint) counts
+11. NEVER write plan/spec missing required template sections → workflow violation
+12. NEVER override cross-cutting in spec slice without ADR
+13. NEVER dispatch slices when split plan/spec status is `PARTIALLY_APPROVED` — full approval required
 
-## Hard Rules (apply to ALL agents)
+## Lane-Aware Behavior
 
-1. **Never** use `.block()` in reactive code (CRITICAL)
-2. **Never** use `@Autowired` field injection — use `@RequiredArgsConstructor`
-3. **Never** expose entities in API responses — use record DTOs
-4. **Never** log sensitive data (PII, credentials, tokens)
-5. **Never** commit secrets to git
-6. **Never** skip input validation on API boundaries
-7. **Never** use `SELECT *` — explicit column selection
-8. **Never** commit to git — only the user commits (Hard Block #9)
-9. **Never** stop at BUILD — drive to VERIFY + REVIEW
-10. **Never** self-assess — only external verification (tests, compile, lint) counts
+| Lane | Pre-flight format | Plan/Spec | Review |
+|---|---|---|---|
+| Trivial | Light (3-5 lines) | Skipped | Stage 2 only |
+| Standard | Full artifact | Required | Stage 1 + Stage 2 |
+| High-stakes | Full artifact | Required + ADR | Stage 1 + Stage 2 (security deep-dive) |
+
+Read lane from `current-triage.json`. Adjust enumeration depth + verification rigor accordingly.
+
+## Subagent Dispatch Context (Execute gate)
+
+If subagent (slice-executor, reviewer):
+- Orchestrator passes per-slice paths (split) or whole-file paths (single-file)
+- Pre-flight 4/5 artifact auto-injected by `subagent-init.sh`
+- `spec_index §1` cross-cutting auto-injected (split shape)
+- Report results to orchestrator — do NOT commit
+
+## Verification External (NEVER Self-Assess)
+
+Tests, compile, lint, security scan determine PASS/FAIL. Hooks run automatically:
+- `quality-gate.sh` — compile + format after Edit
+- `verify-fix-loop.sh` — auto-retry on failure
+- `evolution-check.sh` — Stop hook, instinct promotion scan
+
+External verification declares "passed" — not you.

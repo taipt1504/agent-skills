@@ -36,11 +36,30 @@ skills/*-workspace/
 
 # Claude Code local state (runtime-generated, not part of the plugin)
 .claude/sessions/
+.claude/scheduled_tasks.lock
+.claude/memory/preflight/
+.claude/memory/align-artifacts/
+.claude/memory/brainstorm-artifacts/
+.claude/memory/sessions/
+.claude/memory/state/
+.claude/memory/active/
+.claude/memory/recent/
+.claude/memory/archive/
+.claude/memory/shared/
+.claude/memory/pointers.json
+.claude/memory/index.json
+.claude/memory/context/
 .claude/workflow-state.json
 .claude/verify-fix-state.json
 .claude/build-checkpoint.json
 .claude/project-profile.json
 .claude/session-metrics.json
+
+# Vendored design docs (research artifacts, not plugin code)
+.claude/docs/
+
+# Vendored 3rd-party skills (caveman ecosystem) — installed separately
+.claude/skills/
 
 # Java
 *.class

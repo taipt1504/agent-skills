@@ -5,41 +5,39 @@ description: Generate and run end-to-end API tests with Testcontainers for Sprin
 
 # /e2e -- E2E Test Generation & Run
 
-This command invokes the **test-runner** agent to generate, maintain, and execute end-to-end API tests using Testcontainers and TestRestTemplate (MVC) or WebTestClient (WebFlux).
+Invokes **slice-executor** agent to generate, maintain, and execute end-to-end API tests using Testcontainers and TestRestTemplate (MVC) or WebTestClient (WebFlux).
 
 ## What This Command Does
 
-1. **Generate API Test Journeys** - Create integration tests for API flows
-2. **Run E2E Tests** - Execute tests with real infrastructure via Testcontainers
-3. **Capture Results** - Test reports with JUnit 5 and JaCoCo
-4. **Verify Reactive Streams** - StepVerifier for async validation
-5. **Identify Flaky Tests** - Quarantine unstable tests
+1. **Generate API Test Journeys** — create integration tests for API flows
+2. **Run E2E Tests** — execute tests with real infrastructure via Testcontainers
+3. **Capture Results** — test reports with JUnit 5 and JaCoCo
+4. **Verify Reactive Streams** — StepVerifier for async validation
+5. **Identify Flaky Tests** — quarantine unstable tests
 
 ## When to Use
 
-Use `/e2e` when:
-
 - Testing critical API journeys (authentication, orders, payments)
-- Verifying multi-step flows work end-to-end
+- Verifying multi-step flows end-to-end
 - Testing integration between services and databases
 - Validating Kafka/RabbitMQ event flows
 - Preparing for production deployment
 
 ## Subagent Context (pass to spawned agent)
 
-When invoking the **test-runner** agent, include in its prompt:
+Include in **slice-executor** agent prompt:
 
-- **Phase**: You are in the **VERIFY/E2E** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
-- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
+- **Phase**: VERIFY/E2E phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+- **Skill protocol**: Load `devco-agent-skills:bootstrap` first. Before every file op, load matching skill and announce it.
 - **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first, then `devco-agent-skills:summer-test` for Summer-specific test utilities
 - **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
 - **Suggested skill**: `devco-agent-skills:testing-workflow` for TDD cycle, StepVerifier, and Testcontainers patterns
 
 ## How It Works
 
-The test-runner agent will:
+slice-executor agent will:
 
-1. **Analyze API flow** and identify test scenarios
+1. **Analyze API flow** — identify test scenarios
 2. **Generate test class** with Testcontainers setup
 3. **Run tests** with TestRestTemplate (MVC) or WebTestClient (WebFlux)
 4. **Capture failures** with detailed logs

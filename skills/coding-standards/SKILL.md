@@ -8,6 +8,17 @@ description: >
 triggers:
   natural: ["naming convention", "java pattern", "code style", "immutability", "records"]
   code: ["*.java"]
+applicability:
+  always: true
+  triggers:
+    files_match: ["**/*.java"]
+    code_patterns: ["@Value", "@RequiredArgsConstructor", "record", "@Builder"]
+    task_keywords: ["coding style", "immutability", "naming", "records", "Lombok"]
+    related_rules:
+      - rules/common/coding-style.md
+      - rules/java/coding-style.md
+relevance_assessment: |
+  Always 100% when project has Java files — applies to every code change.
 ---
 
 # Java Coding Standards & Patterns
@@ -25,11 +36,11 @@ triggers:
 
 ## Java 17+ Features
 
-- **Records** — Use for DTOs, value objects, events. Compact constructor for validation. Not for JPA entities or Spring beans.
+- **Records** — DTOs, value objects, events. Compact constructor for validation. Not for JPA entities or Spring beans.
 - **Sealed classes** — Exhaustive type hierarchies: domain events, result types.
 - **Pattern matching instanceof** — `if (event instanceof OrderCreatedEvent e)` — no explicit casts.
 - **Switch expressions** — `String result = switch (status) { case ACTIVE -> "Active"; ... };`
-- **Text blocks** — Multi-line strings for SQL/JSON. No concatenation.
+- **Text blocks** — Multi-line SQL/JSON strings. No concatenation.
 
 ## Naming Conventions
 
@@ -67,19 +78,19 @@ public class OrderService {
 
 - Records with `@Builder(toBuilder = true)` and `@With` for updates via new instances.
 - Never mutate inside reactive chains — transform with `.map()`.
-- Defensive copies: `List.copyOf(items)` in constructors, `List.copyOf()` on getters.
+- Defensive copies: `List.copyOf(items)` in constructors and getters.
 
 ## Optional & Stream Rules
 
-- **Optional**: Return type only. Never as field, parameter, or collection element. Use `orElseThrow()`, `orElseGet()`, `map()`, `flatMap()`.
-- **Streams**: Filter early, use primitive streams for numerics, no side effects, prefer for-loop when readability suffers. Collect to unmodifiable collections.
+- **Optional**: Return type only. Never field, parameter, or collection element. Use `orElseThrow()`, `orElseGet()`, `map()`, `flatMap()`.
+- **Streams**: Filter early, primitive streams for numerics, no side effects, for-loop when readability suffers. Collect to unmodifiable.
 
 ## Error Handling
 
 - Base `DomainException extends RuntimeException` with error code.
 - Specific exceptions: `OrderNotFoundException`, `InsufficientStockException`.
-- Reactive: `switchIfEmpty(Mono.error(...))`, `onErrorMap()`, `onErrorResume()` for fallbacks.
-- Never throw generic `RuntimeException`. No empty catch blocks.
+- Reactive: `switchIfEmpty(Mono.error(...))`, `onErrorMap()`, `onErrorResume()`.
+- Never generic `RuntimeException`. No empty catch blocks.
 
 ## Code Smells
 
@@ -97,6 +108,6 @@ public class OrderService {
 
 ## Related Skills
 
-- **spring-patterns** — Controller/handler patterns using these conventions
+- **spring-webflux-patterns** — Controller/handler patterns using these conventions
 - **architecture** — Hexagonal layer rules complement coding standards
 - **testing-workflow** — Test naming conventions, TDD cycle

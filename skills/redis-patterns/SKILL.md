@@ -4,6 +4,19 @@ description: Redis patterns for Java Spring Boot (MVC and WebFlux) — reactive 
 triggers:
   natural: ["redis cache", "distributed lock", "rate limit with redis", "cache eviction"]
   code: ["ReactiveRedisTemplate", "@Cacheable", "RedisTemplate", "Redisson"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*Cache*.java", "**/*Lock*.java", "**/*RateLimit*.java", "**/*Redis*.java"]
+    code_patterns: ["RedisTemplate", "ReactiveRedisTemplate", "Lettuce", "Redisson", "@Cacheable", "@CacheEvict"]
+    task_keywords: ["Redis", "cache", "distributed lock", "Lua script", "rate limit", "session store", "TTL"]
+    related_rules:
+      - rules/java/observability.md
+relevance_assessment: |
+  HIGH 80%+: new cache layer, distributed lock, Redis-backed rate limiter
+  MEDIUM 40-79%: cache invalidation tweak, TTL change, key naming refactor
+  LOW 1-39%: service that uses cache, no Redis code touched
+  ZERO: project has no Redis (verify: grep -r 'redis' build.gradle = 0)
 ---
 
 # Redis Patterns for Spring Boot
@@ -94,11 +107,11 @@ lock:{entity}:{id}           → lock:order:ORD-001
 
 ## Anti-Patterns
 
-- No TTL on keys -> memory leak. Always set expiry.
-- `KEYS *` in production -> use `SCAN` instead.
-- Big keys (>1MB) -> split into hash fields.
-- Hot keys -> shard with suffix, sum on read.
-- No stampede protection -> lock on cache miss.
+- No TTL → memory leak. Always set expiry.
+- `KEYS *` in production → use `SCAN`.
+- Big keys (>1MB) → split into hash fields.
+- Hot keys → shard with suffix, sum on read.
+- No stampede protection → lock on cache miss.
 
 ## References
 
@@ -110,6 +123,6 @@ lock:{entity}:{id}           → lock:order:ORD-001
 ## Related Skills
 
 - **summer-ratelimit** — Summer Framework rate limiting backed by Redis
-- **spring-patterns** — WebFlux reactive chains that consume Redis caching
+- **spring-webflux-patterns** — WebFlux reactive chains that consume Redis caching
 - **database-patterns** — Cache-aside pattern complements DB queries
 - **testing-workflow** — Testcontainers for Redis integration tests

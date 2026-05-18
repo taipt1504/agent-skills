@@ -7,7 +7,7 @@ description: Run build, test, lint, security, and static analysis pipeline. Mode
 
 ## First Action (MANDATORY)
 
-Before anything else, update the workflow state:
+Update workflow state:
 
 ```bash
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -36,7 +36,7 @@ print('workflow-state.json updated: phase=VERIFY')
 > **AUTO-CONTINUATION RULE — READ FIRST**
 > After verification PASSES:
 > 1. **IMMEDIATELY** invoke `/dc-review` — do NOT ask, do NOT wait
-> 2. Task is NOT done until REVIEW verdict. Never stop after VERIFY.
+> 2. Task NOT done until REVIEW verdict. Never stop after VERIFY.
 > On FAIL: invoke build-fixer → re-verify (max 3 retries, then escalate to user).
 > Read `.claude/devco-config.json` for `workflow.autoReview` (default: true).
 
@@ -54,16 +54,16 @@ Run verification on current Java/Spring codebase. Supports multiple modes.
 
 ## Prerequisites
 
-- BUILD phase should be complete before running verification
-- If no recent test runs exist, consider running `/build` first
-- For `gate` mode, ensure all implementation tasks from the spec are complete
-- Read `.claude/workflow-state.json` — verify BUILD phase completed (check `phaseHistory` contains a BUILD entry)
+- BUILD phase complete before verification
+- No recent test runs → consider `/build` first
+- `gate` mode: ensure all spec implementation tasks complete
+- Read `.claude/workflow-state.json` — verify BUILD phase completed (`phaseHistory` contains BUILD entry)
 
 ### Workflow State on Entry
 
 Update `.claude/workflow-state.json`:
 - Set `phase` to `"VERIFY"`
-- Add `{"phase": "BUILD", "completedAt": "{ISO timestamp}"}` to `phaseHistory` (if not already present)
+- Add `{"phase": "BUILD", "completedAt": "{ISO timestamp}"}` to `phaseHistory` (if not present)
 - Reset `retryCount` to `0`
 
 ## Instructions
@@ -80,7 +80,7 @@ Update `.claude/workflow-state.json`:
    ./gradlew compileJava compileTestJava  # Gradle
    ./mvnw compile test-compile -q         # Maven
    ```
-   If either fails -> STOP and report errors with file:line.
+   Either fails → STOP and report errors with file:line.
 
 ### Mode: `pre-commit`
 
@@ -172,7 +172,7 @@ All `full` steps plus:
     ```
 
 11. **PR Readiness Verdict**
-    Summarize all findings and produce final PASS/BLOCK verdict.
+    Summarize all findings, produce final PASS/BLOCK verdict.
 
 ## Output Format
 
@@ -205,16 +205,14 @@ Issues to Address:
    - Add `{"phase": "VERIFY", "completedAt": "{ISO timestamp}", "verdict": "PASS"}` to `phaseHistory`
    - Reset `retryCount` to `0`
 2. **Read config**: Check `.claude/devco-config.json` for `workflow.autoReview` (default: `true`)
-3. **If autoReview = true**: IMMEDIATELY invoke `/dc-review`
-   - Do NOT ask the user
-   - Do NOT wait
-4. **If autoReview = false**: Remind user `"VERIFY passed. Run /dc-review to complete."`
+3. **autoReview = true**: IMMEDIATELY invoke `/dc-review` — do NOT ask, do NOT wait
+4. **autoReview = false**: Remind user `"VERIFY passed. Run /dc-review to complete."`
 
 ### On FAIL
 
 1. Increment `retryCount` in `workflow-state.json`
-2. Capture the specific error(s)
-3. Invoke **build-fixer agent** with the error details
+2. Capture specific error(s)
+3. Invoke **build-fixer agent** with error details
 4. After fix applied → re-run `/verify`
 
 ### Circuit Breakers
@@ -227,10 +225,10 @@ Issues to Address:
 
 ### Error Normalization
 
-To detect "same error" across consecutive runs:
+Detect "same error" across consecutive runs:
 - Strip line numbers and timestamps from error output
-- Compare first 100 characters of the error message
-- If 3 consecutive verify runs produce the same normalized error → **no-progress breaker fires**
+- Compare first 100 characters of error message
+- 3 consecutive verify runs with same normalized error → no-progress breaker fires
 
 ### Force-Accept Protocol
 
@@ -245,4 +243,4 @@ When max retries exceeded:
    Proceeding to /dc-review with known issues flagged.
    ```
 3. Set `forceAccepted: true` and `unresolvedIssues: [...]` in `workflow-state.json`
-4. Continue to `/dc-review` with WARNING flag — reviewer will see the unresolved issues
+4. Continue to `/dc-review` with WARNING flag — reviewer sees unresolved issues

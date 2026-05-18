@@ -8,11 +8,23 @@ description: >
 triggers:
   natural: ["api design", "error format", "pagination design", "openapi", "rest conventions"]
   code: ["RFC 7807", "ProblemDetail", "OpenAPI", "Pageable"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*Controller.java", "**/*Handler.java", "**/*RouterFunction*.java", "**/openapi*.yml", "**/openapi*.yaml"]
+    code_patterns: ["@RestController", "@RequestMapping", "ResponseEntity", "ProblemDetail", "@Operation", "@ApiResponse"]
+    task_keywords: ["endpoint", "REST", "API", "OpenAPI", "Swagger", "ProblemDetail", "pagination design", "HTTP status"]
+    related_rules:
+      - rules/java/api-design.md
+      - rules/java/security.md
+relevance_assessment: |
+  HIGH 80%+: new endpoint OR contract change OR OpenAPI annotations
+  MEDIUM 40-79%: existing endpoint behavior tweak, no contract change
+  LOW 1-39%: caller refactor without endpoint touch
+  ZERO: no REST surface in scope (verify: grep -r '@RestController' src/main/ = 0)
 ---
 
 # REST API Design Patterns
-
-Production-ready API design for Java 17+ / Spring Boot 3.x / WebFlux.
 
 ## HTTP Methods & Status Codes
 
@@ -24,14 +36,12 @@ Production-ready API design for Java 17+ / Spring Boot 3.x / WebFlux.
 | `PATCH` | Partial update | No | 200 |
 | `DELETE` | Remove | Yes | 204 |
 
-Key status codes: 201 (Created + Location), 202 (Async accepted), 204 (No content), 400 (Validation), 401 (Unauthenticated), 403 (Forbidden), 404 (Not found), 409 (Conflict), 422 (Semantic error), 429 (Rate limited).
+Key codes: 201 (Created + Location), 202 (Async), 204 (No content), 400 (Validation), 401 (Unauthenticated), 403 (Forbidden), 404 (Not found), 409 (Conflict), 422 (Semantic), 429 (Rate limited).
 
 ## URL Conventions
 
-**Structure**: Resource mapping + versioned path
-
-- **Resource mapping** (controller level): `/api/${resource}`
-- **Path APIs** (method level): `/${versioning}/...`
+- **Resource mapping** (controller): `/api/${resource}`
+- **Path APIs** (method): `/${versioning}/...`
 - **Full URL**: `/api/${resource}/${versioning}/...`
 
 ```
@@ -47,8 +57,7 @@ GET    /api/users/v1/123/orders    # Nested (max 2 levels)
 POST   /api/orders/v1/123/cancel   # Action as sub-resource
 ```
 
-Rules: plural nouns, kebab-case, lowercase, no trailing slash, no verbs in path.
-Version belongs to the path method, NOT the resource mapping — enables per-resource version bumps.
+Rules: plural nouns, kebab-case, lowercase, no trailing slash, no verbs. Version on method, NOT resource mapping — enables per-resource bumps.
 
 ## Error Format — RFC 7807
 
@@ -62,7 +71,7 @@ Version belongs to the path method, NOT the resource mapping — enables per-res
 }
 ```
 
-Enable: `spring.mvc.problemdetail.enabled: true`. Use `@RestControllerAdvice` with `ProblemDetail` responses.
+Enable: `spring.mvc.problemdetail.enabled: true`. Use `@RestControllerAdvice` with `ProblemDetail`.
 
 ## Pagination
 
@@ -72,17 +81,17 @@ Enable: `spring.mvc.problemdetail.enabled: true`. Use `@RestControllerAdvice` wi
 | Cursor (opaque token) | Feeds, infinite scroll | Consistent; no drift |
 | Keyset (`afterId=X`) | Large datasets | Fastest; needs composite index |
 
-Always cap `size` at 100. Prefer cursor/keyset for APIs.
+Cap `size` at 100. Prefer cursor/keyset.
 
 ## Versioning
 
-Version in method path: `/api/{resource}/{version}/...`. v1 is forever — backward compatible. Add optional fields for minor changes. Breaking changes = new version per resource. Use `Sunset` + `Deprecation` headers.
+Version in method path: `/api/{resource}/{version}/...`. v1 is forever — backward compatible. Optional fields for minor changes. Breaking changes = new version. Use `Sunset` + `Deprecation` headers.
 
 ## Validation & Rate Limiting
 
 - `@Valid` on all `@RequestBody`. Bean Validation: `@NotBlank`, `@Email`, `@Size`, `@NotNull`.
-- Sort field whitelist to prevent injection.
-- Rate limiting headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`.
+- Whitelist sort fields to prevent injection.
+- Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`.
 
 ## Checklist
 
@@ -109,6 +118,6 @@ Version in method path: `/api/{resource}/{version}/...`. v1 is forever — backw
 ## Related Skills
 
 - **summer-rest** — Summer Framework handler pattern, ResponseFactory, exception handling
-- **spring-patterns** — Controller implementation patterns (MVC + WebFlux)
+- **spring-webflux-patterns** — Controller implementation patterns (MVC + WebFlux)
 - **spring-security** — Rate limiting headers, CORS, authentication for APIs
 - **architecture** — Hexagonal interface layer design for REST endpoints

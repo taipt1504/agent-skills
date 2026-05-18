@@ -5,11 +5,25 @@ triggers:
   natural: ["zip export", "xlsx export", "streaming export", "summer file", "chunked file export"]
   code: ["ZipExporter", "ExportSpec", "ChunkWriter", "DatedExportRow", "SizeLimitedOutputStream", "io.f8a.summer.file"]
 requires: ["summer-core"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*FileService*.java", "**/*Upload*.java", "**/*Download*.java"]
+    code_patterns: ["io.f8a.summer.file", "f8a.file", "FileStorageService", "PresignedUrlService"]
+    task_keywords: ["file upload", "file download", "presigned URL", "S3", "MinIO", "summer file"]
+    related_rules:
+      - rules/common/security.md
+      - rules/java/security.md
+relevance_assessment: |
+  HIGH 80%+: new file upload/download endpoint OR storage backend integration
+  MEDIUM 40-79%: presigned URL generation, file metadata
+  LOW 1-39%: service that references file URLs without storage interaction
+  ZERO: project lacks io.f8a.summer:summer-file
 ---
 
 # Summer File — Streaming Zip Exporter
 
-**Gate:** Verify summer-core is loaded and `io.f8a.summer:summer-platform` is in build.gradle before proceeding.
+**Gate:** Verify summer-core loaded and `io.f8a.summer:summer-platform` in build.gradle before proceeding.
 
 **Module:** `io.f8a.summer:summer-file` (added 0.3.5)
 **Package:** `io.f8a.summer.file.export`
@@ -17,11 +31,12 @@ requires: ["summer-core"]
 
 **This SKILL.md tracks LATEST stable (0.3.5).** First shipped in 0.3.5; no overlays for older versions (module did not exist).
 
+
 ## When to reach for it
 
-Any service that streams rows out as `.zip` of `.xlsx`/`.csv`/`.json` files. Before 0.3.5 every service grew its own `ZipOutputStream` + per-file chunk + size-cap code; replace that boilerplate with one call.
+Any service streaming rows as `.zip` of `.xlsx`/`.csv`/`.json` files. Before 0.3.5 every service had its own `ZipOutputStream` + chunk + size-cap boilerplate; this replaces it with one call.
 
-Skip it when the export is a single small file (just write the file directly) or when the format is itself an archive (e.g. SQLite dump).
+Skip when export is single small file (write directly) or format is itself an archive (e.g. SQLite dump).
 
 ## Public API
 
@@ -37,20 +52,20 @@ Skip it when the export is a single small file (just write the file directly) or
 ## Behavior
 
 - **Plain `ExportRow`** → flat output: `<baseName>_<seq><ext>` (`payments_1.xlsx`, `payments_2.xlsx`, …).
-- **`DatedExportRow`** → grouped output: `<YYYY-MM-DD>_<seq><ext>` (`2026-05-08_1.xlsx`, `2026-05-08_2.xlsx`, …). **Rows must arrive contiguous by date** — the exporter emits a new group as soon as `date()` changes.
-- `maxRowsPerFile` caps any single inside-file. Past the cap, a new entry opens with the next sequence suffix.
-- `maxZipSizeBytes > 0` wraps the output in a `SizeLimitedOutputStream` and aborts with `IOException` on overflow.
-- An **empty input** still emits exactly one entry (the chunk writer is invoked with an empty list) — the resulting zip always has at least one file, typically the header row.
+- **`DatedExportRow`** → grouped: `<YYYY-MM-DD>_<seq><ext>` (`2026-05-08_1.xlsx`, …). **Rows must arrive contiguous by date** — new group emitted when `date()` changes.
+- `maxRowsPerFile` caps any single file. Past cap, new entry opens with next sequence suffix.
+- `maxZipSizeBytes > 0` wraps output in `SizeLimitedOutputStream`, aborts with `IOException` on overflow.
+- **Empty input** still emits exactly one entry (chunk writer invoked with empty list) — zip always has ≥1 file.
 
 ## Threading
 
-- `writeZip` iterates on the calling thread and may block (POI workbook serialization is synchronous).
-- The `Flux<R>` overload bridges internally via `Flux.toIterable()` and **must** run on a blocking-capable scheduler (`Schedulers.boundedElastic()` or a dedicated executor). Never call it on a Reactor event-loop thread.
-- `pipeZip` schedules the writer for you — preferred whenever the downstream is an uploader.
+- `writeZip` iterates on calling thread and may block (POI workbook serialization is synchronous).
+- `Flux<R>` overload bridges via `Flux.toIterable()` — **must** run on blocking-capable scheduler (`Schedulers.boundedElastic()` or dedicated executor). Never call on Reactor event-loop thread.
+- `pipeZip` schedules writer for you — preferred when downstream is an uploader.
 
 ## Stream-to-uploader pattern (`pipeZip`)
 
-The standard "stream → upload" path without a temp file or in-memory buffer. Returns a `PipedInputStream` you hand to your storage client.
+Standard "stream → upload" path without temp file or in-memory buffer. Returns `PipedInputStream` to hand to storage client.
 
 ```java
 PipedInputStream in = ZipExporter.pipeZip(
@@ -61,7 +76,7 @@ PipedInputStream in = ZipExporter.pipeZip(
 storage.upload(bucket, key, in);
 ```
 
-On clean completion the writer closes its `PipedOutputStream`, the reader sees EOF, and the upload finishes. If the writer throws, the `PipedInputStream` is closed too so a blocked reader unblocks with `"Pipe closed"` `IOException` and the failure propagates.
+On completion, writer closes `PipedOutputStream`, reader sees EOF, upload finishes. If writer throws, `PipedInputStream` closes too — blocked reader unblocks with `"Pipe closed"` `IOException`.
 
 ## Minimal example — flat xlsx export
 
@@ -98,7 +113,7 @@ ZipExporter.writeZip(rows, out, spec);
 
 ## Date-grouped variant
 
-Implement `DatedExportRow` and leave `baseName` unset. Output becomes `2026-05-07_1.xlsx`, `2026-05-08_1.xlsx`, `2026-05-08_2.xlsx`, …
+Implement `DatedExportRow`, leave `baseName` unset. Output: `2026-05-07_1.xlsx`, `2026-05-08_1.xlsx`, `2026-05-08_2.xlsx`, …
 
 ```java
 record DailyRow(LocalDate date, ...) implements DatedExportRow {
@@ -106,7 +121,7 @@ record DailyRow(LocalDate date, ...) implements DatedExportRow {
 }
 ```
 
-Order requirement: rows must come out of the source in date order. For R2DBC, add `ORDER BY <date_col>, <id>` to the query.
+Rows must arrive in date order. For R2DBC, add `ORDER BY <date_col>, <id>` to query.
 
 ## Gradle
 
@@ -114,15 +129,15 @@ Order requirement: rows must come out of the source in date order. For R2DBC, ad
 implementation 'io.f8a.summer:summer-file'
 ```
 
-No auto-config; the module is a small utility jar. Apache POI / OpenCSV (or whatever your `ChunkWriter` uses) must be brought in by the service.
+No auto-config; small utility jar. Apache POI / OpenCSV (or whatever `ChunkWriter` uses) must be in service dependencies.
 
 ## Rules
 
-- **Never close the `OutputStream` from inside a `ChunkWriter`** — the exporter owns its lifecycle. Closing it early truncates the zip.
-- Pick `maxRowsPerFile` based on what downstream tools can open. Excel chokes past ~1M rows; many email systems cap attachments at 25 MB.
-- For `Flux` inputs always pick a blocking-capable scheduler. Reactor event-loop threads must not block.
-- Date-grouped exports must receive rows pre-sorted by `date()`. The exporter does not sort; it splits on changes.
-- Treat `maxZipSizeBytes = 0` as "no cap" (the explicit opt-out), but production exports of unknown size should pick a concrete cap to fail loud rather than fill a disk or PVC.
+- **Never close `OutputStream` inside `ChunkWriter`** — exporter owns lifecycle. Early close truncates zip.
+- Pick `maxRowsPerFile` per downstream tool limits. Excel chokes past ~1M rows; many email systems cap at 25 MB.
+- For `Flux` inputs always use blocking-capable scheduler. Event-loop threads must not block.
+- Date-grouped exports must receive rows pre-sorted by `date()`. Exporter splits on changes, does not sort.
+- `maxZipSizeBytes = 0` = no cap (explicit opt-out). Production exports of unknown size SHOULD set concrete cap — fail loud rather than fill disk/PVC.
 
 ## References
 

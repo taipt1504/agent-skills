@@ -5,6 +5,17 @@ triggers:
   natural: ["summer framework", "summer platform"]
   code: ["io.f8a.summer", "summer-platform"]
 requires: []
+applicability:
+  always: false
+  triggers:
+    auto_fire: ["project-profile.json shows summer:true"]
+    files_match: ["**/*.java", "**/build.gradle*"]
+    code_patterns: ["io.f8a.summer", "summer-platform"]
+    task_keywords: ["Summer", "f8a", "platform", "summer framework"]
+    related_skills: ["summer-rest", "summer-data", "summer-security", "summer-test", "summer-ratelimit", "summer-kafka", "summer-file", "summer-payment-sdk"]
+relevance_assessment: |
+  HIGH 100%: io.f8a.summer detected in build.gradle (always load alongside Spring patterns)
+  ZERO: project does not use Summer (verify build.gradle = no io.f8a.summer)
 ---
 
 # Summer Core — Gate & Shared Types
@@ -15,13 +26,12 @@ Reactive Spring Boot 3.x library (Java 21+) on WebFlux + Reactor Netty.
 
 ## Hard Gate
 
-Check `build.gradle` or `pom.xml` for `io.f8a.summer:summer-platform`.
-**NOT FOUND → STOP. Do not load any summer sub-skill.**
+Check `build.gradle` or `pom.xml` for `io.f8a.summer:summer-platform`. **NOT FOUND → STOP. No summer sub-skill.**
 
 ## Version Detection
 
-1. Read `gradle.properties` → `version=X.Y.Z`.
-2. Check `build.gradle` for `summer-platform` version.
+1. Read `gradle.properties` → `version=X.Y.Z`
+2. Check `build.gradle` for `summer-platform` version
 3. Pattern detection — primary signals:
 
    | Signal | Version |
@@ -41,11 +51,9 @@ Check `build.gradle` or `pom.xml` for `io.f8a.summer:summer-platform`.
    | `RateLimiterService` | 0.2.2+ |
    | `SummerGlobalExceptionHandler` / `summer-jwt-resource-server` | 0.2.1+ |
 
-4. If unclear → ask the user. Never guess.
+4. Unclear → ask. Never guess.
 
-When the detected version is older than the latest stable, load the matching
-`<skill>/references/versions/<version>.md` overlay alongside the canonical `SKILL.md`. See
-[references/version-matrix.md](references/version-matrix.md) for the full feature × version table.
+Older than latest stable: load `<skill>/references/versions/<version>.md` overlay alongside `SKILL.md`. See [references/version-matrix.md](references/version-matrix.md) for full feature × version table.
 
 ## Module Overview (current — 0.3.x)
 
@@ -71,7 +79,7 @@ For 0.2.x schemas (single `keycloak.*` block, single `sync-role.enabled`, top-le
 
 ## Gradle Setup
 
-Declare the BOM first; sub-skills list their own module dependencies.
+Declare BOM first; sub-skills list their own modules.
 
 ```gradle
 implementation platform('io.f8a.summer:summer-platform:<version>')
@@ -114,23 +122,23 @@ Usage: `throw CommonExceptions.RESOURCE_NOT_FOUND.toException().detailValue("id"
 
 ## Sub-Skill Gate Verification
 
-Every summer sub-skill MUST verify this gate was loaded. If a sub-skill is triggered directly, check build.gradle for `io.f8a.summer:summer-platform` before proceeding.
+Every summer sub-skill MUST verify this gate loaded. If triggered directly, check build.gradle for `io.f8a.summer:summer-platform` first.
 
 ## Rules
 
-- Never guess the Summer version — detect from gradle.properties or pattern matching, ask if unclear.
-- Never load summer sub-skills without confirming the gate.
-- Always check version compatibility before suggesting features (e.g., rate limiting requires 0.2.2+; `Txid` and `summer-file` require 0.3.5+; SSE filter and `ProviderJwtDecoderResolver` require 0.3.4+).
-- Always use `ViewableException` (not generic RuntimeException) for HTTP error responses.
-- **`Ufid` ≠ `Txid`.** `Ufid` is the 128-bit canonical key (joinable, immutable, collision-safe). `Txid` is the 59-bit human-facing transaction reference (sortable by mint time, fits BIGINT). They are not interchangeable — `Ufid` is wrong for new wallet/payment receipt numbers, and `Txid` cannot hold pre-2026 ids.
+- Never guess Summer version — detect from gradle.properties or pattern matching; ask if unclear.
+- Never load summer sub-skills without confirming gate.
+- Check version compatibility before suggesting features (rate limiting: 0.2.2+; `Txid`/`summer-file`: 0.3.5+; SSE filter/`ProviderJwtDecoderResolver`: 0.3.4+).
+- Use `ViewableException` (not generic RuntimeException) for HTTP error responses.
+- **`Ufid` ≠ `Txid`.** `Ufid` = 128-bit canonical key (joinable, immutable, collision-safe). `Txid` = 59-bit human-facing transaction reference (sortable by mint time, fits BIGINT). Not interchangeable — `Ufid` is wrong for wallet/payment receipt numbers; `Txid` cannot hold pre-2026 ids.
 
 ## References
 
-- **[references/summer-types.md](references/summer-types.md)** — Full usage: Member, CallerAware, Password, PhoneNumber, ViewableException, JsonErrorResponse, CommonExceptions
-- **[references/version-matrix.md](references/version-matrix.md)** — Feature × version matrix for every Summer module + pattern detection signals.
-- **[references/versions/](references/versions/)** — Per-version notes for cross-cutting changes (UFID introduction, exception handler rewrite, etc.). Sub-skills carry their own version dirs.
-- **[references/migrations/](references/migrations/)** — Step-by-step migration guides between major schema/version transitions.
-- **[references/versioning-workflow.md](references/versioning-workflow.md)** — How to add a new Summer release to this repo (audience: maintainers).
+- **[references/summer-types.md](references/summer-types.md)** — Member, CallerAware, Password, PhoneNumber, ViewableException, JsonErrorResponse, CommonExceptions usage
+- **[references/version-matrix.md](references/version-matrix.md)** — Feature × version matrix + pattern detection signals
+- **[references/versions/](references/versions/)** — Per-version notes for cross-cutting changes; sub-skills carry own version dirs
+- **[references/migrations/](references/migrations/)** — Step-by-step migration guides between major schema/version transitions
+- **[references/versioning-workflow.md](references/versioning-workflow.md)** — How to add new Summer release (maintainers)
 
 ## Related Skills
 

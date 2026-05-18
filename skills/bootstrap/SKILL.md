@@ -1,247 +1,308 @@
 ---
 name: bootstrap
-description: >
-  Core enforcement engine for devco-agent-skills plugin. Auto-loaded at session start via
-  SessionStart hook. Teaches skill discovery, 5-phase workflow (PLAN→SPEC→BUILD→VERIFY→REVIEW),
-  project detection, and mandatory skill usage. Foundation skill — all others depend on it.
-  Do NOT manually load; injected by the harness.
+description: Foundation skill — auto-loads at SessionStart. Teaches 5-layer adaptive workflow, 1% pre-flight discovery rule, triage routing, skill announcement contract, project detection. All other skills depend on this. Do NOT manually load.
 triggers:
-  natural: ["plugin status", "skill discovery", "workflow engine"]
+  natural: ["plugin status", "skill discovery", "workflow engine", "1% rule"]
   code: ["SessionStart"]
+applicability:
+  always: true
+  triggers:
+    files_match: ["**"]
+relevance_assessment: |
+  Always 100% — meta-skill, fires first every session.
 ---
 
-# You Have Skills. Use Them.
+# Bootstrap — Workflow Foundation
 
-You are enhanced with a skill system. Before EVERY action involving code generation, modification, or review, search available skills for a match.
+## You Have Skills + Rules. Use Them.
 
-1. **Search** available skills for a match
-2. **Announce** which skill you are using: "Using skill: {name} for {reason}"
-3. **Load** the skill's SKILL.md if not already loaded
-4. If no skill matches: state "No matching skill found, proceeding with general knowledge"
+Before EVERY workflow gate: enumerate ALL skills + rules with ≥1% relevance, score each, decide APPLY or SKIP, justify every SKIP with concrete evidence.
 
-Search available skills when the task involves code generation, modification, or review.
+**1% rule** — non-negotiable. See `skills/preflight/SKILL.md`.
 
-## Workflow Completion Rule (CRITICAL — read before ANY work)
+## Skill announcement contract (replaces skills-loaded.json gate)
 
-**A task is NOT complete until ALL phases execute.** After BUILD completes:
-1. **IMMEDIATELY** run `/verify full` — no asking, no waiting
-2. If VERIFY fails → Verify/Fix Loop handles retry automatically
-3. After VERIFY passes → **IMMEDIATELY** run `/dc-review`
-4. Only after REVIEW verdict is the task done
+When loading skill:
+1. Announce: `Using skill: <name> for <reason>`
+2. Reference skill name in commits / PR description
+3. NO file write. NO gate. Announcement IS the contract.
 
-**You MUST drive the workflow to completion. Never stop at BUILD.**
+No match: `No matching skill found, proceeding with general knowledge`.
 
-Config: Read `.claude/devco-config.json` for autoVerify/autoReview settings.
+`skills/preflight/SKILL.md` enforces enumeration. `scripts/hooks/skill-router.sh` emits hints (non-blocking).
+
+## 5-Layer Adaptive Workflow
+
+```
+REQ → BOOT → PREFLIGHT0 → TRIAGE
+                            ├── trivial → EXECUTE (light) → REVIEW (S2) → COMMIT
+                            └── standard/high-stakes →
+                                ALIGN → PREFLIGHT1 → BRAINSTORM →
+                                PREFLIGHT2 → PLAN → PREFLIGHT3 → SPEC →
+                                PREFLIGHT4 → EXECUTE (subagent dispatch) →
+                                PREFLIGHT5 → REVIEW (S1+S2) → LEARN → COMMIT
+```
+
+Six pre-flights:
+- **0** Initial discovery (after Boot, before Triage) — enumerate ALL skills + rules + instincts
+- **1** Brainstorm prep — brainstorm + domain skills from Align
+- **2** Plan prep — planning skills, pattern rules
+- **3** Spec prep — API design, testing, spec patterns
+- **4** Execute prep — TDD, language, framework, production rules
+- **5** Review prep — security, verification, testing rules
+
+Detail: `skills/preflight/references/gate-mappings.md`.
+
+## Triage Router — Choose Lane First
+
+Three lanes:
+
+| Lane | Criteria | Required gates |
+|---|---|---|
+| Trivial | ≤5 lines, no behavior change, no new dep | Execute (light TDD), Verify (compile+format), Review S2 |
+| Standard | bounded scope, feature/bugfix/refactor | Full flow (Align if vague, Brainstorm if multi-path, Plan, Spec, Execute, Review S1+S2, Learn) |
+| High-stakes | architecture / migration / security / public API / breaking change / new dep | All gates mandatory + ADR + worktree + Brainstorm ≥3 options |
+
+User override: "treat as <lane>". See `skills/triage/SKILL.md`.
+
+## Workflow State Machine — Phase Tracking
+
+`scripts/hooks/workflow-tracker.sh` writes `.claude/workflow-state.json` as gates progress:
+
+```
+/triage → lane set in .claude/memory/state/current-triage.json
+/align  → phase:ALIGN (artifacts in .claude/memory/align-artifacts/)
+/brainstorm → phase:BRAINSTORM (artifacts in .claude/memory/brainstorm-artifacts/, ADR if high-stakes)
+/plan   → phase:PLAN → user approves → PLAN_APPROVED → /spec
+/spec   → phase:SPEC → approves → SPEC_APPROVED → /build
+/build  → phase:BUILD → tests pass → VERIFY_PENDING → AUTO /verify
+/verify → phase:VERIFY → green → REVIEW_PENDING → AUTO /dc-review
+/dc-review → Stage 1 spec compliance → Stage 2 quality → 0 critical → COMPLETE
+```
+
+VERIFY_PENDING + REVIEW_PENDING: `workflow-gate.sh` blocks `src/main/` writes. Run required gate.
+
+Trivial lane bypasses ALIGN / BRAINSTORM / PLAN / SPEC / REVIEW_S1.
+
+## Skill announcement at gate start
+
+Every gate announce:
+- `Skills loaded: <comma-separated list>`
+- `Pre-flight artifact: <path>`
+
+Replaces skills-loaded.json file gate.
 
 ## Project Detection (run once per session)
 
 ```
 1. Scan build.gradle / build.gradle.kts / pom.xml
-2. No build file found? → NOT a Java project → skip all skills
-3. Java project detected:
-   a. spring-boot-starter-webflux? → Spring WebFlux (Reactive)
-   b. spring-boot-starter-web?     → Spring MVC (Servlet)
-   c. Neither?                     → Plain Java
-4. io.f8a.summer:summer-platform?  → Summer Framework → ALSO load summer skills
-   NOT found? → NEVER load/suggest/apply summer patterns
+2. No build file → not Java → skip Java skills
+3. Java detected:
+   a. spring-boot-starter-webflux → load `spring-webflux-patterns` on demand
+   b. spring-boot-starter-web → load `spring-mvc-patterns` on demand
+   c. Neither → plain Java
+4. io.f8a.summer:summer-platform → load `summer-core` + relevant summer-* skills
 ```
+
+Profile written to `.claude/project-profile.json` by `session-init.sh`.
 
 ## Skill Registry
 
-Match file patterns against loaded skill frontmatter descriptions. Each skill's description contains its triggers. Load the matching skill on demand.
+Skills loaded on-demand by file pattern + content + pre-flight enumeration. Authoritative list: `find skills -name SKILL.md`.
 
-### Summer Skills (ONLY when io.f8a.summer:summer-platform detected)
+### Skills (24 + meta)
 
-| Skill | Trigger |
-|-------|---------|
-| `summer-core` | Always load when summer detected (shared types, version) |
-| `summer-rest` | BaseController, RequestHandler, @Handler, WebClientBuilderFactory |
-| `summer-data` | AuditService, OutboxService, f8a.audit.*, f8a.outbox.* |
-| `summer-security` | @AuthRoles, ReactiveKeycloakClient, f8a.security.* |
-| `summer-ratelimit` | RateLimiterService, f8a.rate-limiter.* (v0.2.2+ only) |
-| `summer-test` | src/test/ + summer-test dependency |
+| Skill | Trigger summary |
+|---|---|
+| `bootstrap` | SessionStart (this skill) |
+| `preflight` | Before EVERY workflow gate |
+| `triage` | Session start with task description |
+| `align` | Standard with vague request OR high-stakes always |
+| `brainstorm` | Standard with multi-path OR high-stakes (≥3 options) |
+| `api-design` | REST endpoint design, OpenAPI, RFC 7807 |
+| `architecture` | Hexagonal, CQRS, DDD |
+| `coding-standards` | Immutability, naming, Lombok |
+| `database-patterns` | @Entity, @Repository, R2DBC, JPA |
+| `deployment-patterns` | Profiles, env config, observability |
+| `grpc-patterns` | @GrpcService, protobuf |
+| `messaging-patterns` | Kafka, RabbitMQ, outbox |
+| `observability-patterns` | Micrometer, MDC, tracing |
+| `pentest` | OWASP scanning, security review |
+| `redis-patterns` | RedisTemplate, distributed lock, cache-aside |
+| `spring-webflux-patterns` | Mono/Flux, WebClient, reactive |
+| `spring-mvc-patterns` | @RestController servlet, RestTemplate |
+| `spring-security` | SecurityFilterChain, @PreAuthorize |
+| `summer-core` | io.f8a.summer detected |
+| `summer-data` | f8a.audit, f8a.outbox |
+| `summer-file` | f8a.file |
+| `summer-kafka` | f8a.kafka |
+| `summer-payment-sdk` | f8a.payment |
+| `summer-ratelimit` | f8a.rate-limiter |
+| `summer-rest` | BaseController, RequestHandler |
+| `summer-security` | @AuthRoles, ReactiveKeycloakClient |
+| `summer-test` | f8a.test |
+| `testing-workflow` | TDD, StepVerifier, Testcontainers |
+| `continuous-learning` | `/meta learn`, instinct evolution |
 
-### Meta Skills (on-demand only)
+Pre-flight enumerates ALL every gate. Skills missing from list still enumerated (filesystem walk).
 
-| Skill | Trigger |
-|-------|---------|
-| `continuous-learning` | `/meta learn`, `/meta evolve`, `/meta instinct` |
+## Subagent Dispatch (merged from former skills/subagent-dispatch)
 
-## Workflow Engine — 5 Phases
+Main agent orchestrates. Subagent executes ONE slice per dispatch. Fresh context per slice.
+
+**When to dispatch:**
+- ≥2 slices → dispatch per slice
+- Single non-trivial slice → dispatch (isolates orchestrator context)
+- Single trivial slice → orchestrator executes directly
+
+**Subagent receives (minimal):**
+- Slice description (plan)
+- Slice spec scenarios (spec, slice-scoped)
+- Pre-flight 4 artifact path
+- CONTEXT.md vocabulary
+- Files likely touched
+
+**Never:** other slices' specs, full conversation history, unrelated decisions.
+
+**Parallel dispatch:** independent slices → up to `config.team.maxTeammates` concurrent via `Agent(... run_in_background: true)`.
+
+**Reporting:** subagent reports files changed + tests added + skills applied + deviations. Orchestrator aggregates → triggers `/verify`.
+
+## Worktree per Slice (merged from former skills/git-worktree)
+
+High-stakes: auto-creates git worktree per slice. Standard: optional.
+
+**Pattern:**
+```bash
+WORKTREE_DIR="../$(basename $PWD)-<feature>-slice-<N>"
+BRANCH="feature/<feature>-slice-<N>"
+git worktree add "$WORKTREE_DIR" -b "$BRANCH"
+```
+
+Establish baseline tests pass before edits. Subagent operates inside worktree (`Agent(..., isolation: "worktree")`).
+
+**Benefits:** baseline pre-change, clean discard, parallel features.
+
+**Cleanup:** `git worktree remove --force <dir>` after merge or discard.
+
+State tracked in `.claude/memory/state/active-worktrees.json`. `session-init` warns if >5 active.
+
+## Rule Directory Structure
 
 ```
-PLAN → SPEC → BUILD (TDD) → VERIFY → REVIEW
-                    ↓              ↓
-             VERIFY_PENDING  REVIEW_PENDING
-             (guard state)   (guard state)
+rules/
+├── common/   # Language-agnostic; ALWAYS apply
+├── java/     # Java + generic Spring; ALWAYS apply for Java projects
+└── summer/   # Summer library specific; CONDITIONAL (only when io.f8a.summer detected)
 ```
 
-Phase transitions write to `.claude/workflow-state.json`:
-- `/plan` → phase:PLAN → user approves → phase:PLAN_APPROVED → remind `/spec`
-- `/spec` → phase:SPEC → user approves → phase:SPEC_APPROVED → remind `/build`
-- `/build` → phase:BUILD → tests pass → **hook auto-sets VERIFY_PENDING** → AUTO `/verify` (if config.workflow.autoVerify)
-  - **BUILD failure** → Verify/Fix Loop activates → `/build-fix` → re-run `/verify` (max 3 retries)
-- **VERIFY_PENDING** → workflow-gate BLOCKS all src/main/ writes → agent MUST run `/verify`
-- `/verify` → phase:VERIFY → all green → **hook auto-sets REVIEW_PENDING** → AUTO `/dc-review` (if config.workflow.autoReview)
-- **REVIEW_PENDING** → workflow-gate BLOCKS all src/main/ writes → agent MUST run `/dc-review`
-- `/dc-review` → phase:REVIEW → 0 CRITICAL → phase:COMPLETE → TASK COMPLETE
+`scripts/hooks/preflight-discovery.sh` enumerates `rules/summer/` only when project profile shows `summer:true`. Same as `summer-*` skills — load only when project uses Summer.
 
-### workflow-state.json Structure
+## Hard Rules (CLAUDE.md hard blocks — never violate)
 
-```json
-{
-  "phase": "BUILD",
-  "task": "Add order notification endpoint",
-  "startedAt": "2026-04-01T10:00:00Z",
-  "phaseHistory": [
-    {"phase": "PLAN", "completedAt": "2026-04-01T10:05:00Z"},
-    {"phase": "SPEC", "completedAt": "2026-04-01T10:15:00Z"}
-  ],
-  "decisions": [],
-  "artifacts": {
-    "plan": ".claude/docs/plans/order-notification.md",
-    "spec": ".claude/docs/specs/order-notification.md"
-  },
-  "autoTransition": true,
-  "retryCount": 0,
-  "skipCondition": false
-}
-```
+1. `.block()` in reactive code → CRITICAL
+2. `@Autowired` field injection → `@RequiredArgsConstructor`
+3. Expose entities in API → record DTOs
+4. Log PII / credentials / tokens → FORBIDDEN
+5. Commit secrets to git → FORBIDDEN
+6. Skip input validation on API boundaries → FORBIDDEN
+7. `SELECT *` → explicit columns
+8. Code without `/plan` + `/spec` (except trivial ≤5 lines) → FORBIDDEN
+9. Agent commits to git → FORBIDDEN
+10. Stop after BUILD without VERIFY + REVIEW → FORBIDDEN
 
-Valid `phase` values: `IDLE`, `PLAN`, `PLAN_APPROVED`, `SPEC`, `SPEC_APPROVED`, `BUILD`, `VERIFY_PENDING`, `VERIFY`, `REVIEW_PENDING`, `REVIEW`, `COMPLETE`
-
-`skipCondition: true` bypasses the workflow-gate for trivial ≤5-line fixes (all 4 skip criteria must be met).
-
-### Phase Rules
-
-| Phase | Entry | Agent | Exit | Auto-Transition |
-|-------|-------|-------|------|-----------------|
-| **PLAN** | User task or `/plan` | planner | User approves plan | → PLAN_APPROVED → remind `/spec` |
-| **SPEC** | `/spec` after plan approved | spec-writer | User approves spec | → SPEC_APPROVED → remind `/build` |
-| **BUILD** | After spec approved | implementer (1 subagent per task) | All tests pass | → **VERIFY_PENDING** (hook) → AUTO `/verify full` |
-| **VERIFY_PENDING** | Auto after BUILD success | (guard) | `/verify` invoked | → VERIFY (workflow-gate blocks src/main/ writes) |
-| **VERIFY** | Auto after VERIFY_PENDING or `/verify` | (pipeline) | All checks pass | → **REVIEW_PENDING** (hook) → AUTO `/dc-review` |
-| **REVIEW_PENDING** | Auto after VERIFY success | (guard) | `/dc-review` invoked | → REVIEW (workflow-gate blocks src/main/ writes) |
-| **REVIEW** | Auto after REVIEW_PENDING or `/dc-review` | reviewer | No blocking issues | → COMPLETE |
-
-### Skip Condition
-
-IF ALL true: ≤5 lines, 1 file, no new behavior, no arch impact, no schema change
-THEN → BUILD directly (skip PLAN + SPEC)
-
-### Hard Blocks (STOP immediately if violated)
-
-- Writing code without approved plan → STOP → `/plan` first
-- Writing code without approved spec → STOP → `/spec` first
-- No tests → BLOCK — code does not ship without tests
-- `.block()` in src/main/ → CRITICAL — fix immediately
-- Agent attempts git commit → FORBIDDEN — only user commits
-- **Stopping after BUILD without running VERIFY + REVIEW → FORBIDDEN**
-- **Plan/Spec without document file → FORBIDDEN** — plans MUST be written to `.claude/docs/plans/`, specs to `.claude/docs/specs/`
-
-### Circuit Breakers, Verify/Fix Loop, Checkpoint-Resume
-
-These three safety mechanisms are summarized here; full mechanism + state-file
-schemas are in `references/workflow-details.md`:
-
-- **Circuit breakers**: no-progress (same error 3× → escalate), max-iterations
-  (10/phase ceiling), max-retries (3 verify failures → force-accept), context
-  budget (>95% → force exit). State preserved in `workflow-state.json`.
-- **Verify/Fix Loop (Ralph Pattern)**: hook detects gradle failure, normalizes
-  error, retries `/build-fix` + `/verify` up to `maxRetryOnFail`. Never trust
-  self-assessment — only external checks pass/fail. State in
-  `.claude/verify-fix-state.json`.
-- **BUILD Checkpoint-Resume**: every Edit during BUILD is tracked in
-  `.claude/sessions/build-checkpoint.json`; on context reset, read it to skip
-  already-completed sub-tasks.
-
-### Workflow Completion Rule (CRITICAL)
-
-**A task is NOT complete until ALL phases execute.** After BUILD completes:
-1. **IMMEDIATELY** run `/verify full` — no asking, no waiting
-2. If VERIFY fails → Verify/Fix Loop handles retry automatically
-3. After VERIFY passes → **IMMEDIATELY** run `/dc-review`
-4. Only after REVIEW verdict is the task done
-
-You MUST drive the workflow to completion. Never stop at BUILD.
-
-### Plugin Configuration
-
-Settings in `.claude/devco-config.json` control workflow behavior.
-Default mode: `standard` (requires plan+spec approval, auto-verify, auto-review).
-See `config/defaults.json` for all defaults. Key workflow settings:
-
-| Setting | Default | Effect |
-|---------|---------|--------|
-| `workflow.autoVerify` | `true` | Auto-invoke `/verify full` after BUILD |
-| `workflow.autoReview` | `true` | Auto-invoke `/dc-review` after VERIFY |
-| `workflow.maxRetryOnFail` | `3` | Max VERIFY retries before force-accept |
-| `workflow.maxIterationsPerPhase` | `10` | Absolute ceiling per phase |
-| `workflow.noProgressThreshold` | `3` | Same error N times → escalate |
-
-## Multi-Agent Support — Summary
-
-Two modes via `team.mode` in `devco-config.json`:
-
-| Mode | When | Coordination |
-|------|------|--------------|
-| `subagent` (default, stable) | Independent modules, separate files | Worktree isolation, no inter-agent comm |
-| `team` (experimental) | Interdependent work (entity+repo+service) | Shared TaskList, `SendMessage` between agents — needs `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` |
-
-**Spawn conditions (ALL true)**: `team.enabled`, current phase = BUILD, spec has ≥2 independent tasks, total change >50 lines, current count < `team.maxTeammates`.
-
-**Model routing default**: planner/spec-writer = opus; implementer/reviewer/tester = sonnet.
-
-**After parallel BUILD**: merge results → `/verify full` → `/dc-review` → COMPLETE.
-
-Full call signatures, key properties, and lifecycle details are in
-`references/workflow-details.md` § "Multi-Agent Modes (Subagent vs Team)".
-
-## Harness Engineering — Operational Awareness
-
-### Observability (automatic)
-
-Every tool call is traced to `.claude/sessions/execution-trace.jsonl` (JSONL format).
-Session metrics aggregate in `.claude/sessions/session-metrics.json`: tool call distribution, skill usage, phase timing, quality gate violations.
-Use `/dc-status --metrics` to view current session telemetry.
-
-### Context Budget (automatic)
-
-compact-advisor.sh estimates token usage from known sources (bootstrap + skills + rules + conversation).
-Warnings at 70% / 85% / 95% of budget. Act on warnings promptly — context rot degrades all phases.
-
-### Auto-Extract Learning
-
-On session end, if >20 tool calls AND >3 file changes, a signal file is written to `.claude/instincts/personal/.auto-extract-pending.json`. On next session start, consider running `/meta learn extract` to capture patterns from the productive session.
-
-### Required Skills by Phase
-
-| Phase | Mandatory Skills | Reason |
-|-------|-----------------|--------|
-| PLAN | architecture, api-design | Hexagonal structure, REST contract design |
-| SPEC | testing-workflow, api-design | Test case mapping, endpoint contracts |
-| BUILD | coding-standards, spring-patterns, testing-workflow | Code quality, framework patterns, TDD |
-| VERIFY | (none — pipeline-driven) | Automated checks, no skill needed |
-| REVIEW | coding-standards, spring-patterns + conditional | All quality checklists |
-
-During BUILD, also load domain-specific skills matching files being touched:
-- Database files → database-patterns
-- Messaging files → messaging-patterns
-- Security files → spring-security
-- Redis files → redis-patterns
-- Summer files → summer-core + relevant summer-* sub-skill
-
-**Skill Enforcement Gate**: The hook `skill-router.sh` will BLOCK file edits if the required skill has not been loaded. After loading a skill via the Skill tool, update `.claude/sessions/skills-loaded.json` to acknowledge (append the skill name to the `"skills"` array). This unblocks further edits.
-
-## Skill Loading Protocol
+## Memory architecture (v4.1 — 5 layers)
 
 ```
-Session start → load ONLY: bootstrap (this file)
-               + summer-core (if io.f8a.summer detected)
-On-demand    → load when touching relevant files:
-  1. Detect which files are being modified
-  2. Match file patterns → skill from registry above
-  3. Load that skill's SKILL.md (≤800 tokens each)
-  4. Load references/*.md ONLY when deep detail needed
-  5. After loading, register in .claude/sessions/skills-loaded.json
+LAYER 1 — Auto-loaded by Claude Code at every session
+  ~/.claude/CLAUDE.md                                  user-level
+  ./CLAUDE.md or ./.claude/CLAUDE.md                   project-level
+  ./CLAUDE.local.md                                    per-user project
+  ~/.claude/projects/<project>/memory/MEMORY.md        Claude native auto-memory (≤200 lines / 25KB)
+  ./.claude/rules/*.md (unscoped)                      optional native rules
+
+LAYER 2 — Loaded on-demand by Claude Code
+  ./.claude/rules/*.md (paths: scoped)                 path-conditional
+  ./*/CLAUDE.md in subdirs                             when subdir files read
+  ~/.claude/projects/<project>/memory/<topic>.md       Claude native topic files
+
+LAYER 3 — Read by plugin / agents / hooks on-demand (NOT auto-loaded)
+  Plugin SKILL.md bodies                                via Skill tool
+  Plugin agent .md                                       via Task tool dispatch
+  Plugin rules/{common,java,summer}/*.md                via agent Read in pre-flight
+  ./.claude/memory/active/<feature-id>/                 per-feature state (lifecycle)
+  ./.claude/memory/{recent,archive}/                    completed features
+  Hook additionalContext                                capped via DEVCO_*_MAX_CHARS
+
+LAYER 4 — MCP memory server (optional, load-on-demand)
+  mcp__memory__search_nodes / read_graph              cross-feature search
+  mcp__memory__create_entities / add_observations     persist decisions
+  Plugin probes availability; degrades to filesystem-only if absent
+
+LAYER 5 — Git-tracked durable docs (read-on-demand)
+  ./CONTEXT.md                                          domain vocabulary
+  ./docs/adr/*.md                                       ADRs
+  ./docs/plans/**, ./docs/specs/**                      feature artifacts
 ```
+
+### Lifecycle (`.claude/memory/`)
+
+Per-feature directory — multi-feature parallelism supported:
+
+```
+.claude/memory/
+├── pointers.json                        active feature IDs (multi-feature)
+├── index.json                           fast lookup catalog
+├── active/<feature-id>/                 in-flight (per-feature)
+│   ├── meta.json, triage.json, workflow-state.json
+│   ├── preflight/<gate>-<ts>.md
+│   ├── align.md, brainstorm.md
+│   └── review-stage1/stage2*.json
+├── recent/<feature-id>/                 completed last 30 days
+├── archive/<YYYY-MM>/<feature-id>.tar.gz  >30 days compressed
+└── shared/                              cross-feature
+    ├── pattern-observations.jsonl
+    └── promotion-candidates.md
+```
+
+### Native auto-memory (primary cross-session)
+
+Claude Code manages `~/.claude/projects/<project>/memory/MEMORY.md`. `remember: <pattern>` → Claude writes. First 200 lines / 25KB auto-loaded. Built-in `/memory` for audit.
+
+Plugin does NOT manage `instincts.jsonl`. Promotion candidates via `evolution-check.sh` → `/meta evolve` or `remember: <pattern>`.
+
+### MCP memory entity types (when available)
+
+| Entity | Use |
+|---|---|
+| `ArchitecturalDecision` | ADR mirrored as graph node |
+| `RecurringPattern` | Cross-feature pattern (instinct) |
+| `ProjectVocabulary` | Domain term + definition |
+| `CommonBug` | Bug type with fix pattern |
+| `ServiceContract` | Cross-service event / API contract |
+
+### Hook output caps
+
+`additionalContext` capped via `DEVCO_*_MAX_CHARS`:
+- `DEVCO_SESSION_START_MAX_CHARS=8000`
+- `DEVCO_SUBAGENT_INIT_MAX_CHARS=6000`
+- `DEVCO_PREFLIGHT_MAX_CHARS=4000`
+- `DEVCO_POST_COMPACT_MAX_CHARS=3000`
+
+`DEVCO_HOOK_PROFILE=minimal|standard|strict` (minimal halves caps, strict 1.5×).
+
+## Harness awareness
+
+- Hooks enforce rules — pre-flight, workflow gate, quality gate, verify/fix, observability, evolution
+- State on disk: `.claude/memory/state/*.json`
+- Verification external: tests, compile, lint. Never self-assess.
+- Caveman ecosystem: `~/.claude/skills/caveman*` for token compression
+
+## Related
+
+- `skills/preflight/SKILL.md` — 1% rule + 6 variants
+- `skills/triage/SKILL.md` — lane decision
+- `rules/common/lanes.md` — lane definitions
+- `rules/common/skill-enforcement.md` — 1% rule mandate
+- `rules/common/spec-driven.md` — lane-based spec requirement
+- `CLAUDE.md` — project-level rules + hard blocks
