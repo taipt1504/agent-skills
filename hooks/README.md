@@ -55,7 +55,7 @@ Disable specific hooks: `DISABLED_HOOKS="verify-fix-loop,observability-trace"` o
 
 ## Non-Interactive Mode (claude -p, subagents)
 
-`session-init.sh` pre-populates `.claude/sessions/skills-loaded.json` with all skills the project profile suggests are likely needed (Java MVC → spring-patterns + coding-standards + testing-workflow + architecture; WebFlux adds the same; Summer adds summer-core + variants). This avoids the `skill-router.sh` soft-block in non-interactive mode where the agent cannot get user approval to update the file.
+`session-init.sh` pre-populates `.claude/sessions/skills-loaded.json` with all skills the project profile suggests are likely needed (Java MVC → spring-webflux-patterns + coding-standards + testing-workflow + architecture; WebFlux adds the same; Summer adds summer-core + variants). This avoids the `skill-router.sh` soft-block in non-interactive mode where the agent cannot get user approval to update the file.
 
 If you want to disable this pre-population (interactive mode preferred), set `DEVCO_PREPOPULATE_SKILLS=0` in your environment or settings.
 

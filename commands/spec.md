@@ -7,7 +7,7 @@ description: Generate behavioral spec from approved plan -- define observable co
 
 ## First Action (MANDATORY)
 
-Before anything else, update the workflow state:
+Update workflow state:
 
 ```bash
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -32,40 +32,67 @@ print('workflow-state.json updated: phase=SPEC')
 " 2>/dev/null || echo "workflow-state.json update skipped"
 ```
 
-Generate a behavioral specification from the approved plan. Defines observable contracts (inputs, outputs, error cases) that become the test specification for the BUILD phase.
+Generate behavioral spec from approved plan. Defines observable contracts (inputs, outputs, error cases) that become test spec for BUILD phase.
+
+## Template conformance (HARD BLOCK)
+
+### Inherit shape from plan
+
+Spec shape mirrors plan shape:
+- Plan is `.claude/docs/plans/<feature>.md` (single-file) → spec is `.claude/docs/specs/<feature>.md` using `templates/SPEC_TEMPLATE.md`
+- Plan is `.claude/docs/plans/<feature>/index.md` (split) → spec is `.claude/docs/specs/<feature>/index.md` + `slices/*.md` using `templates/SPEC_INDEX_TEMPLATE.md` + `templates/SPEC_SLICE_TEMPLATE.md`
+
+### Single-file shape
+
+Required sections: §1 Inputs, §2 Outputs / Side Effects, §3 Contracts / Invariants, §4 Error Cases, §5 Scenarios, §6 SDD ↔ TDD mapping, §10 Logging, §11 Out of scope, §12 References. Conditional: §7 Auth, §8 Idempotency, §9 Performance.
+
+### Split shape
+
+- `index.md` — §1 Cross-cutting (1.1+1.4+1.5 mandatory; 1.2+1.3+1.6 conditional), §2 Slice index, §3 Out of scope, §4 References. **§1 is AUTHORITATIVE — slice override forbidden w/o ADR.**
+- `slices/<NN>-<slug>.md` — §0 Cross-cutting reference, §1 Inputs (slice), §2 Outputs (slice), §3 Contracts (slice), §4 Error Cases (slice-specific only), §5 Scenarios, §6 SDD ↔ TDD
+- Slice IDs + slugs MUST match plan slice IDs + slugs (1:1)
+
+### Universal rules
+
+- Validate before user approval: `bash scripts/ci/validate-plan-spec-templates.sh --spec <path>` (file for single, dir for split)
+- Missing required section = workflow violation
+- Update `workflow-state.json`:
+  - Single-file: `artifacts.spec = "<path>.md"`
+  - Split: `artifacts.spec_index = "<path>/index.md"` (NO `artifacts.spec` for split)
 
 ## Prerequisites
 
+- **Read `templates/SPEC_TEMPLATE.md`** — MANDATORY, before anything else
 - `/plan` must have been run and approved
 - Read `.claude/workflow-state.json`:
   1. Verify PLAN phase completed (`phaseHistory` contains PLAN entry or `phase` is `PLAN_APPROVED`)
-  2. **Read `artifacts.plan`** — this is the exact path to the approved plan file
-  3. If `artifacts.plan` is missing: scan `.claude/docs/plans/` for any file with `status: approved`
-- If no approved plan found: **STOP** — output: `"No approved plan found. Run /plan first."`
-- **Validate** the plan file exists and `status: approved` in its frontmatter
-- After reading and validating the plan file:
-  4. Check `artifacts.spec_count` in workflow-state.json — if present and > 1, this is a **multi-spec run**
-  5. Check if the plan contains `## Service Impact Map` — confirm multi-service scope
-  6. If multi-service: output "**Multi-spec mode**: {N} services detected. Will generate {N} coordinated specs."
+  2. **Read `artifacts.plan`** — exact path to approved plan file
+  3. `artifacts.plan` missing → scan `.claude/docs/plans/` for file with `status: approved`
+- No approved plan → **STOP**: `"No approved plan found. Run /plan first."`
+- **Validate** plan file exists and `status: approved` in frontmatter
+- **Validate plan conforms to PLAN_TEMPLATE.md** — required sections present. If not, refuse: "Plan missing required sections. Re-run /plan with template enforcement."
+- After validating plan:
+  4. Check `artifacts.spec_count` in workflow-state.json — if present and > 1, **multi-spec run**
+  5. Check if plan contains `## Service Impact Map` — confirm multi-service scope
+  6. Multi-service: output "**Multi-spec mode**: {N} services detected. Will generate {N} coordinated specs."
 
 ## Subagent Context (pass to spawned agent)
 
-When invoking the **spec-writer** agent, include in its prompt:
+Include in spec-writer prompt:
 
-- **Plan file**: `"Read the approved plan at: {artifacts.plan from workflow-state.json}. This is the EXACT file you must base the spec on. Do NOT scan the directory — use THIS file."`
-- **Phase**: You are in the **SPEC** phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
-- **Skill protocol**: Load `devco-agent-skills:bootstrap` first — contains the skill registry. Before every file operation, load the matching skill and announce it.
+- **Plan file**: `"Read approved plan at: {artifacts.plan from workflow-state.json}. EXACT file — do NOT scan directory."`
+- **Phase**: SPEC phase of SDD (PLAN → SPEC → BUILD → VERIFY → REVIEW)
+- **Skill protocol**: Load `devco-agent-skills:bootstrap` first. Before every file op, load matching skill and announce it.
 - **Summer check**: Scan `build.gradle` for `io.f8a.summer` → if found, load `devco-agent-skills:summer-core` first
 - **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
-- **Gate**: This is the gate between PLAN and BUILD — spec must be approved before any code is written
+- **Gate**: PLAN→BUILD gate — spec must be approved before any code
 - **Suggested skill**: `devco-agent-skills:api-design` for REST contract design and status code conventions
+- **Multi-spec mode**: Plan has `## Service Impact Map` → generate one spec per service. Sequential (provider first). Cross-Reference Pass after all specs written.
+- **Contract Registry**: Extract all API paths, event topics, shared DTOs from plan's `## Cross-Service Integration Points`. Every spec MUST use values from registry exactly.
+- **R5 compliance**: For each related service, read only CLAUDE.md + session files + specific files named in plan. NEVER glob/grep related service trees.
+- **Spec naming**: Multi-service specs use `.claude/docs/specs/{feature-name}-{service-name}.md`.
 
-- **Multi-spec mode**: If the plan has `## Service Impact Map`, generate one spec per service. Use sequential generation (provider first). Apply the Cross-Reference Pass after all specs are written.
-- **Contract Registry**: Extract all API paths, event topics, shared DTOs from the plan's `## Cross-Service Integration Points` into a Contract Registry. Every spec MUST use values from this registry exactly.
-- **R5 compliance**: For each related service, read only CLAUDE.md + session files + specific files named in the plan. NEVER glob/grep related service trees.
-- **Spec naming**: Multi-service specs use `.claude/docs/specs/{feature-name}-{service-name}.md` — kebab-case service name appended.
-
-**CRITICAL**: The plan file path MUST be passed to the spec-writer agent. Without it, the spec-writer cannot find the correct plan.
+**CRITICAL**: Plan file path MUST be passed to spec-writer agent.
 
 ## Workflow
 
@@ -137,18 +164,18 @@ When invoking the **spec-writer** agent, include in its prompt:
 
 ## Spec Generation
 
-The spec-writer agent handles spec generation with:
+spec-writer agent handles generation with:
 - Automatic task type detection (REST, Domain Logic, Messaging, DB Migration, Background Job)
 - 7-step process: Read Plan → Detect Type → Read Codebase → Generate Spec → Map to Tests → Task Decomposition → Present for Approval
-- Concrete templates for each task type with field names, status codes, exception types
+- Concrete templates per task type with field names, status codes, exception types
 
-The agent will read the codebase to ground the spec in reality — using actual class names, exception types, and field names found in the code.
+Agent reads codebase to ground spec in reality — actual class names, exception types, field names.
 
 See `agents/spec-writer.md` for full template details.
 
 ## Spec to Test Case Mapping
 
-After spec approval, output a test case skeleton:
+After spec approval, output test case skeleton:
 
 ```
 Spec Scenarios -> Test Cases:
@@ -158,7 +185,7 @@ Spec Scenarios -> Test Cases:
   Scenario 4 (auth)           -> shouldReturn401WhenNoToken()
 ```
 
-This feeds directly into the BUILD phase TDD cycle.
+Feeds directly into BUILD phase TDD cycle.
 
 ## Task Decomposition
 
@@ -171,11 +198,11 @@ After spec approval, decompose into ordered atomic tasks:
 | 3 | Implement use case | CreateOrderUseCase.java | shouldCreateOrderWhenValid() | 1,2 |
 | 4 | Add controller endpoint | OrderController.java | shouldReturn201WhenCreated() | 3 |
 
-Each task is independently testable. BUILD phase processes tasks in order.
+Each task independently testable. BUILD processes tasks in order.
 
 ## Document Persistence (MANDATORY)
 
-The spec MUST be written to a file — not just presented in conversation:
+Spec MUST be written to file — not just presented in conversation:
 
 - **Location**: `.claude/docs/specs/{feature-name}.md` (matches plan filename)
 - **References plan**: Frontmatter includes `plan_ref: .claude/docs/plans/{feature-name}.md`
@@ -183,28 +210,28 @@ The spec MUST be written to a file — not just presented in conversation:
 - **On revision**: Same file updated with revision history
 - **On approval**: `status: approved` updated in frontmatter
 
-The build command will READ this file. If no file exists, BUILD cannot proceed.
+Build command reads this file. No file = BUILD cannot proceed.
 
 ## Workflow State Tracking
 
-When this command runs, **update** `.claude/workflow-state.json`:
+On run, update `.claude/workflow-state.json`:
 - Set `phase` to `"SPEC"`
-- Add `{"phase": "PLAN", "completedAt": "{ISO timestamp}"}` to `phaseHistory` (if not already present)
+- Add `{"phase": "PLAN", "completedAt": "{ISO timestamp}"}` to `phaseHistory` (if not present)
 
-When the user **approves** the spec:
+On user **approval**:
 1. Update `workflow-state.json`:
    - Add `{"phase": "SPEC", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
    - Set `phase` to `"SPEC_APPROVED"`
-   - **Set `artifacts.spec` to the spec file path** (e.g., `".claude/docs/specs/order-notification.md"`)
-2. Output to user: **"Spec approved and saved to: `.claude/docs/specs/{feature-name}.md`"**
+   - **Set `artifacts.spec`** to spec file path (e.g., `".claude/docs/specs/order-notification.md"`)
+2. Output: **"Spec approved and saved to: `.claude/docs/specs/{feature-name}.md`"**
 3. Output: **"Run `/build` to start TDD implementation — it will read from this spec file."**
 
-When the user **approves** the specs (multi-service):
+On user **approval** (multi-service):
 1. Update `workflow-state.json`:
    - Add `{"phase": "SPEC", "completedAt": "{ISO timestamp}"}` to `phaseHistory`
    - Set `phase` to `"SPEC_APPROVED"`
-   - **Set `artifacts.spec`** to the FIRST spec path (provider spec) — backward compatibility with `/build`
-   - **Set `artifacts.specs`** to the ordered array of ALL spec paths:
+   - **Set `artifacts.spec`** to FIRST spec path (provider spec) — backward compat with `/build`
+   - **Set `artifacts.specs`** to ordered array of ALL spec paths:
      ```json
      "artifacts": {
        "plan": ".claude/docs/plans/{feature-name}.md",
@@ -221,7 +248,7 @@ When the user **approves** the specs (multi-service):
 
 ## Approval Protocol
 
-Present the completed spec (already written to file) and WAIT:
+Present completed spec (already written to file) and WAIT:
 
 ```
 SPEC REVIEW

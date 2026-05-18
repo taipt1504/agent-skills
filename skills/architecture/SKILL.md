@@ -8,6 +8,21 @@ description: >
 triggers:
   natural: ["hexagonal", "cqrs", "domain event", "package structure", "ports and adapters"]
   code: ["UseCase", "Port", "Adapter", "DomainEvent"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/domain/**/*.java", "**/application/**/*.java", "**/infrastructure/**/*.java", "**/interfaces/**/*.java", "docs/architecture/**", "docs/adr/**"]
+    code_patterns: ["UseCase", "Aggregate", "DomainEvent", "Port", "Adapter", "BoundedContext"]
+    task_keywords: ["architecture", "hexagonal", "DDD", "CQRS", "event sourcing", "bounded context", "ADR", "package structure"]
+    related_rules:
+      - rules/common/patterns.md
+      - rules/common/spec-driven.md
+relevance_assessment: |
+  HIGH 90%+: new bounded context, new layer, architectural reshape
+  HIGH 80%+: cross-layer refactor (e.g., add Port + Adapter pair)
+  MEDIUM 40-79%: in-layer refactor that respects existing boundaries
+  LOW 1-39%: small feature addition within existing structure
+  ZERO: trivial fix, single-method change
 ---
 
 # Architecture — Hexagonal + Solution Design
@@ -41,7 +56,7 @@ com.example.order/
 
 ### Aggregate Root Pattern
 
-Rich model with behavior. No setters — state changes through business methods that register domain events.
+Rich model. No setters — state changes through business methods that register domain events.
 
 ```java
 public class Order {
@@ -86,11 +101,11 @@ public class Order {
 }
 ```
 
-Key rules: `create()` validates invariants + emits creation event, `reconstitute()` trusts DB data, business methods guard state transitions, events collected and dispatched by application layer.
+`create()` validates invariants + emits creation event. `reconstitute()` trusts DB data. Business methods guard state transitions. Application layer dispatches events.
 
 ### Value Objects
 
-Records with compact constructor validation:
+Records with compact constructor validation. Example:
 
 ```java
 public record Money(BigDecimal amount, String currency) {
@@ -175,7 +190,7 @@ public record OrderDetailResponse(
 ) {}
 ```
 
-Key rules: Command handlers use domain aggregates; query handlers use flat read models directly. Never mix command and query in one handler. Query side can bypass domain layer entirely.
+Command handlers use domain aggregates. Query handlers use flat read models directly. Never mix command and query. Query side can bypass domain layer.
 
 ### Domain Event Publisher
 
@@ -262,13 +277,13 @@ public class OrderBeanConfig {
 
 ## Mapping Strategy
 
-Three models at each boundary — always explicit mappers:
+Three models at each boundary — explicit mappers always:
 
 ```
 REST DTO <-> Application Command/Response <-> Domain <-> Persistence Entity
 ```
 
-Use MapStruct (`@Mapper(componentModel = "spring")`) or manual mappers. Never let a single model cross boundaries.
+Use MapStruct (`@Mapper(componentModel = "spring")`) or manual mappers. Never cross boundaries with one model.
 
 ## Testing by Layer
 
@@ -280,11 +295,11 @@ Use MapStruct (`@Mapper(componentModel = "spring")`) or manual mappers. Never le
 
 ## ArchUnit Enforcement
 
-Enforce dependency rules with `@ArchTest`: domain must not depend on Spring/JPA, application must not depend on infrastructure, ports must be interfaces.
+`@ArchTest`: domain must not depend on Spring/JPA, application must not depend on infrastructure, ports must be interfaces.
 
 ## When to Use / Skip
 
-**Use**: Complex business logic, multiple input channels, long-lived projects, teams >3.
+**Use**: Complex logic, multiple input channels, long-lived projects, teams >3.
 **Skip**: Simple CRUD, prototypes, <3 entities.
 
 ## References
@@ -296,7 +311,7 @@ Enforce dependency rules with `@ArchTest`: domain must not depend on Spring/JPA,
 
 ## Related Skills
 
-- **coding-standards** — Package naming, method/class size limits that align with hexagonal layers
-- **messaging-patterns** — Event-driven communication between bounded contexts
+- **coding-standards** — Package naming, method/class size limits
+- **messaging-patterns** — Event-driven inter-context communication
 - **database-patterns** — Repository adapters for persistence layer
 - **api-design** — REST interface design for infrastructure adapters

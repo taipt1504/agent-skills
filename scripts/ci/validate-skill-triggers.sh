@@ -18,11 +18,11 @@ TOTAL=20
 # --- Natural language trigger table (pipe-separated: "trigger|skill") ---
 # Mirrors the NL_TRIGGERS array in skill-router.sh
 TRIGGERS="
-rest endpoint|spring-patterns
-api handler|spring-patterns
-pagination|spring-patterns
-web filter|spring-patterns
-webclient|spring-patterns
+rest endpoint|spring-webflux-patterns
+api handler|spring-webflux-patterns
+pagination|spring-webflux-patterns
+web filter|spring-webflux-patterns
+webclient|spring-webflux-patterns
 jwt auth|spring-security
 cors config|spring-security
 security filter|spring-security
@@ -175,7 +175,7 @@ echo "=== Natural Language Trigger Tests ==="
 
 assert_skill "add kafka consumer" "messaging-patterns"
 assert_skill "configure jwt authentication" "spring-security"
-assert_skill "create rest endpoint" "spring-patterns"
+assert_skill "create rest endpoint" "spring-webflux-patterns"
 assert_skill "write database migration" "database-patterns"
 assert_skill "add redis cache" "redis-patterns"
 assert_skill "setup structured logging" "observability-patterns"
@@ -187,7 +187,7 @@ assert_skill "add rabbitmq listener" "messaging-patterns"
 assert_skill "configure cors headers" "spring-security"
 assert_skill "add distributed tracing" "observability-patterns"
 assert_skill "create jpa entity" "database-patterns"
-assert_skill "add web filter" "spring-patterns"
+assert_skill "add web filter" "spring-webflux-patterns"
 assert_skill "implement rate limiter" "summer-ratelimit"
 assert_skill "design openapi spec" "api-design"
 assert_skill "setup domain events with cqrs" "architecture"

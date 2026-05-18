@@ -87,20 +87,64 @@ case "$_HOOK_PROFILE" in
     _ENABLED_HOOKS=""
     ;;
   minimal)
-    _ENABLED_HOOKS="session-init session-save subagent-init"
+    _ENABLED_HOOKS="session-init session-save subagent-init preflight-gate preflight-discovery workflow-gate"
     ;;
   standard)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace workflow-gate workflow-phase-lock memory-gate team-spawn-evaluator"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint workflow-gate workflow-phase-lock preflight-gate preflight-discovery auto-adr evolution-check docs-index"
     ;;
   strict)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace workflow-gate workflow-phase-lock memory-gate team-spawn-evaluator"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint workflow-gate workflow-phase-lock preflight-gate preflight-discovery auto-adr evolution-check docs-index"
     export STRICT_MODE=true
     ;;
   *)
-    # Unknown profile → fall back to standard (not all-enabled)
-    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint observability-trace workflow-gate workflow-phase-lock memory-gate team-spawn-evaluator"
+    _ENABLED_HOOKS="session-init session-save skill-router quality-gate compact-advisor git-guard pre-compact post-compact workflow-tracker subagent-init verify-fix-loop build-checkpoint workflow-gate workflow-phase-lock preflight-gate preflight-discovery auto-adr evolution-check docs-index"
     ;;
 esac
+
+# --- Output cap helper (v4.1 — DEVCO_*_MAX_CHARS) ---
+#
+# Cap additionalContext payload size per hook. Default caps:
+#   session-init:        DEVCO_SESSION_START_MAX_CHARS=8000
+#   subagent-init:       DEVCO_SUBAGENT_INIT_MAX_CHARS=6000
+#   preflight-gate:      DEVCO_PREFLIGHT_MAX_CHARS=4000
+#   preflight-discovery: DEVCO_PREFLIGHT_MAX_CHARS=4000
+#   post-compact:        DEVCO_POST_COMPACT_MAX_CHARS=3000
+#
+# Usage in hook:
+#   CTX=$(cap_context "$CTX" "$DEFAULT_CAP" "DEVCO_<NAME>_MAX_CHARS")
+#
+# Env var DEVCO_HOOK_PROFILE=off disables all output (overrides _HOOK_PROFILE for caps).
+cap_context() {
+  local text="$1"
+  local default_cap="${2:-8000}"
+  local env_var="${3:-}"
+  local cap="$default_cap"
+
+  if [ -n "$env_var" ] && [ -n "${!env_var:-}" ]; then
+    cap="${!env_var}"
+  fi
+
+  # Profile minimal halves the cap
+  if [ "$_HOOK_PROFILE" = "minimal" ]; then
+    cap=$(( cap / 2 ))
+  fi
+
+  # Strict profile allows 1.5x
+  if [ "$_HOOK_PROFILE" = "strict" ]; then
+    cap=$(( cap * 3 / 2 ))
+  fi
+
+  local len=${#text}
+  if [ "$len" -le "$cap" ]; then
+    printf '%s' "$text"
+    return 0
+  fi
+
+  # Truncate with marker
+  printf '%s\n\n[truncated: %d chars > cap %d. Override via %s env var.]' \
+    "${text:0:$cap}" "$len" "$cap" "$env_var"
+}
+export -f cap_context 2>/dev/null || true
 
 # Check if this hook is enabled
 if [ -n "$_HOOK_NAME" ]; then

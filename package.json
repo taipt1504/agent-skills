@@ -1,7 +1,7 @@
 {
   "name": "@devco/agent-skills",
-  "version": "3.3.1",
-  "description": "Lightweight, context-efficient Claude Code plugin for Java Spring backend — hook-bootstrapped skills, 3-tier organization, lazy loading",
+  "version": "4.0.0-beta",
+  "description": "Adaptive 5-layer workflow Claude Code plugin for Java Spring backend — 1% pre-flight discovery, triage routing, two-stage review, subagent dispatch, auto-evolution",
   "keywords": [
     "claude-code",
     "java",

@@ -5,27 +5,41 @@ triggers:
   natural: ["kafka consumer idempotency", "outbox consumer", "lsn watermark", "summer kafka", "kafka dlt", "kafka retry summer"]
   code: ["OutboxConsumerIdempotency", "IdempotencyContext", "SummerKafkaConsumerFactories", "DefaultErrorHandlerCustomizer", "ConsumerWatermarkValidator", "f8a.kafka.consumer", "outbox_consumer_watermark"]
 requires: ["summer-core", "summer-data"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*KafkaListener*.java", "**/*MessageHandler*.java", "**/*OutboxPublisher*.java"]
+    code_patterns: ["io.f8a.summer.kafka", "AbstractKafkaMessageHandler", "MessageHandlerRegistry", "OutboxEventPublisher"]
+    task_keywords: ["summer Kafka", "outbox dispatcher", "message handler registry", "f8a.kafka"]
+    related_skills: ["messaging-patterns", "summer-data"]
+    related_rules:
+      - rules/java/observability.md
+relevance_assessment: |
+  HIGH 80%+: new Summer Kafka consumer/producer OR outbox routing change
+  MEDIUM 40-79%: handler registry registration tweak
+  LOW 1-39%: caller publishes via Summer outbox but handler in other service
+  ZERO: project lacks io.f8a.summer:summer-kafka
 ---
 
 # Summer Kafka — Consumer Idempotency & Error Handling
 
-**Gate:** Verify summer-core is loaded and `io.f8a.summer:summer-platform` is in build.gradle before proceeding. Producers should already be on `summer-data-outbox` 0.3.1+ so messages carry the `ob.lsn` header.
+**Gate:** Verify summer-core loaded + `io.f8a.summer:summer-platform` in build.gradle. Producers must be on `summer-data-outbox` 0.3.1+ — messages must carry `ob.lsn` header.
 
 **Modules:** `summer-kafka-consumer` | `summer-kafka-consumer-autoconfigure` (both added 0.3.1)
 **Package:** `io.f8a.summer.kafka.consumer.*`
 **Activation:** Auto when `summer-kafka-consumer-autoconfigure` is on the classpath. **There is no `enabled` flag — presence of the dependency is the opt-in.** Disable by dropping the dependency.
 
-**This SKILL.md tracks LATEST stable (0.3.5).** First shipped in 0.3.1; no separate overlay for 0.3.5 (no kafka-consumer changes since 0.3.1).
+**Tracks LATEST stable (0.3.5).** First shipped 0.3.1; no 0.3.5 overlay (no kafka-consumer changes since 0.3.1).
 
 ## Why it exists
 
-Pre-0.3.1 every consumer rolled its own dedup table (one row per event) or relied on a domain-unique key + `DuplicateKeyException`. Both scale with **message volume** and produce hot indexes. Summer's `OutboxConsumerIdempotency` watermarks by `(consumer_group, topic, partition)` — matching Kafka's native offset granularity — so storage cost is O(groups × topics × partitions), typically under a few hundred rows per service, regardless of throughput.
+Pre-0.3.1: every consumer needed its own dedup table (one row per event) or a domain-unique key + `DuplicateKeyException`. Both scale with **message volume** and produce hot indexes. `OutboxConsumerIdempotency` watermarks by `(consumer_group, topic, partition)` — matching Kafka's native offset granularity — so storage cost is O(groups × topics × partitions), typically a few hundred rows per service regardless of throughput.
 
-The contract works because Debezium preserves PostgreSQL LSN order **within** a Kafka topic-partition. Scheduler-mode publishers emit `createdAt.toEpochNanos()` as a best-effort substitute — stable under normal load, not authoritative under extreme concurrency. Strict ordering ⇒ publish via CDC mode.
+Debezium preserves PostgreSQL LSN order **within** a topic-partition. Scheduler-mode publishers emit `createdAt.toEpochNanos()` as best-effort — stable under normal load, not authoritative under extreme concurrency. Strict ordering → use CDC mode.
 
 ## Schema — `outbox_consumer_watermark`
 
-One row per consuming `(group, topic, partition)`. Schema must exist before consumers run; `ConsumerWatermarkValidator` checks it on startup (disable: `f8a.kafka.consumer.idempotency.validate-on-startup=false`).
+One row per `(group, topic, partition)`. Schema must exist before consumers run; `ConsumerWatermarkValidator` checks on startup (disable: `f8a.kafka.consumer.idempotency.validate-on-startup=false`).
 
 ```sql
 CREATE TABLE outbox_consumer_watermark (
@@ -39,7 +53,7 @@ CREATE TABLE outbox_consumer_watermark (
 );
 ```
 
-**Column names are load-bearing** — `ConsumerWatermarkValidator` checks for exactly `consumer_group`, `topic`, `partition`, `last_lsn`, `last_event_id`, `last_updated_at`. A migration that uses `lsn` / `updated_at` instead will fail boot. DDL also lives in `summer-data/references/ddl-scripts.md`.
+**Column names load-bearing** — `ConsumerWatermarkValidator` checks exact names: `consumer_group`, `topic`, `partition`, `last_lsn`, `last_event_id`, `last_updated_at`. Using `lsn`/`updated_at` instead fails boot. DDL also in `summer-data/references/ddl-scripts.md`.
 
 ## Public API
 
@@ -55,7 +69,7 @@ CREATE TABLE outbox_consumer_watermark (
 
 ## Listener pattern
 
-The **one rule**: `recordProcessed` must commit in the same transaction as the business write. Otherwise a crash between commits produces a duplicate-processing window. Reactive: wrap with `TransactionalOperator.transactional(...)`.
+**One rule**: `recordProcessed` must commit in the same transaction as the business write. Crash between commits → duplicate-processing window. Reactive: wrap with `TransactionalOperator.transactional(...)`.
 
 ```java
 @Component
@@ -91,10 +105,10 @@ Imperative consumers use `@Transactional` instead — same rule, same wiring.
 
 ## Error handling (`DefaultErrorHandler` + DLT)
 
-The autoconfigure wires:
+Autoconfigure wires:
 
-- **Exponential-backoff retry** matching Spring Kafka's `ExponentialBackOffWithMaxRetries`. Each failed record retries up to `maxAttempts` times, with `initialInterval × multiplier^(n-1)` delay (capped at `maxInterval`).
-- On exhaustion, `DeadLetterPublishingRecoverer` forwards the record to `<topic>.DLT` via `dltKafkaTemplate`.
+- **Exponential-backoff retry** (`ExponentialBackOffWithMaxRetries`). Retries up to `maxAttempts`; delay = `initialInterval × multiplier^(n-1)` capped at `maxInterval`.
+- On exhaustion, `DeadLetterPublishingRecoverer` forwards to `<topic>.DLT` via `dltKafkaTemplate`.
 
 ```yaml
 f8a:
@@ -112,7 +126,7 @@ f8a:
 
 ### Marking exceptions non-retryable
 
-Don't replace the whole handler — register a `DefaultErrorHandlerCustomizer` bean:
+Register a `DefaultErrorHandlerCustomizer` bean — don't replace the whole handler:
 
 ```java
 @Bean
@@ -125,7 +139,7 @@ DefaultErrorHandlerCustomizer markValidationFatal() {
 
 ### Custom DLT producer
 
-Override the default fire-and-forget template if you need idempotence on DLT writes (rare):
+Override default fire-and-forget template only if idempotence on DLT writes needed (rare):
 
 ```java
 @Bean("dltKafkaTemplate")
@@ -138,7 +152,7 @@ KafkaTemplate<?, ?> dltKafkaTemplate(ProducerFactory<?, ?> pf) {
 
 ## JSON consumer factory helpers
 
-For services that need a typed `ConcurrentKafkaListenerContainerFactory` instead of the Spring Boot default:
+For typed `ConcurrentKafkaListenerContainerFactory` instead of Spring Boot default:
 
 ```java
 @Bean("orderListenerContainerFactory")
@@ -150,7 +164,7 @@ ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> orderListener
 }
 ```
 
-Reference it from the listener: `@KafkaListener(topics = "...", containerFactory = "orderListenerContainerFactory")`.
+Reference from listener: `@KafkaListener(topics = "...", containerFactory = "orderListenerContainerFactory")`.
 
 ## Gradle
 
@@ -162,22 +176,22 @@ implementation 'io.f8a.summer:summer-data-r2dbc'   // for R2dbcOutboxConsumerIde
 
 ## Rules
 
-- **Always** call `idempotency.recordProcessed(ctx)` in the **same reactive transaction** as the business write. A separate `.subscribe()` or chained `flatMap` outside the transaction breaks the contract.
-- **Never** skip the watermark validator. A consumer started against a missing/misshapen `outbox_consumer_watermark` table will silently re-process from offset 0 on every restart.
-- **Never** invent your own `(consumerGroup, topic, partition)` keying — that's the contract; use `KafkaHeaders.RECEIVED_TOPIC` / `RECEIVED_PARTITION` directly, not the listener's static `topics =` value (which is misleading for pattern listeners).
-- **Always** bind `@Header("ob.lsn") long` — 8-byte big-endian since 0.3.1, decoded by Spring Messaging's default `byte[] → Long` converter. Older string-encoded headers produce wrong values silently — make sure producers are on `summer-data-outbox` 0.3.1+.
-- **Always** point DLT consumers at `<topic>.DLT` — that's where `DeadLetterPublishingRecoverer` writes.
-- **Never** raise `idempotency.enabled=true` without the dependency; the property has no effect without the autoconfigure jar.
+- **Always** call `idempotency.recordProcessed(ctx)` in the **same reactive transaction** as the business write. Separate `.subscribe()` or `flatMap` outside transaction breaks the contract.
+- **Never** skip watermark validator. Missing/misshapen `outbox_consumer_watermark` → silently re-processes from offset 0 on restart.
+- **Never** invent own `(consumerGroup, topic, partition)` keying. Use `KafkaHeaders.RECEIVED_TOPIC`/`RECEIVED_PARTITION` directly — not static `topics =` value (misleading for pattern listeners).
+- **Always** bind `@Header("ob.lsn") long` — 8-byte big-endian since 0.3.1. Older string-encoded headers produce wrong values silently. Producers must be on `summer-data-outbox` 0.3.1+.
+- **Always** point DLT consumers at `<topic>.DLT` — where `DeadLetterPublishingRecoverer` writes.
+- **Never** set `idempotency.enabled=true` without the dependency — no effect without autoconfigure jar.
 
 ## References
 
-- **[references/versions/0.3.1.md](references/versions/0.3.1.md)** — module introduction (and the `ob.lsn` binary header change).
-- **[references/listener-examples.md](references/listener-examples.md)** — full listener wiring, including imperative-mode and multi-topic patterns.
+- **[references/versions/0.3.1.md](references/versions/0.3.1.md)** — module introduction + `ob.lsn` binary header change
+- **[references/listener-examples.md](references/listener-examples.md)** — full listener wiring, imperative-mode, multi-topic patterns
 
-For the full feature × version table see [`summer-core/references/version-matrix.md`](../summer-core/references/version-matrix.md).
+Full feature × version table: [`summer-core/references/version-matrix.md`](../summer-core/references/version-matrix.md)
 
 ## Related Skills
 
-- **summer-data** — producer side (`OutboxService.saveEvent`, `KafkaOutboxPublisher`, `ob.lsn` header).
-- **summer-core** — gate; `Txid` / `Ufid` types appearing in event payloads.
-- **summer-rest** — handlers that initiate writes which then publish via outbox.
+- **summer-data** — producer side (`OutboxService.saveEvent`, `KafkaOutboxPublisher`, `ob.lsn` header)
+- **summer-core** — gate; `Txid`/`Ufid` types in event payloads
+- **summer-rest** — handlers that initiate writes published via outbox

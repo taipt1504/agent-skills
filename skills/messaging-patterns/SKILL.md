@@ -9,11 +9,23 @@ description: >
 triggers:
   natural: ["kafka consumer", "message queue", "event streaming", "rabbitmq", "dead letter"]
   code: ["@KafkaListener", "KafkaTemplate", "@RabbitListener", "RabbitTemplate"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*KafkaListener*.java", "**/*Consumer*.java", "**/*Producer*.java", "**/*EventPublisher*.java", "**/*Outbox*.java"]
+    code_patterns: ["@KafkaListener", "KafkaTemplate", "@RabbitListener", "RabbitTemplate", "OutboxService", "AbstractKafkaMessageHandler"]
+    task_keywords: ["Kafka", "RabbitMQ", "event", "outbox", "consumer", "producer", "DLQ", "DLT", "idempotency", "saga"]
+    related_rules:
+      - rules/java/security.md
+      - rules/java/observability.md
+relevance_assessment: |
+  HIGH 80%+: new consumer/producer OR new event type OR outbox table OR DLQ config
+  MEDIUM 40-79%: existing handler modification, retry/DLQ tuning
+  LOW 1-39%: caller emits event but handler in other service
+  ZERO: project has neither Kafka nor RabbitMQ (verify build.gradle)
 ---
 
 # Messaging Patterns for Spring Boot
-
-Production-ready Kafka and RabbitMQ patterns for Java 17+ / Spring Boot 3.x.
 
 ## Decision Table: Kafka vs RabbitMQ
 
@@ -27,25 +39,25 @@ Production-ready Kafka and RabbitMQ patterns for Java 17+ / Spring Boot 3.x.
 | Use when | Event streaming, log aggregation, high-volume CQRS | Task queues, RPC, complex routing, low-latency request/reply |
 | Protocol | Custom binary | AMQP 0-9-1 |
 
-**Rule of thumb:** Event log / replay needed -> Kafka. Complex routing / task dispatch -> RabbitMQ.
+**Rule:** Event log/replay needed → Kafka. Complex routing/task dispatch → RabbitMQ.
 
 ## Shared Patterns
 
 ### Producer Reliability
-1. **Idempotent sends** -- Kafka: `enable.idempotence=true`; RabbitMQ: publisher confirms
-2. **Persistent delivery** -- Kafka: `acks=all`; RabbitMQ: `PERSISTENT` delivery mode
-3. **Transactional** -- Kafka: `executeInTransaction`; RabbitMQ: `rabbitTemplate.invoke`
-4. **Serialization** -- Explicit serializer config (JSON/Avro); never rely on defaults
+1. **Idempotent sends** — Kafka: `enable.idempotence=true`; RabbitMQ: publisher confirms
+2. **Persistent delivery** — Kafka: `acks=all`; RabbitMQ: `PERSISTENT` delivery mode
+3. **Transactional** — Kafka: `executeInTransaction`; RabbitMQ: `rabbitTemplate.invoke`
+4. **Serialization** — Explicit (JSON/Avro); never rely on defaults
 
 ### Consumer Error Handling
-1. **Manual ACK** -- both brokers; never auto-ack in production
-2. **Retry + dead letter** -- Kafka: `DefaultErrorHandler` + `DeadLetterPublishingRecoverer`; RabbitMQ: `RetryInterceptorBuilder` + DLX/DLQ
-3. **Non-retryable exceptions** -- skip retry for `DeserializationException`, `ValidationException`
-4. **DLQ consumer** -- persist failed messages, always ACK DLQ to prevent loops
+1. **Manual ACK** — both brokers; never auto-ack in production
+2. **Retry + dead letter** — Kafka: `DefaultErrorHandler` + `DeadLetterPublishingRecoverer`; RabbitMQ: `RetryInterceptorBuilder` + DLX/DLQ
+3. **Non-retryable exceptions** — skip retry for `DeserializationException`, `ValidationException`
+4. **DLQ consumer** — persist failed messages, always ACK DLQ to prevent loops
 
 ## Critical Config
 
-For full producer/consumer configuration, see references/kafka.md or references/rabbitmq.md.
+Full producer/consumer config: see `references/kafka.md` or `references/rabbitmq.md`.
 
 ## Verification Checklist
 

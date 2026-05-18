@@ -4,11 +4,11 @@ A lightweight, context-efficient Claude Code plugin for **Java Spring** backend 
 
 ## What It Provides
 
-- **18 Skills** — Flat structure: 1 bootstrap + 10 generic (Spring/Java) + 6 Summer Framework + 1 meta
-- **8 Agents** — Planner, spec-writer, implementer, reviewer, build-fixer, test-runner, database-reviewer, refactorer
-- **12 Commands** — `/plan`, `/spec`, `/build`, `/verify`, `/review`, `/setup`, `/status`, `/build-fix`, `/refactor`, `/db-migrate`, `/e2e`, `/meta`
-- **9 Rules** — Flat, ≤500 tokens each: workflow, coding style, architecture, security, testing, observability, git, API design, spec-driven
-- **6 Hooks** — Session init (bootstrap injection), session save, skill router, quality gate, compact advisor, pre-compact
+- **30+ Skills** — bootstrap + preflight + triage + align + brainstorm + subagent-dispatch + git-worktree + 10 generic (Spring WebFlux/MVC, Java) + 6 Summer Framework + meta-skills
+- **9 Agents** — planner, spec-writer, slice-executor (formerly implementer), reviewer (split into spec-compliance + code-quality coming Phase 4), build-fixer, test-runner, database-reviewer, refactorer, pentest
+- **17 Commands** — `/triage`, `/align`, `/brainstorm`, `/plan`, `/spec`, `/build`, `/verify`, `/dc-review`, `/dc-setup`, `/dc-status`, `/build-fix`, `/refactor`, `/db-migrate`, `/e2e`, `/meta`, `/pentest-scan`, `/threat-model`
+- **13 Rules** — split into `rules/common/` (language-agnostic: coding-style, security, patterns, lanes, spec-driven, skill-enforcement, development-workflow, git-workflow) + `rules/java/` (coding-style, security, api-design, testing, observability, reactive)
+- **20 Hooks** — session-init (with smart skill load + triage), preflight-gate + preflight-discovery (1% rule enforcement), workflow-gate (lane-aware), quality-gate, compact-advisor, pre/post-compact, skill-router (announcement-only), subagent-init, verify-fix-loop, build-checkpoint, observability-trace (stubbed), and more
 
 ## Architecture
 

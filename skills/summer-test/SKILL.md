@@ -5,11 +5,26 @@ triggers:
   natural: ["summer test", "blackbox test", "summer testcontainer"]
   code: ["summer-test", "BlackboxTest", "WireMockServiceManager"]
 requires: ["summer-core", "testing-workflow"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*Test.java", "**/*IT.java", "**/*Spec.java"]
+    code_patterns: ["io.f8a.summer.test", "AbstractBlackboxTest", "f8a.test"]
+    task_keywords: ["summer test", "blackbox test", "summer testcontainer", "integration test"]
+    related_skills: ["testing-workflow"]
+    related_rules:
+      - rules/java/testing.md
+relevance_assessment: |
+  HIGH 90%+: new blackbox integration test OR Summer-specific testcontainer setup
+  HIGH 80%+: existing test using Summer test fixtures
+  MEDIUM 40-79%: unit test for code that integrates with Summer services
+  LOW 1-39%: test using vanilla Spring Boot Test (should migrate)
+  ZERO: project lacks io.f8a.summer:summer-test
 ---
 
 # Summer Test — Containers, WireMock & Blackbox
 
-**Gate:** Verify summer-core is loaded and io.f8a.summer:summer-platform is in build.gradle before proceeding.
+**Gate:** Verify summer-core loaded and `io.f8a.summer:summer-platform` in build.gradle.
 
 **Module:** `summer-test` | **Dependency:** `testImplementation 'io.f8a.summer:summer-test'`
 
@@ -42,9 +57,7 @@ class UserServiceIntegrationTest {
 }
 ```
 
-Methods: `getJdbcUrl()`, `getR2dbcUrl()`, `getUsername()`, `getPassword()`, `runFlywayMigrations(path)`, `executeSqlScript(path)`, `createConnection()`.
-
-For database assertion utilities (tableExists, getTableRowCount, executeUpdate, queryForString), see `references/blackbox-config.md` — DatabaseTestUtils section.
+Methods: `getJdbcUrl()`, `getR2dbcUrl()`, `getUsername()`, `getPassword()`, `runFlywayMigrations(path)`, `executeSqlScript(path)`, `createConnection()`. DB assertion utils (tableExists, getTableRowCount, executeUpdate, queryForString) → `references/blackbox-config.md` DatabaseTestUtils.
 
 ## WireMockServiceManager
 
@@ -123,17 +136,17 @@ webTestClient.get().uri("/api/resource")
 
 ## RANDOM_PORT vs DEFINED_PORT
 
-`@SpringBootTest(webEnvironment = RANDOM_PORT)` binds to an ephemeral port. The `base_url` in `blackbox_config.json` must use `http://localhost:8080` only when the app runs on a fixed port (`DEFINED_PORT`). With `RANDOM_PORT`, inject the actual port via `@LocalServerPort` and construct the base URL dynamically — do not hardcode 8080 in config.
+`RANDOM_PORT` binds to ephemeral port. `base_url` in `blackbox_config.json` only hardcodes 8080 when using `DEFINED_PORT`. With `RANDOM_PORT`, inject via `@LocalServerPort` and build URL dynamically.
 
-See `references/blackbox-config.md` for full config JSON format and test-case JSON schema.
+Full config JSON format + test-case JSON schema → `references/blackbox-config.md`.
 
 ## Rules
 
-- Always use `PostgresTestContainer.create()` for integration tests — never hardcode JDBC/R2DBC URLs.
-- Always use `@DynamicPropertySource` to wire container URLs — never rely on static config files for test DB.
-- Always use `RANDOM_PORT` with `@LocalServerPort` — never hardcode port 8080 in test config.
-- Never start WireMock stubs without calling `stopAllServices()` in `@AfterAll` — port leaks break CI.
-- Always use `TestCaseUtils.loadTestCases()` for blackbox tests — enables JSON-driven test data.
+- `PostgresTestContainer.create()` for integration tests — never hardcode JDBC/R2DBC URLs
+- `@DynamicPropertySource` to wire container URLs — never static config files for test DB
+- `RANDOM_PORT` + `@LocalServerPort` — never hardcode port 8080 in test config
+- Always call `stopAllServices()` in `@AfterAll` — port leaks break CI
+- `TestCaseUtils.loadTestCases()` for blackbox tests — enables JSON-driven test data
 
 ## Related Skills
 

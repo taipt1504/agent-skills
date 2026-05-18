@@ -9,6 +9,20 @@ triggers:
   natural: ["dockerfile", "kubernetes", "k8s", "ci/cd", "deploy", "health check", "container", "graceful shutdown", "docker image", "helm"]
   code: ["Dockerfile", "deployment.yaml", "health", "actuator", "HorizontalPodAutoscaler"]
 requires: []
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/application*.yml", "**/application*.properties", "**/Dockerfile", "**/docker-compose.yml", "**/build.gradle*", "**/pom.xml", ".github/workflows/**"]
+    code_patterns: ["@Profile", "@ConditionalOn", "spring.profiles", "ENV "]
+    task_keywords: ["deployment", "profile", "config", "Docker", "Kubernetes", "graceful shutdown", "actuator", "production"]
+    related_rules:
+      - rules/java/observability.md
+      - rules/java/security.md
+relevance_assessment: |
+  HIGH 80%+: new profile, deploy target, container/orchestration config
+  MEDIUM 40-79%: app config tweak (timeouts, pool sizes, actuator endpoints)
+  LOW 1-39%: dependency version bump
+  ZERO: no infrastructure / config files touched
 ---
 
 # Deployment Patterns — Docker, K8s, CI/CD
@@ -25,12 +39,12 @@ requires: []
 
 ## Core Principles
 
-1. **Separate build/runtime** — multi-stage Docker builds (JDK to build, JRE to run)
-2. **Never root** — always `USER appuser` in production images
+1. **Separate build/runtime** — multi-stage builds (JDK build, JRE runtime)
+2. **Never root** — `USER appuser` in production images
 3. **Container-aware JVM** — `-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0`
 4. **Probe semantics** — liveness = internal only, readiness = external deps
 5. **Graceful shutdown** — `terminationGracePeriodSeconds` > `timeout-per-shutdown-phase`
-6. **No secrets in images** — use K8s Secrets, SealedSecrets, or Vault
+6. **No secrets in images** — K8s Secrets, SealedSecrets, or Vault
 
 ## Dockerfile Essentials
 
@@ -55,7 +69,7 @@ EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
 ```
 
-For layered JAR, Maven variant, JVM flags reference → read `references/dockerfile.md`.
+Layered JAR, Maven, JVM flags → `references/dockerfile.md`.
 
 ## Health Probes Summary
 
@@ -82,7 +96,7 @@ spring:
 | Readiness | `/actuator/health/readiness` | DB, Redis | Remove from Service |
 | Startup | `/actuator/health/liveness` | Init done | Wait |
 
-For custom HealthIndicators, composite readiness, shutdown sequence → read `references/health-probes.md`.
+Custom HealthIndicators, composite readiness, shutdown sequence → `references/health-probes.md`.
 
 ## Resource Sizing
 
@@ -92,13 +106,11 @@ For custom HealthIndicators, composite readiness, shutdown sequence → read `re
 | Standard API | 512Mi | 1Gi | 250m | 1000m |
 | Heavy Processing | 1Gi | 2Gi | 500m | 2000m |
 
-For full K8s manifests (Deployment, Service, HPA, ConfigMap, NetworkPolicy) → read `references/kubernetes.md`.
+Full K8s manifests (Deployment, Service, HPA, ConfigMap, NetworkPolicy) → `references/kubernetes.md`.
 
 ## CI/CD Pipeline Quick Reference
 
-Stages: build & test → security scan → Docker build + Trivy scan → deploy staging → deploy production.
-
-For full GitHub Actions/GitLab CI YAML, deployment strategies comparison → read `references/cicd.md`.
+Stages: build & test → security scan → Docker build + Trivy scan → deploy staging → deploy production. Full YAML, strategies → `references/cicd.md`.
 
 ## Graceful Shutdown Checklist
 
@@ -112,5 +124,5 @@ For full GitHub Actions/GitLab CI YAML, deployment strategies comparison → rea
 ## Related Skills
 
 - **observability-patterns** — Prometheus metrics, structured logging, tracing
-- **spring-patterns** — Spring Boot configuration, profiles
+- **spring-webflux-patterns** — Spring Boot configuration, profiles
 - **architecture** — Hexagonal structure mapping to Docker layers

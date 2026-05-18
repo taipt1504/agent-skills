@@ -10,15 +10,27 @@ triggers:
   natural: ["rate limiter", "summer rate limit", "token bucket"]
   code: ["RateLimiterService", "f8a.rate-limiter"]
 requires: ["summer-core", "redis-patterns"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*RateLimit*.java", "**/*Throttle*.java"]
+    code_patterns: ["io.f8a.summer.ratelimit", "RateLimiterService", "f8a.rate-limiter"]
+    task_keywords: ["rate limit", "throttle", "token bucket", "summer rate limit", "OTP rate limit"]
+    related_skills: ["redis-patterns"]
+    related_rules:
+      - rules/common/security.md
+relevance_assessment: |
+  HIGH 80%+: new rate-limited endpoint OR rate config change
+  MEDIUM 40-79%: rate-limit key strategy refactor
+  LOW 1-39%: endpoint that should be rate-limited but currently isn't
+  ZERO: project lacks io.f8a.summer:summer-rate-limiter
 ---
 
 # Summer Rate Limiting — v0.2.2+ Only
 
-**Gate:** Verify summer-core is loaded and io.f8a.summer:summer-platform is in build.gradle before proceeding.
+**Gate:** Verify summer-core loaded and `io.f8a.summer:summer-platform` in build.gradle before proceeding.
 
-**Module:** `summer-ratelimit-autoconfigure` | **Config:** `f8a.rate-limiter`
-
-**Prerequisite:** Summer Framework >= 0.2.2. This module does not exist in earlier versions.
+**Module:** `summer-ratelimit-autoconfigure` | **Config:** `f8a.rate-limiter` | **Prereq:** Summer >= 0.2.2 only.
 
 ```gradle
 implementation 'io.f8a.summer:summer-ratelimit-autoconfigure'
@@ -120,24 +132,24 @@ f8a:
 
 ## Storage
 
-- **Redis** (default): Atomic Lua scripts. Auto-detected when `spring-boot-starter-data-redis-reactive` is on classpath.
-- **Memory**: In-process fallback (`storage-type: memory`). Use for development/testing only.
+- **Redis** (default): Atomic Lua scripts. Auto-detected when `spring-boot-starter-data-redis-reactive` on classpath.
+- **Memory**: In-process fallback (`storage-type: memory`). Dev/testing only.
 
-WARNING: `storage-type: memory` is NOT cluster-safe and resets on restart. Use Redis storage in production. In-memory storage silently produces incorrect rate limiting in multi-instance deployments.
+WARNING: `storage-type: memory` NOT cluster-safe, resets on restart. Use Redis in production — in-memory silently produces incorrect limits in multi-instance deployments.
 
 ## Strategy Override
 
-The `strategy` is defined per named policy in config and cannot be overridden at the call site. Only `limit` and `window` can be overridden at call site via `acquire(key, limit, window)` / `tryAcquire(key, limit, window)`.
+`strategy` is per named policy — not overridable at call site. Only `limit` and `window` can be overridden via `acquire(key, limit, window)` / `tryAcquire(key, limit, window)`.
 
-See `references/policy-examples.md` for common per-user, per-IP, and per-endpoint configuration examples.
+See `references/policy-examples.md` for per-user, per-IP, per-endpoint examples.
 
 ## Rules
 
-- Always use `acquire()` for standard endpoints — auto-429 is safer than manual handling.
-- Always use Redis storage in production — `storage-type: memory` is NOT cluster-safe.
-- Always define named policies for critical scopes (auth, write endpoints) — never rely solely on default-policy.
-- Never override strategy at call site — it's per-policy config only; only `limit` and `window` are overridable.
-- Always verify Summer version >= 0.2.2 — this module does not exist in earlier versions.
+- Use `acquire()` for standard endpoints — auto-429 safer than manual handling
+- Redis storage in production — `memory` NOT cluster-safe
+- Named policies for auth/write scopes — never rely solely on default-policy
+- Never override strategy at call site — per-policy only; `limit` and `window` are overridable
+- Verify Summer >= 0.2.2 — module absent in earlier versions
 
 ## Related Skills
 

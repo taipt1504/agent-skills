@@ -9,13 +9,29 @@ description: >
 triggers:
   natural: ["write test", "tdd", "coverage", "testcontainers", "step verifier"]
   code: ["*Test.java", "StepVerifier", "@SpringBootTest", "Testcontainers"]
+applicability:
+  always: false
+  triggers:
+    files_match: ["**/*Test.java", "**/*IT.java", "**/*Spec.java", "**/*Mock*.java"]
+    code_patterns: ["@Test", "@WebMvcTest", "@WebFluxTest", "@SpringBootTest", "MockMvc", "WebTestClient", "StepVerifier", "Testcontainers"]
+    task_keywords: ["test", "TDD", "unit test", "integration test", "coverage", "mock", "JUnit", "Mockito", "Testcontainers"]
+    related_rules:
+      - rules/java/testing.md
+      - rules/common/spec-driven.md
+relevance_assessment: |
+  HIGH 100%: BUILD phase (TDD mandatory)
+  HIGH 90%+: any test file edit
+  HIGH 80%+: production code change (new tests required to maintain 80%+ coverage)
+  MEDIUM 40-79%: refactor without behavior change (existing tests must stay green)
+  LOW 1-39%: documentation-only change
+  ZERO: trivial typo fix in non-test, non-production file
 ---
 
 # Testing Workflow
 
 ## TDD Cycle
 
-**RED** -- write a failing test. **GREEN** -- minimal code to pass. **REFACTOR** -- clean up, tests stay green.
+**RED** — failing test. **GREEN** — minimal code to pass. **REFACTOR** — clean up, tests stay green.
 
 ```java
 // RED: write test first
@@ -40,7 +56,7 @@ triggers:
 | Blackbox | `@SpringBootTest(DEFINED_PORT) + @Testcontainers` | Slow | Full-stack JSON-driven |
 | E2E | `@SpringBootTest + @Testcontainers` | Slow | Full flows |
 
-**Ratio:** unit > integration > E2E. Coverage minimum: **80% line coverage** (JaCoCo).
+**Ratio:** unit > integration > E2E. Min coverage: **80% line** (JaCoCo).
 
 ## Verification Pipeline (7 Phases)
 
@@ -54,7 +70,7 @@ triggers:
 | 6. Static Analysis | .block(), @Autowired, debug stmts | CRITICAL: .block() |
 | 7. Diff Review | Changed files review | Manual |
 
-For full commands per phase, see references/verification-pipeline.md.
+Full commands per phase → `references/verification-pipeline.md`.
 
 ## Quick Verification Modes
 
@@ -76,22 +92,20 @@ For full commands per phase, see references/verification-pipeline.md.
 
 - **StepVerifier** for all reactive assertions (never `Thread.sleep`)
 - **Testcontainers** with `.withReuse(true)` for local speed
-- **No `@MockBean`** in blackbox tests -- use WireMock stubs
-- **No H2** -- always real DB via Testcontainers
-- **`@BeforeEach` cleanup** -- independent tests, no shared state
+- **No `@MockBean`** in blackbox tests — use WireMock stubs
+- **No H2** — always real DB via Testcontainers
+- **`@BeforeEach` cleanup** — independent tests, no shared state
 - **Test slices** (`@WebMvcTest`, `@DataR2dbcTest`) over `@SpringBootTest` for unit/slice tests
 
 ## References
 
-Load as needed for full patterns and code examples:
-
-- **[references/tdd-patterns.md](references/tdd-patterns.md)** -- Unit tests (JUnit 5 + Mockito + StepVerifier), WebFlux/MVC integration tests, R2DBC/JPA repository tests, Kafka tests, mocking patterns, JaCoCo config, common mistakes
-- **[references/blackbox-test.md](references/blackbox-test.md)** -- JSON-driven test cases (F8A Summer Test), test case structure, JSON path assertions, WireMock stub patterns, test class template, file organization
-- **[references/verification-pipeline.md](references/verification-pipeline.md)** -- Full 7-phase pipeline detail, commands per phase, static analysis checks, diff review process
+- **[references/tdd-patterns.md](references/tdd-patterns.md)** — Unit tests (JUnit 5 + Mockito + StepVerifier), WebFlux/MVC, R2DBC/JPA, Kafka, mocking, JaCoCo, common mistakes
+- **[references/blackbox-test.md](references/blackbox-test.md)** — JSON-driven test cases (F8A Summer Test), structure, JSON path assertions, WireMock stubs, template, file org
+- **[references/verification-pipeline.md](references/verification-pipeline.md)** — 7-phase detail, commands, static analysis, diff review
 
 ## Related Skills
 
 - **summer-test** — Summer-specific Testcontainers, WireMock, blackbox test JSON format
-- **spring-patterns** — StepVerifier (WebFlux) and MockMvc (MVC) test patterns
+- **spring-webflux-patterns** — StepVerifier (WebFlux) and MockMvc (MVC) test patterns
 - **database-patterns** — @DataR2dbcTest, @DataJpaTest, Flyway migration testing
 - **coding-standards** — Test naming conventions (shouldDoXWhenY)

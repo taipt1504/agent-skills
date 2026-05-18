@@ -1,220 +1,286 @@
-# Workflow Details Reference
+# Workflow Details — Reference
 
-Subagent isolation protocol, commands quick reference, workflow state machine, auto-invoke chain, and circuit breakers.
+Subagent dispatch protocol, commands reference, workflow state machine, auto-invoke chain, circuit breakers, lane-aware execution. Updated for 5-layer adaptive workflow (v4.0).
 
 ---
 
-## Subagent Isolation (BUILD phase)
+## Subagent Dispatch (Execute gate)
 
-Each task from the approved spec — spawn 1 separate Agent (implementer) with:
-- Task description + relevant spec scenario
-- Loaded skills matching files being touched
-- Summary of prior completed tasks (NOT full context)
+Each slice from approved Plan → spawn 1 separate `slice-executor` Agent. Subagent context contains:
 
-Execute continuously per task. If blocked — ask user. After each task — 2-stage review: spec compliance first, then code quality.
+1. **Slice description** (from `.claude/docs/plans/<feature>.md`)
+2. **Slice spec** (from `.claude/docs/specs/<feature>.md`)
+3. **Pre-flight 4 artifact** (`.claude/memory/preflight/execute-<ts>.md`) — skills + rules + scoring per 1% rule
+4. **CONTEXT.md vocabulary** (project domain language)
+5. Files this slice will touch (main agent identifies via plan dependency graph)
+
+**Do NOT include:**
+- Other slices' specs (irrelevant — pollutes context)
+- Full conversation history (noise)
+- Unrelated past decisions
+
+**Subagent process:**
+1. Re-verify pre-flight items match this slice's needs
+2. If new items emerge mid-slice → append to artifact
+3. Apply listed skills/rules
+4. Cite skill names in commits + result summary
+5. Report files changed + tests added + deviations from spec to main agent
+
+After each slice: 2-stage review (spec compliance → quality).
 
 ---
 
 ## Commands Quick Reference
 
-| Command | Phase |
-|---------|-------|
-| `/plan` | Start planning |
-| `/spec` | Define contracts |
-| `/build` | TDD cycle |
-| `/verify` | Run verification pipeline |
-| `/dc-review` | Multi-aspect code review |
-| `/build-fix` | Fix compilation errors |
-| `/e2e` | E2E test generation |
-| `/db-migrate` | Database migration |
-| `/refactor` | Dead code cleanup |
-| `/dc-setup` | Project install |
-| `/dc-status` | Plugin health check |
-| `/meta` | Learning and evolution |
+| Command | Gate / Phase | Lane gate? |
+|---|---|---|
+| `/triage` | Triage router | All |
+| `/align` | Align (grill ambiguity) | Standard (vague), High-stakes (always) |
+| `/brainstorm` | Solution exploration | Standard (multi-path), High-stakes (mandatory ≥3) |
+| `/plan` | Slice decomposition + dependency graph | Standard, High-stakes |
+| `/spec` | Behavioral contracts per slice | Standard (if behavior change), High-stakes (always) |
+| `/build` | TDD subagent dispatch | All non-trivial |
+| `/verify` | Compile + tests + coverage + security scan | All |
+| `/dc-review` | Two-stage review (S1 compliance → S2 quality) | All |
+| `/build-fix` | Verify/fix loop after BUILD failure | All |
+| `/e2e` | E2E test generation | On-demand |
+| `/db-migrate` | DB migration (high-stakes auto-trigger) | High-stakes |
+| `/meta refactor` | Dead code cleanup (subcommand) | On-demand |
+| `/dc-setup` | Project install | One-shot |
+| `/dc-status` | Plugin health check | On-demand |
+| `/meta` | Learning + evolution + ADR + improve-architecture | On-demand |
 
 ---
 
 ## Workflow State Machine
 
-The workflow state is persisted in `.claude/workflow-state.json` across the entire lifecycle of a task.
+State persisted in `.claude/workflow-state.json` (phase tracking) + `.claude/memory/state/current-triage.json` (lane).
 
-### State File Structure
+### State files
 
 ```json
+// .claude/workflow-state.json
 {
   "phase": "BUILD",
+  "lane": "standard",
   "task": "Add order notification endpoint",
-  "startedAt": "2026-04-01T10:00:00Z",
+  "startedAt": "2026-05-15T10:00:00Z",
   "phaseHistory": [
-    {"phase": "PLAN", "completedAt": "2026-04-01T10:05:00Z"},
-    {"phase": "SPEC", "completedAt": "2026-04-01T10:15:00Z"}
+    {"phase": "PLAN", "completedAt": "2026-05-15T10:05:00Z"},
+    {"phase": "SPEC", "completedAt": "2026-05-15T10:15:00Z"}
   ],
   "decisions": [],
+  "artifacts": {
+    "preflight": ".claude/memory/preflight/plan-<ts>.md",
+    "align": ".claude/memory/align-artifacts/<date>-<task>.md",
+    "brainstorm": ".claude/memory/brainstorm-artifacts/<date>-<task>.md",
+    "plan": ".claude/docs/plans/<feature>.md",
+    "spec": ".claude/docs/specs/<feature>.md"
+  },
   "autoTransition": true,
   "retryCount": 0
 }
+
+// .claude/memory/state/current-triage.json
+{
+  "lane": "standard",
+  "task_description": "Add order notification endpoint",
+  "timestamp": "2026-05-15T09:55:00Z",
+  "reasoning": "Feature with bounded scope, single service",
+  "user_override": false
+}
 ```
 
-### Field Descriptions
+### Field reference
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `phase` | string | Current active phase: `PLAN`, `PLAN_APPROVED`, `SPEC`, `SPEC_APPROVED`, `BUILD`, `VERIFY`, `REVIEW`, `COMPLETE` |
-| `task` | string | User's original task description |
-| `startedAt` | ISO 8601 | When the workflow was initiated |
-| `phaseHistory` | array | Completed phases with timestamps and optional verdicts |
-| `decisions` | array | Key decisions made during the workflow |
-| `autoTransition` | boolean | Whether auto-invoke chain is active |
-| `retryCount` | number | Current retry count for VERIFY phase failures |
+| Field | Description |
+|---|---|
+| `phase` | Current execution phase: PLAN, PLAN_APPROVED, SPEC, SPEC_APPROVED, BUILD, VERIFY, REVIEW_PENDING, REVIEW, COMPLETE |
+| `lane` | Workflow lane from triage: trivial, standard, high-stakes |
+| `phaseHistory` | Completed phases with timestamps + verdicts |
+| `artifacts` | Paths to gate output documents (pre-flight, align, brainstorm, plan, spec) |
+| `autoTransition` | Whether auto-invoke chain is active |
+| `retryCount` | VERIFY phase retry counter |
 
-### Phase Transitions
+### Phase transitions (post-Triage)
 
 ```
-/plan creates workflow-state.json
-  phase: "PLAN"
-  | user approves
-  phase: "PLAN_APPROVED", PLAN added to phaseHistory
-  -> remind user to run /spec
+TRIAGE → writes lane to current-triage.json
+       ├── trivial → /build (skip Align, Brainstorm, Plan, Spec)
+       └── standard / high-stakes → /align (if vague or high-stakes)
 
-/spec reads workflow-state.json
-  phase: "SPEC", PLAN in phaseHistory
-  | user approves
-  phase: "SPEC_APPROVED", SPEC added to phaseHistory
-  -> remind user to run /build
+/align → writes align-artifacts/<date>-<task>.md → /brainstorm (if needed) or /plan
 
-/build reads workflow-state.json
-  phase: "BUILD", SPEC in phaseHistory
-  | all tests pass
-  BUILD added to phaseHistory
-  -> AUTO /verify full (if config.workflow.autoVerify = true)
+/brainstorm → writes brainstorm-artifacts/<date>-<task>.md (+ docs/adr/NNNN if high-stakes) → /plan
 
-/verify reads workflow-state.json
-  phase: "VERIFY", BUILD in phaseHistory
-  | all checks pass
-  VERIFY added to phaseHistory with verdict
-  -> AUTO /dc-review (if config.workflow.autoReview = true)
-  | checks fail
-  retryCount++ -> build-fixer -> re-verify (up to maxRetryOnFail)
+/plan → creates workflow-state.json, phase=PLAN, writes .claude/docs/plans/<feature>.md
+       | user approves
+       phase=PLAN_APPROVED, PLAN added to phaseHistory
+       → remind /spec
 
-/dc-review reads workflow-state.json
-  phase: "REVIEW", VERIFY in phaseHistory
-  | 0 CRITICAL issues
-  phase: "COMPLETE"
-  -> TASK DONE
+/spec → phase=SPEC, writes .claude/docs/specs/<feature>.md
+       | user approves
+       phase=SPEC_APPROVED, SPEC added to phaseHistory
+       → remind /build
+
+/build → phase=BUILD, dispatches one slice-executor subagent per plan slice
+       | all slices complete + tests pass
+       BUILD added to phaseHistory
+       → AUTO /verify full (if config.workflow.autoVerify)
+
+/verify → phase=VERIFY, runs compile + tests + coverage + security scan
+       | all green
+       VERIFY added to phaseHistory with verdict
+       → AUTO /dc-review (if config.workflow.autoReview)
+       | checks fail
+       retryCount++ → /build-fix → re-verify (up to maxRetryOnFail)
+
+/dc-review → phase=REVIEW
+       Stage 1 (spec-compliance-reviewer) → spec compliance binary
+       | Stage 1 fail
+       returns to BUILD with deltas
+       | Stage 1 pass
+       Stage 2 (code-quality-reviewer) → quality severity report
+       | 0 CRITICAL
+       phase=COMPLETE → TASK DONE
 ```
 
 ---
 
 ## Auto-Invoke Chain
 
-After BUILD completes with passing tests, the workflow automatically chains:
+After BUILD passes, workflow chains automatically:
 
 ```
-BUILD passes -> /verify full -> /dc-review -> COMPLETE
+BUILD passes → /verify full → /dc-review → COMPLETE
 ```
 
-This chain is controlled by config settings:
-- `config.workflow.autoVerify` (default: `true`) — auto-invoke `/verify full` after BUILD
-- `config.workflow.autoReview` (default: `true`) — auto-invoke `/dc-review` after VERIFY passes
+Controlled by `.claude/devco-config.json`:
 
-When auto-transition is active:
-1. Do NOT ask the user for permission between phases
-2. Do NOT stop or wait — proceed immediately
+- `workflow.autoVerify` (default `true`) — auto-invoke `/verify full` after BUILD
+- `workflow.autoReview` (default `true`) — auto-invoke `/dc-review` after VERIFY passes
+
+When auto-transition active:
+1. Do NOT ask user permission between phases
+2. Do NOT stop / wait — proceed immediately
 3. Report progress at each transition
-4. Only stop if a circuit breaker trips or REVIEW produces a BLOCK verdict
+4. Only stop if circuit breaker trips or REVIEW returns BLOCK verdict
+
+---
+
+## Lane-Aware Execution
+
+### Trivial lane bypass
+
+`workflow-gate.sh` reads `.claude/memory/state/current-triage.json` first. If `lane=trivial`:
+- Allow direct src/main/ writes (no PLAN/SPEC gate enforcement)
+- `/verify` runs compile + format only (no security scan, no full suite)
+- `/dc-review` runs Stage 2 quality only (no Stage 1 spec compliance)
+
+### Standard lane
+
+Full gate sequence. Brainstorm conditional (skip if single obvious solution).
+
+### High-stakes lane
+
+All gates mandatory. Additional protections:
+- `/plan` BLOCKED until brainstorm artifact exists
+- ADR auto-generation by `scripts/hooks/auto-adr.sh` at session end if missing
+- Worktree dispatch via `skills/bootstrap/SKILL.md §"Worktree per slice"` (planned)
+- `/verify` adds dependency CVE scan + security review
 
 ---
 
 ## Circuit Breakers
 
-Safety mechanisms that prevent infinite loops and wasted resources.
+Safety mechanisms preventing infinite loops + wasted compute.
 
-### No-Progress Detection
+### No-progress detection
 
 - Track normalized error messages across consecutive attempts
-- If the same error appears `noProgressThreshold` times (default: 3) → escalate to user
-- Normalization: strip line numbers, timestamps, and variable values before comparison
+- Same error appears `noProgressThreshold` times (default 3) → escalate to user
+- Normalization: strip line numbers, timestamps, variable values
 
-### Max Iterations Per Phase
+### Max iterations per phase
 
-- Each phase has a ceiling of `maxIterationsPerPhase` (default: 10) iterations
-- Exceeding the ceiling → force exit with state preserved
-- Log all iteration details for user review
+- Each phase ceiling: `maxIterationsPerPhase` (default 10)
+- Exceeding → force exit with state preserved
+- Log iteration details for user review
 
-### Max Retries on Verify Failure
+### Max retries on verify failure
 
-- VERIFY failures trigger build-fixer + re-verify cycle
-- After `maxRetryOnFail` (default: 3) failures → force-accept with warning
-- Force-accept proceeds to `/dc-review` with all unresolved issues flagged
+- VERIFY failures trigger `/build-fix` + re-verify cycle
+- After `maxRetryOnFail` (default 3) failures → force-accept with warning
+- Force-accept proceeds to `/dc-review` with unresolved issues flagged
 
-### Context Budget
+### Context budget
 
 - Monitor context window utilization
-- >95% utilization → force exit immediately
-- Preserve workflow state so the next conversation can resume
-- This is hardcoded and cannot be overridden
+- > 95% utilization → force exit immediately
+- Preserve workflow state so next session resumes
+- Hardcoded — not configurable
 
-### Circuit Breaker Response Protocol
+### Breaker response protocol
 
 When any breaker trips:
-1. Log the breaker type and reason to workflow-state.json
-2. Preserve all progress and state
+1. Log breaker type + reason to workflow-state.json
+2. Preserve all progress + state
 3. Present clear summary to user:
    - What was being attempted
-   - Why the breaker tripped
-   - What options the user has (retry, skip, modify approach)
+   - Why breaker tripped
+   - User options (retry, skip, modify approach)
 
 ---
 
 ## Agent Team Support
 
-### When to Use Teams
+### When to use teams
 
-- Spec has ≥2 independent tasks
-- Each task modifies different files
-- Combined change >50 lines
+- Plan has ≥2 independent slices (per dependency graph)
+- Each slice modifies different files
+- Combined change > 50 lines
 - `team.enabled = true` in devco-config.json
-- `project-profile.json` exists (stack detection completed)
+- `.claude/project-profile.json` exists (stack detection completed)
 
-### Team Workflow
+### Team workflow
 
-1. Team Lead reads approved spec
-2. Analyzes task dependencies from spec's task decomposition table
-3. Spawns implementer agents (one per independent task, max `config.team.maxTeammates`)
-4. Each implementer works in scope-locked isolation
-5. After all implementers complete → spawn parallel reviewers (security + quality)
-6. Aggregate results and report
+1. Team lead (orchestrator) reads approved plan + dependency graph
+2. Spawns `slice-executor` agents — one per independent slice (max `config.team.maxTeammates`)
+3. Each slice-executor works scope-locked per slice files
+4. After all slices complete → spawn parallel reviewers (S1 spec compliance + S2 quality)
+5. Aggregate results, report to user
 
-### Cost Control
+### Cost control
 
-- Default model for execution: sonnet (fast, cheap)
-- Opus reserved for: plan, spec, architecture decisions
-- Override via devco-config.json: `team.roles.{role}.model`
-- Max teammates capped by `config.team.maxTeammates` (default: 4)
-- `team.costControl.preferFastModel` (default: true) — prefer sonnet for execution tasks
-- `team.costControl.useOpusOnlyFor` (default: ["plan", "spec", "architecture"]) — roles that use opus
+- Default execution model: sonnet (fast, cheap)
+- Opus reserved for: plan, spec, brainstorm, architecture decisions
+- Override via devco-config.json: `team.roles.<role>.model`
+- Max teammates capped: `config.team.maxTeammates` (default 4)
+- `team.costControl.preferFastModel` (default true) — prefer sonnet for execution
+- `team.costControl.useOpusOnlyFor` (default `["plan", "spec", "brainstorm", "architecture"]`)
 
-### Teammate Scope Lock
+### Teammate scope lock
 
-Each teammate is assigned specific files from the spec's task decomposition.
-A teammate MUST NOT modify files outside its assigned scope.
-If a teammate needs to touch a shared file, it must message the team lead.
-Scope violations are flagged during the 2-stage review after each task.
+Each slice-executor assigned specific files from plan's dependency graph.
+- MUST NOT modify files outside assigned slice scope
+- If shared file needed → message orchestrator
+- Scope violations flagged during S1 review
 
 ---
 
-## Multi-Agent Modes (Subagent vs Team)
+## Multi-Agent Modes
 
-Two modes for parallel execution, configured via `team.mode` in `devco-config.json`:
+Two modes for parallel execution. Configured via `team.mode` in devco-config.json:
 
-### Mode 1: Subagents (default, stable) — `team.mode: "subagent"`
+### Mode 1: Subagent (default, stable) — `team.mode: "subagent"`
 
-Independent agents with **worktree isolation**. Each agent gets an isolated copy of the repo. Best for: independent TDD modules that don't need to coordinate with each other.
+Independent agents with **worktree isolation**. Each agent gets isolated git worktree copy. Best for: independent slices that don't coordinate.
 
 ```
 Agent({
-  description: "Implement: {task title}",
-  prompt: "Implement task from spec at {artifacts.spec}. TDD: RED->GREEN->REFACTOR. Load devco-agent-skills:coding-standards. No .block(), no git commit.",
+  description: "Execute slice {N}: {slice title}",
+  prompt: "Execute slice {N} from plan at {artifacts.plan}. Pre-flight at {artifacts.preflight}. Spec at {artifacts.spec}. TDD: RED→GREEN→REFACTOR. No .block(), no git commit.",
+  subagent_type: "slice-executor",
   model: "{team.roles.implementer.model}",
   isolation: "worktree",
   run_in_background: true
@@ -223,22 +289,23 @@ Agent({
 
 **Key properties:**
 - `isolation: "worktree"` — safe parallel file edits (each agent has own git worktree)
-- `run_in_background: true` — concurrent execution
-- Agents report results to parent only — no inter-agent communication
-- After completion: merge worktree changes -> `/verify full` -> `/dc-review`
+- `run_in_background: true` — concurrent
+- Agents report to parent only — no inter-agent communication
+- After completion: merge worktree changes → `/verify full` → `/dc-review`
 
 ### Mode 2: Agent Teams (experimental) — `team.mode: "team"`
 
-Coordinated agents with **shared task list** and **inter-agent messaging**. Best for: interdependent work where agents need to negotiate interfaces. Requires: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.
+Coordinated agents with **shared task list** + **inter-agent messaging**. Best for: interdependent slices needing interface negotiation. Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 
 ```
-TeamCreate({ team_name: "build-{feature}", description: "TDD for {feature}" })
-TaskCreate({ subject: "{task title}", description: "{task description}" })
+TeamCreate({ team_name: "build-{feature}", description: "Execute plan for {feature}" })
+TaskCreate({ subject: "{slice title}", description: "{slice description}" })
 Agent({
-  description: "Implement: {task title}",
-  prompt: "You are a teammate. Read task via TaskGet. TDD. Mark done via TaskUpdate.",
+  description: "Execute slice: {slice title}",
+  prompt: "You are a teammate. Read task via TaskGet. Pre-flight: {preflight path}. TDD. Mark done via TaskUpdate.",
   team_name: "build-{feature}",
-  name: "impl-{N}",
+  name: "slice-{N}",
+  subagent_type: "slice-executor",
   model: "{team.roles.implementer.model}",
   run_in_background: true
 })
@@ -246,37 +313,38 @@ Agent({
 
 **Key properties:**
 - Shared working directory — partition files by ownership (no worktree)
-- Teammates can `SendMessage` to each other for interface negotiation
-- Shared `TaskList` — teammates self-claim available tasks
-- After completion: `/verify full` -> `/dc-review` -> `TeamDelete`
+- Teammates can `SendMessage` for interface negotiation
+- Shared `TaskList` — teammates self-claim available slices
+- After completion: `/verify full` → `/dc-review` → `TeamDelete`
 
-### Choosing the Mode
+### Mode selection
 
 | Scenario | Use | Why |
-|----------|-----|-----|
-| Independent modules (separate packages/files) | `subagent` | Worktree isolation prevents conflicts |
-| Shared domain model (entity + repo + service) | `team` | Agents need to negotiate interfaces |
-| First time / unsure | `subagent` | Stable, safe default |
+|---|---|---|
+| Independent slices (separate packages/files) | `subagent` | Worktree prevents conflicts |
+| Shared domain model (entity + repo + service across slices) | `team` | Agents negotiate interfaces |
+| First time / unsure | `subagent` | Stable default |
 
-### Model Routing
+### Model routing
 
 | Role | Default | Override |
-|------|---------|---------|
-| planner, spec-writer | opus | `team.costControl.useOpusOnlyFor` |
-| implementer | sonnet | `team.roles.implementer.model` |
-| reviewer | sonnet | `team.roles.reviewer.model` |
-| tester | sonnet | `team.roles.tester.model` |
+|---|---|---|
+| planner, spec-writer, brainstorm | opus | `team.costControl.useOpusOnlyFor` |
+| slice-executor | sonnet | `team.roles.implementer.model` |
+| spec-compliance-reviewer | sonnet | `team.roles.reviewer.model` |
+| code-quality-reviewer | sonnet | `team.roles.reviewer.model` |
+| slice-executor | sonnet | `team.roles.tester.model` |
 
-### After Parallel BUILD Completes
+### After parallel BUILD completes
 
-1. Collect/merge results from all agents
-2. Run `/verify full` (covers all agents' work)
-3. Run `/dc-review` (unified review)
-4. Only after REVIEW passes is the task complete
+1. Collect / merge results from all slice-executors
+2. Run `/verify full` (covers all slices' work)
+3. Run `/dc-review` (Stage 1 then Stage 2, unified)
+4. Only after REVIEW returns verdict is task complete
 
 ---
 
-## Verify/Fix Loop (Ralph Pattern)
+## Verify / Fix Loop (Ralph Pattern)
 
 When BUILD or VERIFY fails (gradle test/build returns error):
 
@@ -285,9 +353,9 @@ When BUILD or VERIFY fails (gradle test/build returns error):
 2. Error count < noProgressThreshold AND attempt < maxRetryOnFail:
    → Emit: "Run /build-fix with error context, then re-run /verify"
    → Agent executes fix cycle automatically
-3. Same error >= noProgressThreshold (3):
+3. Same error ≥ noProgressThreshold (3):
    → ESCALATE to user — no more auto-retry
-4. Total attempts >= maxRetryOnFail (3):
+4. Total attempts ≥ maxRetryOnFail (3):
    → FORCE_ACCEPT with warning — move to REVIEW with known issues
 ```
 
@@ -298,4 +366,27 @@ State persists in `.claude/verify-fix-state.json` (disk, not context).
 
 ## BUILD Checkpoint-Resume
 
-During BUILD, every file edit is tracked in `.claude/sessions/build-checkpoint.json`. If context resets mid-BUILD: read checkpoint → see which files were already modified → resume from last completed sub-task instead of restarting.
+During BUILD, every file edit tracked in `.claude/sessions/build-checkpoint.json`. If context resets mid-BUILD:
+1. Read checkpoint → see which files were modified
+2. Resume from last completed slice instead of restarting
+3. Re-read pre-flight artifact to recover skill/rule context
+
+---
+
+## Pre-flight Artifact Handoff
+
+Artifacts pass forward through gates. NOT regenerated — referenced.
+
+| Gate | Reads | Writes |
+|---|---|---|
+| Triage | (none) | `current-triage.json` + `preflight/initial-<ts>.md` |
+| Align | `preflight/initial-<ts>.md`, `CONTEXT.md` | `align-artifacts/<date>-<task>.md` + updates `CONTEXT.md` |
+| Brainstorm | `align-artifacts/...`, `preflight/brainstorm-<ts>.md` | `brainstorm-artifacts/<date>-<task>.md` + `docs/adr/NNNN-...md` (high-stakes) |
+| Plan | `align-artifacts/...`, `brainstorm-artifacts/...`, `preflight/plan-<ts>.md` | `.claude/docs/plans/<feature>.md` |
+| Spec | `align-artifacts/...`, `brainstorm-artifacts/...`, plan, `preflight/spec-<ts>.md` | `.claude/docs/specs/<feature>.md` |
+| Execute | plan, spec, `preflight/execute-<ts>.md`, CONTEXT.md | code + tests; updates `build-checkpoint.json` |
+| Review S1 | spec, code diff | verdict in `workflow-state.json` |
+| Review S2 | code diff, `preflight/review-<ts>.md` | severity report; final verdict |
+| Learn | full session | instinct candidates → `.claude/memory/promotion-candidates.md` |
+
+Skip the dead `.claude/sessions/skills-loaded.json` — removed in v4.0 per REFACTOR_PLAN §3.6.1. Skill announcement is the contract, not a file gate.

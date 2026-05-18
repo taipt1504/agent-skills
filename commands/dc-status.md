@@ -7,8 +7,7 @@ description: >
 
 # /dc-status -- Plugin State & Health Check
 
-Run the diagnostic script below using the Bash tool. Then format the raw output into a
-clean, readable report for the user. Do NOT add commentary beyond the data.
+Run diagnostic script below via Bash tool. Format raw output into clean, readable report. Do NOT add commentary beyond data.
 
 ```bash
 echo ""
