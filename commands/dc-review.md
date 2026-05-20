@@ -115,7 +115,7 @@ Agent({
   description: "Review S2: code quality for {feature_name}",
   subagent_type: "code-quality-reviewer",
   model: "sonnet",
-  prompt: "Stage 2. Read pre-flight 5. Apply 5 dimensions. Severity-tag findings."
+  prompt: "Stage 2. Read pre-flight 5. Apply 5 dimensions + ALL rules/java/code-review-*.md (CORE/MVC/RX/WFL/XCT/JKS). Severity P0-P4. MANDATORY: cite rule ID per finding (e.g. [P0][CORE-NUM-001], [P0][JKS-POL-002]). Findings without rule ID = invalid."
 })
 ```
 
@@ -127,7 +127,7 @@ For each slice in artifacts.spec_slice_list:
     description: "Review S2 slice {slice_id}: {slice_title}",
     subagent_type: "code-quality-reviewer",
     model: "sonnet",
-    prompt: "Stage 2 slice scope. Files: {slice plan §2 file list}. Apply 5 dimensions. Severity-tag findings.",
+    prompt: "Stage 2 slice scope. Files: {slice plan §2 file list}. Apply 5 dimensions + ALL rules/java/code-review-*.md (CORE/MVC/RX/WFL/XCT/JKS). Severity P0-P4 with MANDATORY rule ID per finding.",
     run_in_background: true
   })
 ```
@@ -136,24 +136,29 @@ Per-slice verdicts: `.claude/memory/state/review-stage2-<slice-id>.json`. Aggreg
 
 ```json
 {
-  "verdict": "Approve",  // Block if ANY slice has Critical; Approve with caveats if any Major; Approve if all clean
+  "verdict": "Approve",
   "per_slice": {
-    "01": {"verdict": "Approve", "critical": 0, "major": 0, "minor": 1},
-    "02": {"verdict": "Approve with caveats", "critical": 0, "major": 2, "minor": 3}
+    "01": {"verdict": "Approve", "p0": 0, "p1": 0, "p2": 0, "p3": 1, "p4": 0},
+    "02": {"verdict": "Approve with caveats", "p0": 0, "p1": 0, "p2": 2, "p3": 3, "p4": 0}
   }
 }
 ```
 
-### Step 3 — Aggregate verdict
+### Step 3 — Aggregate verdict (P0-P4 per `rules/java/code-review-crosscut.md §7`)
 
 | Stage 1 | Stage 2 | Workflow phase |
 |---|---|---|
 | FAIL | — | BUILD (re-execute fix list) |
-| PASS | Block (≥1 Critical) | BUILD (fix critical issues) |
-| PASS | Approve with caveats | COMPLETE (note caveats) |
-| PASS | Approve | COMPLETE |
-| SKIP (trivial) | Block | BUILD (fix critical) |
-| SKIP (trivial) | Approve | COMPLETE |
+| PASS | Block (≥1 P0, or P1 without ADR) | BUILD (fix blockers) |
+| PASS | Approve with caveats (P1 with ADR, or P2 only) | COMPLETE (note caveats + follow-up tickets) |
+| PASS | Approve (P3/P4 only) | COMPLETE |
+| SKIP (trivial) | Block (P0/P1) | BUILD (fix) |
+| SKIP (trivial) | Approve (P2-P4) | COMPLETE |
+
+**Reviewer output validation** — orchestrator MUST verify every finding has format `[<P0-P4>][<RULE-ID>]`:
+- Missing severity tag → reject reviewer output, re-dispatch
+- Missing rule ID (except P4) → reject reviewer output, re-dispatch
+- Unknown rule ID (not in `rules/java/code-review-*.md`) → mark `[NEW-RULE]`, route to evolve-rules
 
 Write final to workflow-state.json `phase`. User commits (per CLAUDE.md hard block #9 — agent never commits).
 
@@ -205,57 +210,99 @@ Include in **reviewer** agent prompt:
 git diff --name-only HEAD -- '*.java' '*.yml' '*.yaml' '*.gradle'
 ```
 
-2. For each changed file, run all review aspects:
+2. For each changed file, run all review aspects (rule IDs reference `rules/java/code-review-*.md`):
 
-### Security Issues (CRITICAL)
+### Security Issues (P0 default)
 
-- Hardcoded credentials, API keys, tokens, DB passwords
-- SQL injection vulnerabilities (string concatenation in queries)
-- Missing input validation (`@Valid`, Bean Validation)
-- Insecure dependencies (run `./gradlew dependencyCheckAnalyze`)
-- Secrets in configuration files
-- Missing `@PreAuthorize` on sensitive endpoints
+- Hardcoded credentials, API keys, tokens, DB passwords → `[P0][MVC-CFG-003]`
+- SQL injection (string concat in queries) → `[P0][MVC-REP-*]`
+- Missing input validation (`@Valid`, Bean Validation) → `[P0/P1][MVC-VAL-001]`
+- Sensitive data in logs (password, OTP, full PAN, CVV, JWT) → `[P0][CORE-LOG-002]`
+- Insecure dependencies (`./gradlew dependencyCheckAnalyze`) → `[P0/P1][XCT-DEP-002]`
+- Secrets in configuration files → `[P0][MVC-CFG-003]`
+- Missing `@PreAuthorize` on sensitive endpoints → `[P0][MVC-SEC-001]` / `[P0][WFL-SEC-001]`
+- Jackson polymorphic deserialization with `Id.CLASS` → `[P0][JKS-POL-002]` (RCE — CVE-2017-7525)
+- `enableDefaultTyping()` without validator → `[P0][JKS-POL-003]` (RCE)
+- Password/secret without `@JsonIgnore` / `WRITE_ONLY` access → `[P0][JKS-ANN-003]`
+- Sensitive field serialized without masking → `[P0][JKS-SEC-004]`
+- No JSON input size limit (DoS) → `[P1][JKS-SEC-003]`
+- Stack trace leaked in error response → `[P1][JKS-ERR-004]`
 
-### Reactive Issues (CRITICAL -- WebFlux)
+### Reactive Issues (P0/P1 — WebFlux)
 
-- `.block()`, `.blockFirst()`, `.blockLast()` calls
-- `Thread.sleep()` in reactive chains
-- `.subscribe()` inside reactive pipelines (fire-and-forget)
-- Missing error handling (no `onErrorResume`/`onErrorMap`)
+- `.block()`, `.blockFirst()`, `.blockLast()` → `[P1][RX-FND-001]`
+- `Thread.sleep()` in reactive chains → `[P1][RX-FND-001]`
+- `.subscribe()` inside reactive pipelines (fire-and-forget without error handler) → `[P2][RX-SUB-002]`
+- Missing error handling → `[P1][RX-OPS-003]`
+- Nested `Mono<Mono<T>>` (map returning Publisher) → `[P2][RX-PIT-001]`
+- `switchIfEmpty(Mono.error(...))` without `defer` → `[P2][RX-OPS-002]`
 
-### Performance Issues (HIGH)
+### Performance Issues (P1)
 
-- N+1 query patterns (findAll in loops, missing @EntityGraph)
-- Missing connection pool configuration
-- Unbounded collections without pagination
-- Missing caching for repeated expensive calls
-- Missing timeouts on WebClient/external service calls
+- N+1 query patterns → `[P1][MVC-REP-004]`
+- Unbounded list query (no pagination) → `[P1][MVC-REP-003]` / `[P1][WFL-REP-004]`
+- HTTP call inside `@Transactional` → `[P1][MVC-TX-001]`
+- Missing timeouts on WebClient/external → `[P0][WFL-WC-002]`
+- Unbounded `onBackpressureBuffer` → `[P1][WFL-PIT-002]`
+- Missing connection pool config → `[P2][WFL-SRV-002]`
 
-### Code Quality (HIGH)
+### Concurrency & Transaction (P1)
 
-- Methods > 50 lines
-- Classes > 800 lines
-- Nesting depth > 4 levels
-- Missing error handling
-- `System.out.println` or `printStackTrace` statements
-- TODO/FIXME comments without tickets
-- Missing Javadoc for public APIs
-- Field injection (`@Autowired` on fields)
+- Dual-write Kafka + DB without outbox → `[P1][MVC-TX-002]`
+- Missing optimistic lock for concurrent update → `[P1][MVC-TX-003]`
+- ThreadLocal without `remove()` in finally → `[P1][CORE-CON-004]`
+- Self-invocation bypass proxy (`@Transactional` no effect) → `[P1][MVC-SVC-003]`
+- Mix JDBC + R2DBC in same TX → `[P1][WFL-TX-002]`
+- Missing idempotency for retry-able op → `[P1][MVC-SVC-004]` / `[P1][XCT-IDM-001]`
 
-### Best Practices (MEDIUM)
+### Numeric & Money (P0)
 
-- Mutation patterns (use immutable builders instead)
-- Missing tests for new code
-- Magic numbers without constants
-- Circular dependencies
+- `double`/`float` for money → `[P0][CORE-NUM-001]`
+- `BigDecimal.divide` without RoundingMode/MathContext → `[P0][CORE-NUM-002]`
+- Integer overflow not checked (`Math.addExact`, `Math.toIntExact`) on ledger → `[P0][CORE-NUM-003]`
+- `BigDecimal.equals` for value compare (scale-sensitive) → `[P1][CORE-EQH-004]`
+- BigDecimal serialized as JSON number (JS precision loss) → `[P0][JKS-MNY-001]` (fintech-critical)
+- Missing `USE_BIG_DECIMAL_FOR_FLOATS` when deserializing money → `[P1][JKS-MNY-002]`
+- BigDecimal scale not normalized at API boundary → `[P1][JKS-MNY-003]`
 
-3. Generate report with:
-    - Severity: CRITICAL, HIGH, MEDIUM, LOW
-    - File location and line numbers
-    - Issue description
-    - Suggested fix with code example
+### Jackson Lifecycle & Modules (P0/P1)
 
-4. Block commit if CRITICAL or HIGH issues found
+- `new ObjectMapper()` in service body (not injected) → `[P1][JKS-OBJ-001]`
+- Mutating shared ObjectMapper after first use → `[P1][JKS-OBJ-002]`
+- Missing `JavaTimeModule` for `java.time.*` → `[P0][JKS-MOD-001]`
+- Missing `disable(WRITE_DATES_AS_TIMESTAMPS)` (output as epoch array) → `[P1][JKS-MOD-002]`
+- `java.util.Date` instead of `java.time.*` → `[P2][JKS-TIM-005]`
+- Missing `TypeReference` for generic deserialize (type erasure) → `[P1][JKS-PRF-002]`
+- Silent swallow of `JsonProcessingException` → `[P2][JKS-ERR-001]`
+- Validation inside `@JsonCreator` instead of Bean Validation → `[P2][JKS-ERR-003]`
+- Field/getter `@JsonProperty` conflict → `[P2][JKS-ANN-009]`
+
+### Code Quality (P3 default, P2 if extreme)
+
+- Method > 50 lines → `[P3][CORE-API-001]` (P2 if > 80)
+- Class > 400 lines → `[P3][CORE-API-001]` (P2 if > 600, P1 if > 800 absolute max)
+- Field injection (`@Autowired` on fields) → `[P2]` (CLAUDE.md hard block #2)
+- `@Data` Lombok on domain → `[P2]` violates immutability
+- `System.out.println`, `e.printStackTrace()`, debug code → `[P2]`
+- Catch `Exception`/`Throwable` (non-top-level) → `[P2][CORE-EXC-001]`
+- Ignored exception → `[P2][CORE-EXC-002]`
+- Exception for control flow → `[P3][CORE-EXC-003]`
+
+### Best Practices (P3)
+
+- Magic numbers → `[P3]`
+- Missing tests for new code → `[P2][XCT-TST-*]`
+- Missing Javadoc on public API → `[P4][XCT-DOC-001]`
+- Unstructured logging → `[P3][CORE-LOG-004]`
+- Method naming > 3 fields → `[P3][MVC-REP-001]`
+
+3. Generate report:
+   - **MANDATORY: cite rule ID per finding** (`[<severity>][<RULE-ID>]`)
+   - File location + line numbers
+   - Issue description
+   - Suggested fix with code example
+
+4. Block commit if any P0, or P1 without ADR trade-off
 
 ## Output Format
 
@@ -263,39 +310,52 @@ git diff --name-only HEAD -- '*.java' '*.yml' '*.yaml' '*.gradle'
 CODE REVIEW REPORT
 ==================
 Files Reviewed: X
+Rules loaded: code-review-core, code-review-mvc, code-review-reactor, code-review-webflux, code-review-crosscut
 
-CRITICAL (Must Fix)
--------------------
-[CRITICAL] SQL Injection
-File: OrderRepository.java:45
-Issue: String concatenation in SQL query
-Fix: Use parameterized query with .bind()
+P0 BLOCKERS (Must Fix Before Merge)
+------------------------------------
+[P0][CORE-NUM-001] double for money
+File: TransferService.java:42
+Issue: `double amount = req.getAmount();` — IEEE 754 precision loss
+Fix: `BigDecimal amount = new BigDecimal(req.getAmount());` with explicit scale
 
-[CRITICAL] Blocking call in reactive chain
+[P0][CORE-LOG-002] sensitive data in log
+File: AuthController.java:18
+Issue: `log.info("user login password={}", req.getPassword());`
+Fix: Drop password from log entirely
+
+P1 CRITICAL (Must Fix or Document ADR)
+---------------------------------------
+[P1][MVC-TX-001] HTTP call in @Transactional
 File: OrderService.java:78
-Issue: .block() used in WebFlux service
-Fix: Return Mono/Flux, compose with flatMap
+Issue: `paymentClient.charge()` inside @Transactional method → connection pool exhaustion risk
+Fix: Split TX boundary — load entity in TX1, call payment outside, update in TX2
 
-HIGH (Should Fix)
------------------
-[HIGH] Field injection
-File: UserService.java:15
-Issue: @Autowired on field
-Fix: Use constructor injection with @RequiredArgsConstructor
+[P1][RX-FND-001] .block() in reactive chain
+File: OrderHandler.java:45
+Issue: `userRepository.findById(id).block()` in WebFlux handler
+Fix: Return `Mono<Response>`, compose with flatMap
 
-[HIGH] Missing error handling
-File: PaymentService.java:42
-Issue: No onErrorResume in reactive chain
-Fix: Add error handling for downstream failures
+P2 MAJOR (Should Fix or Follow-up Ticket)
+------------------------------------------
+[P2][XCT-TST-003] missing Testcontainers integration test
+File: OrderRepositoryTest.java
+Issue: Repository tested with H2 only, prod uses Postgres
+Fix: Add @Testcontainers + PostgreSQLContainer
 
-MEDIUM (Consider)
------------------
-[MEDIUM] Method too long
+P3 MINOR (Comment, No Block)
+----------------------------
+[P3][CORE-API-001] method exceeds 30 LOC
 File: OrderService.java:100
-Issue: Method is 67 lines (limit: 50)
-Fix: Extract helper methods
+Issue: 67-line method
+Fix: Extract helpers
 
-VERDICT: [APPROVE / BLOCK]
+P4 NITS (Optional)
+------------------
+[P4] Variable naming could be clearer
+File: UserService.java:15
+
+VERDICT: BLOCK | APPROVE WITH CAVEATS | APPROVE
 ```
 
 ## Two-Stage Review Orchestration
@@ -314,17 +374,18 @@ VERDICT: [APPROVE / BLOCK]
 
 ### Stage 2: Code Quality Review (only after Stage 1 passes)
 
-1. Run full code quality review (all checklists: Security, Reactive, Performance, Code Quality, Best Practices)
+1. Run full code quality review against ALL applicable `rules/java/code-review-*.md`
 2. Spring-specific checks from CLAUDE.md NEVER rules
-3. Categorize findings: **CRITICAL** / **IMPORTANT** / **MINOR**
+3. Categorize findings: **P0** / **P1** / **P2** / **P3** / **P4** (per `rules/java/code-review-crosscut.md §7`)
+4. **MANDATORY: cite rule ID per finding** (`[<P0-P4>][<RULE-ID>]`)
 
 ### Verdict Logic
 
 | Condition | Verdict | Action |
 |-----------|---------|--------|
-| 0 CRITICAL issues | **APPROVED** | Task is done |
-| IMPORTANT items only (no CRITICAL) | **APPROVED WITH NOTES** | Task done, notes logged |
-| ≥1 CRITICAL issue | **REJECTED** | Back to slice-executor with feedback |
+| 0 P0/P1 issues | **APPROVED** | Task done |
+| P1 with ADR trade-off, or P2 only | **APPROVED WITH CAVEATS** | Task done, caveats logged + follow-up tickets |
+| ≥1 P0, or P1 without ADR | **BLOCKED** | Back to slice-executor with rule IDs + fix list |
 
 ### After Review Complete
 
@@ -336,6 +397,17 @@ VERDICT: [APPROVE / BLOCK]
 
 ## Verdict Rules
 
-- **BLOCK** if any CRITICAL or unresolved HIGH issues
-- **APPROVE** with warnings if only MEDIUM/LOW issues
-- Never approve code with security vulnerabilities or blocking calls in WebFlux
+- **BLOCK** if any P0, or P1 without ADR documenting trade-off
+- **APPROVE WITH CAVEATS** if only P2 (or P1 with ADR)
+- **APPROVE** if only P3/P4
+- Never approve code with security vulnerabilities (any P0 security) or `.block()` in WebFlux
+
+## Related rule files (loaded per stack)
+
+- `rules/java/code-review-core.md` — CORE-* foundation
+- `rules/java/code-review-mvc.md` — MVC-* (MVC stack only)
+- `rules/java/code-review-reactor.md` — RX-* (reactive)
+- `rules/java/code-review-webflux.md` — WFL-* (WebFlux stack only)
+- `rules/java/code-review-crosscut.md` — XCT-* + PR checklist §6 + severity §7 + rule catalog §8
+- `rules/java/code-review-jackson.md` — JKS-* (Jackson — DTO/ObjectMapper/@JsonProperty)
+- `skills/coding-standards/SKILL.md` — unified enforcement entry point

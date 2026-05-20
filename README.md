@@ -268,7 +268,7 @@ agent-skills/
 ├── agents/                   # 8 agents + _shared-protocol
 ├── skills/                   # 28 SKILL.md (lazy-loaded)
 ├── commands/                 # 16 slash commands
-├── rules/{common,java,summer}/  # 18 rules (summer conditional)
+├── rules/{common,java,summer}/  # 24 rules (8 common + 13 java incl. 6 code-review + 3 summer conditional)
 ├── templates/                # 7 plan/spec/CONTEXT templates
 ├── hooks/hooks.json          # hook registry
 ├── scripts/

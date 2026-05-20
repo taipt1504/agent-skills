@@ -87,6 +87,14 @@ Output establishes baseline for later gates to reference.
 - `rules/java/reactive.md` (if WebFlux)
 - `rules/java/security.md`
 - `rules/java/observability.md`
+- **`rules/java/code-review-core.md`** — CORE-* foundation (always for Java)
+- **`rules/java/code-review-mvc.md`** — MVC-* (if MVC stack)
+- **`rules/java/code-review-reactor.md`** — RX-* (if reactive code)
+- **`rules/java/code-review-webflux.md`** — WFL-* (if WebFlux stack)
+- **`rules/java/code-review-crosscut.md`** — XCT-* + checklist + severity (always)
+- **`rules/java/code-review-jackson.md`** — JKS-* (if Jackson — DTO with `@JsonProperty`/`@JsonFormat`, `ObjectMapper`, or BigDecimal/date in JSON)
+
+Execute MUST apply these during REFACTOR step. Slice-executor cites violated rule IDs (`CORE-NUM-001`, `MVC-TX-002`, `JKS-OBJ-001`, etc.) in result report.
 
 ### Variant 5 — Review prep
 
@@ -98,6 +106,14 @@ Output establishes baseline for later gates to reference.
 - `rules/common/security.md`
 - `rules/java/security.md`
 - `rules/java/testing.md`
+- **`rules/java/code-review-core.md`** — CORE-* (always for Java review)
+- **`rules/java/code-review-mvc.md`** — MVC-* (if MVC stack)
+- **`rules/java/code-review-reactor.md`** — RX-* (if reactive)
+- **`rules/java/code-review-webflux.md`** — WFL-* (if WebFlux)
+- **`rules/java/code-review-crosscut.md`** — XCT-* + PR checklist + severity P0-P4 + rule ID catalog (always)
+- **`rules/java/code-review-jackson.md`** — JKS-* (if Jackson — CRITICAL for fintech: BigDecimal precision + RCE via polymorphic deser)
+
+Code-quality-reviewer MUST cite rule IDs per finding (`[P0][CORE-NUM-001]`, `[P1][MVC-TX-002]`, `[P0][JKS-POL-002]`). Missing rule ID = invalid finding, re-do required.
 
 ## Per-lane summary
 

@@ -14,6 +14,15 @@ requiredSkills:
     messaging: ["messaging-patterns"]
     redis: ["redis-patterns"]
     summer: ["summer-core", "summer-rest"]
+requiredRules:
+  always:
+    - rules/java/code-review-core.md       # CORE-* foundation (apply during REFACTOR)
+    - rules/java/code-review-crosscut.md   # XCT-* observability + testing
+  conditional:
+    mvc: ["rules/java/code-review-mvc.md"]
+    reactive: ["rules/java/code-review-reactor.md"]
+    webflux: ["rules/java/code-review-webflux.md"]
+    jackson: ["rules/java/code-review-jackson.md"]   # JKS-* (load when DTO/ObjectMapper/@JsonProperty)
 requiredCommands:
   always: []
   afterAllSlices: ["/verify full"]
@@ -113,7 +122,45 @@ Minimum code to pass. No extras.
 
 ### 5. Refactor (IMPROVE)
 
-Clean up while tests stay green. Apply rules from pre-flight (e.g., `rules/java/coding-style.md` immutability, `rules/java/reactive.md` no-block).
+Clean up while tests stay green. Apply ALL applicable rules from pre-flight:
+- `rules/java/code-review-core.md` — CORE-* foundation (always for Java)
+- `rules/java/code-review-mvc.md` — MVC-* (if MVC stack)
+- `rules/java/code-review-reactor.md` — RX-* (if reactive)
+- `rules/java/code-review-webflux.md` — WFL-* (if WebFlux)
+- `rules/java/code-review-crosscut.md` — XCT-*
+- `rules/java/code-review-jackson.md` — JKS-* (if Jackson — DTO/ObjectMapper/@JsonProperty)
+
+**Self-check before declaring done — verify against rule IDs:**
+
+Always (any Java):
+- `CORE-NUM-001` — no `double`/`float` for money? BigDecimal only?
+- `CORE-LOG-002` — no sensitive data (password, OTP, full PAN, CVV, JWT) in logs?
+- `CORE-EXC-004` — service boundary wraps `IOException`/`SQLException` to business exception?
+- `CORE-API-001` — method ≤ 50 LOC, class ≤ 400 LOC?
+
+MVC:
+- `MVC-TX-001` — no HTTP call inside `@Transactional`?
+- `MVC-TX-002` — Kafka publish uses outbox pattern (same TX as DB)?
+- `MVC-VAL-001` — `@Valid` on `@RequestBody`?
+- `MVC-REP-004` — N+1 query check (fetch join / entity graph)?
+
+Reactive:
+- `RX-FND-001` — no `.block()` in reactive chain?
+- `RX-OPS-002` — `switchIfEmpty(Mono.defer(...))` not direct `Mono.error()`?
+- `WFL-WC-002` — explicit timeouts on `WebClient`?
+
+Jackson (if DTO/ObjectMapper touched):
+- `JKS-OBJ-001` — no `new ObjectMapper()` in service body? Injected from Spring?
+- `JKS-MOD-001` — `JavaTimeModule` registered if using `java.time.*`?
+- `JKS-MNY-001` — BigDecimal serialized as string (`@JsonFormat(shape = STRING)` or `WRITE_BIGDECIMAL_AS_PLAIN`)?
+- `JKS-POL-002`/`JKS-POL-003` — no `JsonTypeInfo.Id.CLASS`, no `enableDefaultTyping()` (RCE)?
+- `JKS-ANN-003` — passwords/secrets `@JsonIgnore` or `WRITE_ONLY`?
+- `JKS-PRF-002` — `TypeReference` for generic deserialize?
+
+Cross-cutting:
+- `XCT-IDM-001` — idempotency-key for mutation endpoint?
+
+Fix violations before moving to next scenario.
 
 ### 6. Verify coverage
 
@@ -204,9 +251,25 @@ Load `testing-workflow` skill — code patterns, mock setups, verification pipel
 **Tests added:** <count> (passing)
 **Coverage delta:** <before %> → <after %>
 **Skills applied:** <from pre-flight APPLY list>
-**Rules applied:** <from pre-flight APPLY list>
+**Rules applied:** <from pre-flight APPLY list — list every code-review-*.md loaded>
+**Rule IDs enforced (REFACTOR self-check):**
+- ✅ CORE-NUM-001 — BigDecimal for money
+- ✅ CORE-LOG-002 — no sensitive data in logs
+- ✅ MVC-TX-001 — no HTTP in @Transactional
+- ✅ RX-FND-001 — no .block()
+- (list IDs verified clean for this slice)
 **Deviations from spec:** <if any, why>
-**Open issues:** <if any, severity>
+**Open issues:** <if any, with severity P0-P4 + rule ID>
+- [P2][XCT-TST-005] missing contract test for payment-service consumer — follow-up ticket
+```
+
+Cite rule IDs in commit message body (orchestrator drives commit, but body comes from your report):
+```
+Implement order-create endpoint
+
+Rules applied: CORE-NUM-001 (BigDecimal), MVC-TX-002 (outbox), MVC-VAL-001 (@Valid),
+WFL-WC-002 (WebClient timeouts), XCT-IDM-001 (idempotency-key).
+Coverage: 85%.
 ```
 
 ## After all slices complete
@@ -225,4 +288,11 @@ Orchestrator aggregates results, then:
 - `skills/bootstrap/SKILL.md §"Worktree per slice"` — isolation mechanism (high-stakes auto)
 - `skills/testing-workflow/SKILL.md` — TDD patterns, code samples
 - `commands/build.md` — `/build` entry point
+- `rules/java/code-review-core.md` — CORE-* (REFACTOR self-check)
+- `rules/java/code-review-mvc.md` — MVC-*
+- `rules/java/code-review-reactor.md` — RX-*
+- `rules/java/code-review-webflux.md` — WFL-*
+- `rules/java/code-review-crosscut.md` — XCT-* + severity
+- `rules/java/code-review-jackson.md` — JKS-* (Jackson DTO/ObjectMapper)
+- `skills/coding-standards/SKILL.md` — unified enforcement entry
 - `rules/java/reactive.md` — no-`.block()` enforcement

@@ -93,6 +93,14 @@ return Mono.deferContextual(ctx -> {
 
 ## Related
 
+- `rules/java/code-review-reactor.md` — `RX-*` full catalog:
+  - `RX-FND-001` no .block() · `RX-FND-002` Mono.fromCallable · `RX-FND-003` hot vs cold
+  - `RX-OPS-001..004` flatMap/switchIfEmpty/error operators/then
+  - `RX-SCH-001..003` subscribeOn vs publishOn, scheduler choice
+  - `RX-CTX-001` Reactor Context for MDC · `RX-CTX-002` ReactiveSecurityContextHolder
+  - `RX-SUB-001..002` subscription lifecycle · `RX-PIT-001..005` common pitfalls
+  - `RX-TST-001..003` StepVerifier, VirtualTimeScheduler, TestPublisher
+- `rules/java/code-review-webflux.md` — `WFL-*` WebFlux-specific (uses Reactor)
 - `rules/java/coding-style.md` — error handling, imports
 - `rules/java/security.md` — reactive security filters
 - `skills/spring-webflux-patterns` — WebFlux deep dive

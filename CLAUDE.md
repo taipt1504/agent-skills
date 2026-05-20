@@ -104,6 +104,12 @@ After BUILD: VERIFY runs automatically → if fail, verify/fix loop retries → 
 12. **Slice-executor executing against plan/spec missing required sections** → FORBIDDEN. Subagent refuses, routes back to planner/spec-writer.
 13. **Cross-cutting override in spec slice without ADR** → FORBIDDEN. Spec index §1 (auth/logging/error envelope/idempotency/perf) is AUTHORITATIVE. Slice override requires ADR + explicit §"Cross-cutting override" block.
 14. **`/build` dispatching when split plan/spec status is `PARTIALLY_APPROVED`** → FORBIDDEN. Full feature approval required (all slices APPROVED + index APPROVED) before any slice dispatched.
+15. **Code review finding without rule ID citation** → FORBIDDEN. Stage 2 reviewer MUST cite rule ID from `rules/java/code-review-*.md` per finding (`[<P0-P4>][<RULE-ID>]` e.g. `[P0][CORE-NUM-001]`, `[P0][JKS-POL-002]`, `[P1][MVC-TX-002]`). Findings without rule ID = invalid, orchestrator rejects output and re-dispatches reviewer. P4 nits may omit rule ID. Unknown ID not in catalog → mark `[NEW-RULE]`, route to evolve-rules.
+16. **Slice-executor declaring slice done without applying code-review rules during REFACTOR** → FORBIDDEN. REFACTOR step MUST self-check against critical rule IDs across all 6 rule sets (CORE/MVC/RX/WFL/XCT/JKS): CORE-NUM-001, CORE-LOG-002, CORE-EXC-004, CORE-API-001, MVC-TX-001, MVC-TX-002, MVC-VAL-001, MVC-REP-004, RX-FND-001, RX-OPS-002, WFL-WC-002, JKS-OBJ-001, JKS-MOD-001, JKS-MNY-001, JKS-POL-002, JKS-POL-003, JKS-ANN-003, JKS-PRF-002, XCT-IDM-001. Cite enforced IDs in result report.
+17. **Jackson polymorphic deserialization without explicit whitelist** → FORBIDDEN. `@JsonTypeInfo(use = Id.CLASS)` (JKS-POL-002) and `enableDefaultTyping()` without `PolymorphicTypeValidator` (JKS-POL-003) = RCE vulnerability (CVE-2017-7525 class). Use `Id.NAME` + `@JsonSubTypes` whitelist.
+18. **BigDecimal serialized as JSON number for money** → FORBIDDEN in fintech context. `@JsonFormat(shape = JsonFormat.Shape.STRING)` on BigDecimal field, or global `WRITE_BIGDECIMAL_AS_PLAIN`. Citation: JKS-MNY-001 (P0).
+19. **Plugin version bumped without syncing all 3 sources** → FORBIDDEN. `.claude-plugin/plugin.json` (canonical), `package.json`, `.claude-plugin/marketplace.json` `plugins[0].version` MUST agree. Run `bash scripts/ci/validate-version-sync.sh` before declaring release done. Detail: `rules/common/version-sync.md`.
+20. **Hardcoded version banner in user-facing script** → FORBIDDEN. Scripts MUST read version dynamically from `.claude-plugin/plugin.json` (e.g. via `$PLUGIN_VERSION` variable). Per-script header comments (`# script.sh (v3.2)`) are NOT user-visible and exempt.
 
 ## Always
 
@@ -121,6 +127,10 @@ After BUILD: VERIFY runs automatically → if fail, verify/fix loop retries → 
 12. **Validate template conformance** before user approval: `bash scripts/ci/validate-plan-spec-templates.sh --plan <path> --spec <path>` (path is `.md` for single-file, directory for split)
 13. **Split shape: cross-cutting in `spec_index §1` is AUTHORITATIVE** — slices reference, never override w/o ADR
 14. **Split shape: `/build` requires full approval** — all slices + indices APPROVED, NOT PARTIALLY_APPROVED
+15. **Code review rule ID citation mandatory** — every Stage 2 finding tagged `[<P0-P4>][<RULE-ID>]`. Rule IDs from `rules/java/code-review-{core,mvc,reactor,webflux,crosscut,jackson}.md`. Catalog: `rules/java/code-review-crosscut.md §8` + jackson §17.
+16. **REFACTOR step self-checks code-review rules** — slice-executor verifies critical IDs (CORE-NUM-001, CORE-LOG-002, MVC-TX-001/002, RX-FND-001, WFL-WC-002, JKS-OBJ-001/MOD-001/MNY-001/POL-002/POL-003/ANN-003, XCT-IDM-001) before reporting slice done.
+17. **Unified code-review skill** — `skills/coding-standards/SKILL.md` (aka code-review) loads all 6 rule sets (CORE/MVC/RX/WFL/XCT/JKS) and enforces rule ID citation. Always loaded for Java tasks.
+18. **Plugin version is single-source** — `.claude-plugin/plugin.json` `version` is canonical. `package.json` + `.claude-plugin/marketplace.json` `plugins[0].version` mirror it. User-facing scripts (banner, log) read dynamically — never hardcode. Validator: `scripts/ci/validate-version-sync.sh` (wired into `run-all.sh`).
 
 ## Harness Awareness
 

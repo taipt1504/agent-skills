@@ -108,6 +108,12 @@ Contract tests catch breaking changes at build time — not in production.
 - **slice-executor** — Use PROACTIVELY for new features; enforces TDD (write-tests-first)
 - **slice-executor** — Use after API implementation; E2E + blackbox testing specialist
 
+## Related Rules
+
+- `rules/java/code-review-crosscut.md` — `XCT-TST-001..005` test pyramid · slice tests · Testcontainers · contract tests · don't-mock-classes-you-don't-own
+- `rules/java/code-review-reactor.md` — `RX-TST-001..003` StepVerifier · VirtualTimeScheduler · TestPublisher · `RX-PIT-005` no .block() in test
+- `rules/java/code-review-jackson.md` — `JKS-TST-001..004` `@JsonTest` · round-trip · backward compat · golden file
+
 ## Related Skills
 
 - **testing-workflow** — Full TDD patterns, verification pipeline, StepVerifier examples

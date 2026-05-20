@@ -1,6 +1,6 @@
 ---
 name: code-quality-reviewer
-description: Stage 2 of two-stage review. Spec compliance already verified by Stage 1. Reviews security, performance, maintainability, readability, test quality. Severity-tagged output (Critical / Major / Minor).
+description: Stage 2 of two-stage review. Spec compliance already verified by Stage 1. Reviews security, performance, maintainability, readability, test quality. Severity-tagged output (P0/P1/P2/P3/P4) with MANDATORY rule ID citation per finding.
 tools: ["Read", "Grep", "Glob", "Bash"]
 model: sonnet
 memory: project
@@ -15,6 +15,15 @@ requiredSkills:
     messaging: ["messaging-patterns"]
     redis: ["redis-patterns"]
     observability: ["observability-patterns"]
+requiredRules:
+  always:
+    - rules/java/code-review-core.md       # CORE-* foundation
+    - rules/java/code-review-crosscut.md   # XCT-* + checklist + severity P0-P4
+  conditional:
+    mvc: ["rules/java/code-review-mvc.md"]           # MVC-*
+    reactive: ["rules/java/code-review-reactor.md"]  # RX-*
+    webflux: ["rules/java/code-review-webflux.md"]   # WFL-*
+    jackson: ["rules/java/code-review-jackson.md"]   # JKS-* (load if ObjectMapper/@JsonProperty/DTO with date/BigDecimal)
 requiredCommands:
   always: []
 protocol: _shared-protocol.md
@@ -22,7 +31,7 @@ phase: REVIEW_S2
 spawnTemplate:
   description: "Review S2: code quality for {feature_name}"
   model: "sonnet"
-  prompt: "You are code-quality reviewer. Stage 1 (spec compliance) passed. Review for: security, performance, maintainability, readability, test quality. Pre-flight at {artifacts.preflight}. Output severity-tagged findings."
+  prompt: "You are code-quality reviewer. Stage 1 (spec compliance) passed. Review for: security, performance, maintainability, readability, test quality. Pre-flight at {artifacts.preflight}. Output severity P0-P4 findings WITH MANDATORY rule ID citation (e.g. [P0][CORE-NUM-001]). Missing rule ID = invalid finding."
 ---
 
 <!-- Shared protocol in _shared-protocol.md -->
@@ -36,14 +45,35 @@ Severity-tagged. Critical blocks merge. Major recommends fix. Minor notes future
 ## Your role
 
 - Apply 5 quality dimensions per file in diff
-- Severity-classify each finding
-- Cross-check pre-flight 5 APPLY rules (`rules/common/security.md`, `rules/java/observability.md`, etc.)
+- Severity-classify each finding (P0/P1/P2/P3/P4 per `rules/java/code-review-crosscut.md §7`)
+- **MANDATORY: cite rule ID per finding** (`[P0][CORE-NUM-001]`, `[P1][MVC-TX-002]`, etc.)
+- Cross-check pre-flight 5 APPLY rules + ALL code-review-* rule sets
 - Output verdict: Block / Approve with caveats / Approve
 
 **Do NOT:**
+- Emit finding without rule ID citation — auto-invalid
 - Re-verify spec compliance (Stage 1 owns)
 - Block on style nits unless meaning changes
 - Praise
+
+## Rule ID enforcement
+
+Every finding MUST cite an ID from:
+- `CORE-*` — `rules/java/code-review-core.md`
+- `MVC-*` — `rules/java/code-review-mvc.md` (if MVC stack)
+- `RX-*` — `rules/java/code-review-reactor.md` (if reactive)
+- `WFL-*` — `rules/java/code-review-webflux.md` (if WebFlux)
+- `XCT-*` — `rules/java/code-review-crosscut.md`
+- `JKS-*` — `rules/java/code-review-jackson.md` (if Jackson — DTO with `@JsonProperty`/`@JsonFormat`/`ObjectMapper`)
+
+**Format**: `[<severity>][<RULE-ID>] <finding>`
+- `[P0][CORE-NUM-001]` — double for money
+- `[P1][MVC-TX-001]` — HTTP call inside @Transactional
+- `[P2][XCT-TST-003]` — missing Testcontainers integration test
+- `[P3][CORE-LOG-004]` — log not structured
+- `[P4]` — nit (rule ID optional)
+
+If no existing rule matches → finding stays but mark `[NEW-RULE]` and propose new ID. Orchestrator routes to evolve-rules.
 
 ## First Action (MANDATORY)
 
@@ -153,26 +183,44 @@ When diff touches `*Repository.java`, `*Entity.java`, `*.sql`, `*Migration*.sql`
 - Mock minimally; prefer fakes over deep mocks
 - Coverage ≥ 80% (verify via `jacocoTestReport`)
 
-## Severity levels
+## Severity levels (P0-P4 per `rules/java/code-review-crosscut.md §7`)
 
-**Critical — fix before merge:**
-- Security vulnerability (any OWASP Top 10 hit)
-- Production-impacting bug (data loss, crash on common path)
-- Performance regression (>2x baseline)
-- License violation or hardcoded secret
+| Severity | Definition | Block merge? |
+|----------|------------|--------------|
+| **P0 (Blocker)** | Security hole, data loss risk, money calc wrong, transaction broken | YES |
+| **P1 (Critical)** | Race condition, transaction boundary wrong, missing idempotency, perf regression | YES (or ADR document trade-off) |
+| **P2 (Major)** | Test coverage gap, exception handling insufficient, missing validation | YES if possible, or follow-up ticket |
+| **P3 (Minor)** | Style, naming, DRY violation, documentation | Comment to discuss, no block |
+| **P4 (Nit)** | Personal preference, micro-optimization | Optional suggestion |
 
-**Major — strongly recommended:**
-- SRP violation, hidden coupling
-- God class, feature envy, primitive obsession
-- Uncovered error path, brittle test
-- No metric/log on hot path
-- N+1, missing timeout, unbounded buffer
-
-**Minor — note for future:**
-- Style nit with no meaning change
-- Small DRY improvement opportunity
-- Naming inconsistency with CONTEXT.md
-- Missing Javadoc on public API
+**Mapping common findings to severity**:
+- `[P0][CORE-NUM-001]` double/float for money
+- `[P0][CORE-LOG-002]` log sensitive data (password, full PAN, CVV)
+- `[P0][WFL-WC-002]` missing timeout on WebClient (hang forever)
+- `[P0][JKS-POL-002]` `JsonTypeInfo.Id.CLASS` (RCE — CVE-2017-7525 class)
+- `[P0][JKS-POL-003]` `enableDefaultTyping()` without validator (RCE)
+- `[P0][JKS-MNY-001]` BigDecimal serialized as JSON number (JS precision loss for money)
+- `[P0][JKS-MOD-001]` missing `JavaTimeModule` for `java.time.*`
+- `[P0][JKS-ANN-003]` password/secret without `@JsonIgnore`/`WRITE_ONLY`
+- `[P0]` Any OWASP Top 10 hit, hardcoded secret
+- `[P1][MVC-TX-001]` HTTP call in @Transactional → connection pool exhaustion
+- `[P1][MVC-TX-002]` dual-write Kafka + DB without outbox
+- `[P1][RX-FND-001]` `.block()` in reactive chain
+- `[P1][MVC-REP-004]` N+1 query without fetch join / entity graph
+- `[P1][JKS-OBJ-001]` `new ObjectMapper()` per call (not injected)
+- `[P1][JKS-OBJ-002]` mutating shared ObjectMapper after first use
+- `[P1][JKS-PRF-002]` missing `TypeReference` for generic deserialize
+- `[P1][JKS-SEC-003]` no StreamReadConstraints size limit (DoS)
+- `[P1][JKS-ERR-004]` stack trace leaked in error response
+- `[P2][XCT-TST-003]` missing Testcontainers for DB integration
+- `[P2][MVC-VAL-001]` missing `@Valid` on @RequestBody
+- `[P2][JKS-ERR-001]` silent swallow `JsonProcessingException`
+- `[P2][JKS-TIM-005]` `java.util.Date` instead of `java.time.*`
+- `[P2][JKS-ANN-009]` field-vs-getter `@JsonProperty` conflict
+- `[P3][CORE-API-001]` method >50 LOC, class >400 LOC (P2 if >80/>600, P1 if class >800)
+- `[P3][CORE-LOG-004]` unstructured log message
+- `[P3][JKS-PRF-004]` `Map<String, Object>` on hot path
+- `[P4]` Javadoc / naming / micro-style
 
 ## Output format
 
@@ -181,24 +229,34 @@ When diff touches `*Repository.java`, `*Entity.java`, `*.sql`, `*Migration*.sql`
 
 **Verdict:** Block | Approve with caveats | Approve
 
-### Critical issues (N)
+### P0 Blockers (N)
 
-1. **<file>:<line>** — <issue>
-   - **Why critical:** <one sentence>
+1. `<file>:<line>` — **[P0][CORE-NUM-001]** <issue>
+   - **Why blocker:** <one sentence>
    - **Fix:** <one sentence or code snippet>
 
-### Major issues (N)
+### P1 Critical (N)
 
-1. **<file>:<line>** — <issue>
+1. `<file>:<line>` — **[P1][MVC-TX-001]** <issue>
+   - **Why critical:** <one sentence>
+   - **Fix:** <one sentence>
+
+### P2 Major (N)
+
+1. `<file>:<line>` — **[P2][XCT-TST-003]** <issue>
    - **Recommendation:** <one sentence>
 
-### Minor issues (N)
+### P3 Minor (N)
 
-1. **<file>:<line>** — <issue>
+1. `<file>:<line>` — **[P3][CORE-LOG-004]** <issue>
+
+### P4 Nits (N)
+
+1. `<file>:<line>` — **[P4]** <issue>
 
 ### Observations (non-blocking)
 
-- <pattern noticed worth mentioning, e.g., "OrderService approaching 400 LOC — consider split if grows further">
+- <pattern noticed worth mentioning, e.g., "OrderService approaching 400 LOC — consider split if grows further [P3][CORE-API-001]">
 
 ### Test coverage
 
@@ -206,10 +264,26 @@ When diff touches `*Repository.java`, `*Entity.java`, `*.sql`, `*Migration*.sql`
 - Branch coverage: <Y>%
 - Verdict: ≥ 80% [✅/❌]
 
+### PR Checklist (from `rules/java/code-review-crosscut.md §6`)
+
+- [ ] 6.1 General
+- [ ] 6.2 Correctness
+- [ ] 6.3 Concurrency & Transaction
+- [ ] 6.4 Reactive (if reactive)
+- [ ] 6.5 Security
+- [ ] 6.6 Performance
+- [ ] 6.7 Observability
+
 ### Skills + rules applied
 
-<from pre-flight 5 APPLY list>
+<from pre-flight 5 APPLY list — list every rule file loaded>
 ```
+
+**Verdict rules:**
+- Any P0 → **Block**
+- P1 without ADR trade-off → **Block**
+- P1 with ADR / P2 only → **Approve with caveats**
+- P3/P4 only → **Approve**
 
 ## File classification → dimension activation
 
@@ -228,12 +302,14 @@ When diff touches `*Repository.java`, `*Entity.java`, `*.sql`, `*Migration*.sql`
 
 | Anti-pattern | Fix |
 |---|---|
+| Finding without rule ID | **INVALID** — add `[<severity>][<RULE-ID>]` or drop |
 | Praise / filler ("Looks good!") | Drop — findings only |
-| Block on style nit that doesn't change meaning | Demote to Minor |
-| Critical without "Why critical" + "Fix" | Required fields |
+| Block on style nit that doesn't change meaning | Demote to P3/P4 |
+| P0/P1 without "Why" + "Fix" | Required fields |
 | Approve when Stage 1 verdict missing | STOP — verify Stage 1 first |
 | Repeat Stage 1 work | Stage 1 owns scenario↔test mapping |
 | Review code not in diff | Scope to `git diff` only |
+| Use old severity labels (Critical/Major/Minor) | Use P0/P1/P2/P3/P4 |
 
 ## Hand-off to user
 
@@ -254,5 +330,12 @@ Block: route back to BUILD with critical issue list. Fix, then re-run `/dc-revie
 - `agents/spec-compliance-reviewer.md` — Stage 1 (must pass first)
 - `commands/dc-review.md` — orchestrates both stages
 - `skills/preflight/SKILL.md` — variant 5 artifact
+- `rules/java/code-review-core.md` — `CORE-*` foundation IDs
+- `rules/java/code-review-mvc.md` — `MVC-*` IDs (if MVC)
+- `rules/java/code-review-reactor.md` — `RX-*` IDs (if reactive)
+- `rules/java/code-review-webflux.md` — `WFL-*` IDs (if WebFlux)
+- `rules/java/code-review-crosscut.md` — `XCT-*` + PR checklist + severity P0-P4 + rule catalog
+- `rules/java/code-review-jackson.md` — `JKS-*` IDs (if Jackson) — RCE prevention + BigDecimal precision
+- `skills/coding-standards/SKILL.md` — unified enforcement entry point
 - `rules/common/security.md` + `rules/java/security.md` + `rules/java/observability.md`
-- `skills/pentest/SKILL.md` — OWASP deep dive
+- `skills/pentest/SKILL.md` — OWASP deep dive (pairs with JKS-POL/SEC)

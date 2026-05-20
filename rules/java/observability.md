@@ -83,6 +83,12 @@ Threshold alerting ("alert if latency > 500ms") causes alert fatigue, misses gra
 - Alert on **burn rate** — how fast error budget is consumed
 - Multi-window alerting to reduce false positives (short window for fast alerts + long window for confirmation)
 
+## Related Rules
+
+- `rules/java/code-review-core.md` — `CORE-LOG-001` SLF4J parameterized · `CORE-LOG-002` no sensitive data · `CORE-LOG-003` log levels · `CORE-LOG-004` structured logging · `CORE-LOG-005` MDC correlation
+- `rules/java/code-review-crosscut.md` — `XCT-OBS-001` Micrometer metrics · `XCT-OBS-002` OpenTelemetry tracing · `XCT-OBS-003` health checks
+- `rules/java/code-review-reactor.md` — `RX-CTX-001` Reactor Context for MDC propagation
+
 ## Related Skills
 
 - **observability-patterns** — Full Logback config, reactive MDC propagation, Micrometer auto-instrumentation, Prometheus config

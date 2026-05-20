@@ -14,8 +14,8 @@
       "name": "devco-agent-skills",
       "source": "./",
       "npmPackage": "@devco/agent-skills",
-      "description": "Adaptive 5-layer workflow plugin for Java Spring backend — 31+ skills, 9 agents, 17 commands, 14 rules (common + java split), 22 hooks. Triage routing, pre-flight discovery, subagent dispatch, two-stage review, auto-evolution.",
-      "version": "4.0.0-beta",
+      "description": "Adaptive 5-layer workflow plugin for Java Spring backend — 28 skills, 8 agents, 16 commands, 24 rules (8 common + 13 java incl. 6 code-review + 3 summer conditional), 20 hooks. Triage routing, pre-flight discovery, subagent dispatch, two-stage review with rule-ID citation, auto-evolution.",
+      "version": "4.0.1",
       "author": {
         "name": "TaiPT",
         "email": "taipt1504@gmail.com"

@@ -1,13 +1,23 @@
 # Java Patterns Reference
 
-Immutability, null safety, concurrency, collections, and streams.
+Immutability, null safety, concurrency, collections, streams. Each pattern paired with code review rule IDs from `rules/java/code-review-*.md`.
 
 ## Table of Contents
-- [Immutability](#immutability)
-- [Null Safety](#null-safety)
-- [Concurrency](#concurrency)
-- [Collections](#collections)
-- [Streams & Functional](#streams--functional)
+- [Immutability](#immutability) — pairs with `CORE-IMM-*`, `CORE-EQH-003`
+- [Null Safety](#null-safety) — pairs with `CORE-NUL-*`
+- [Concurrency](#concurrency) — pairs with `CORE-CON-*`
+- [Collections](#collections) — pairs with `CORE-COL-*`
+- [Streams & Functional](#streams--functional) — pairs with `CORE-COL-002..005`
+
+## Rule citation reminder
+
+Every code review finding cites format `[<P0-P4>][<RULE-ID>]`. Rule IDs come from:
+- `rules/java/code-review-core.md` — `CORE-*` (always for Java)
+- `rules/java/code-review-mvc.md` — `MVC-*` (servlet stack)
+- `rules/java/code-review-reactor.md` — `RX-*` (reactive)
+- `rules/java/code-review-webflux.md` — `WFL-*` (WebFlux)
+- `rules/java/code-review-crosscut.md` — `XCT-*` + PR checklist + severity P0-P4 + full catalog
+- `rules/java/code-review-jackson.md` — `JKS-*` (Jackson DTO/ObjectMapper)
 
 ---
 
@@ -264,3 +274,39 @@ users.forEach(this::process);  // simpler than stream().forEach()
 
 Use when: >10K elements, CPU-intensive, independent ops, order doesn't matter.
 Avoid when: small data, I/O-bound, side effects, inside reactive code.
+Rule: `CORE-COL-003` — benchmark before using parallel.
+
+---
+
+## Pattern → Rule ID Map (review reference)
+
+| Pattern in this doc | Matching rule IDs |
+|---|---|
+| Records with validation | `CORE-EQH-003`, `JKS-REC-001`, `JKS-REC-002` |
+| `Objects.requireNonNull` at boundary | `CORE-NUL-004` |
+| Immutable collections (`List.of`/`copyOf`) | `CORE-IMM-002`, `CORE-COL-004` |
+| Final fields by default | `CORE-IMM-001` |
+| Defensive copies | `CORE-IMM-002` |
+| Optional return only (not field/param) | `CORE-NUL-002` |
+| Atomic + ConcurrentHashMap | `CORE-CON-001`, `CORE-CON-002` |
+| `computeIfAbsent` | `CORE-COL-001` |
+| Filter early in streams | (no specific ID — best practice) |
+| Primitive streams | `CORE-COL-005` (refactor when complex) |
+| `Collectors.toUnmodifiableList()` | `CORE-COL-004` |
+| `parallelStream()` discipline | `CORE-COL-003` |
+| `@JsonFormat(shape = STRING)` for BigDecimal | `JKS-MNY-001` (P0 fintech) |
+| `JavaTimeModule` registered | `JKS-MOD-001` (P0) |
+| No `@JsonTypeInfo(Id.CLASS)` | `JKS-POL-002` (P0 RCE) |
+| No `enableDefaultTyping()` without validator | `JKS-POL-003` (P0 RCE) |
+| Password `@JsonIgnore` / `WRITE_ONLY` | `JKS-ANN-003` (P0) |
+| Inject ObjectMapper from Spring | `JKS-OBJ-001` (P1) |
+| `TypeReference` for generic deser | `JKS-PRF-002` (P1) |
+| `@JsonAlias` for backward compat | `JKS-ANN-008`, `JKS-VER-001` |
+| Record + Bean Validation | `JKS-REC-003` |
+| `@JsonTest` slice | `JKS-TST-001` |
+
+## Related rule files
+
+- `rules/java/code-review-core.md` — CORE-* full bodies (null/equality/money/exceptions/concurrency/logging)
+- `rules/java/code-review-jackson.md` — JKS-* full bodies (Jackson serialization + RCE prevention)
+- `rules/java/code-review-crosscut.md §8` — full rule ID catalog

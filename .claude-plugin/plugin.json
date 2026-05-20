@@ -1,6 +1,6 @@
 {
   "name": "devco-agent-skills",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Adaptive 5-layer workflow Claude Code plugin for Java Spring backend — 1% pre-flight discovery, triage routing, two-stage review, subagent dispatch, auto-evolution",
   "author": {
     "name": "TaiPT",

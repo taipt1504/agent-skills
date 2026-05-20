@@ -210,6 +210,10 @@ Otherwise → typed record + `@WireMockTest`.
 
 ## Related Rules
 
+- `rules/java/code-review-mvc.md` — `MVC-CTL-001..005` controller patterns · `MVC-VAL-001..003` validation · `MVC-RSP-001..002` DTO + error envelope · `MVC-EXC-001..003` exception handling
+- `rules/java/code-review-webflux.md` — `WFL-CTL-001..002` reactive controller · `WFL-WC-001..005` WebClient · `WFL-EXC-001..002` reactive error handling
+- `rules/java/code-review-crosscut.md` — `XCT-IDM-001` idempotency-key · `XCT-DOC-001` Javadoc public API
+- `rules/java/code-review-jackson.md` — `JKS-ANN-001..009` annotations · `JKS-REC-003` record + `@Valid` · `JKS-VER-001..003` API versioning · `JKS-ERR-004` no stack trace in error
 - `rules/java/coding-style.md` — DTO typing (records, Lombok)
 - `rules/java/testing.md` — `@WireMockTest` for typed client methods
 - `rules/summer/handler-api-standards.md` (Summer-only) — SpringBus dispatch, PageResponse

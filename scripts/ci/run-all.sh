@@ -45,6 +45,7 @@ run_validator "Command Files"     "$SCRIPT_DIR/validate-commands.sh"
 run_validator "Hook Configuration" "$SCRIPT_DIR/validate-hooks.sh"
 run_validator "Skill Trigger Coverage" "$SCRIPT_DIR/validate-skill-triggers.sh"
 run_validator "Plan/Spec Template Conformance" "$SCRIPT_DIR/validate-plan-spec-templates.sh" "--all"
+run_validator "Version Sync" "$SCRIPT_DIR/validate-version-sync.sh"
 # Non-interactive integration test (opt-in: SKIP_NONINTERACTIVE=0)
 run_validator "Non-Interactive Mode" "$SCRIPT_DIR/test-non-interactive.sh"
 

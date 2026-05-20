@@ -68,6 +68,13 @@ WebClient.builder()
 
 ## Related
 
+- `rules/java/code-review-core.md` — `CORE-*` rule catalog (full bodies):
+  - `CORE-NUL` null handling · `CORE-EQH` equality · `CORE-NUM` BigDecimal/money · `CORE-EXC` exceptions
+  - `CORE-RES` AutoCloseable · `CORE-IMM` immutability · `CORE-COL` collections · `CORE-CON` concurrency
+  - `CORE-LOG` SLF4J + MDC + masking · `CORE-API` method/param/builder
+- `rules/java/code-review-mvc.md` — `MVC-CFG-001` (`@ConfigurationProperties` over `@Value`)
+- `rules/java/code-review-jackson.md` — `JKS-REC-001..004` records + Jackson · `JKS-ANN-006` `@JsonCreator` constructor · `JKS-MNY-001` BigDecimal as string · `JKS-OBJ-001` inject ObjectMapper (not new)
 - `rules/java/reactive.md` — no .block(), backpressure
 - `rules/java/api-design.md` — REST conventions
+- `skills/coding-standards/SKILL.md` — unified code-review enforcement
 - `skills/spring-webflux-patterns` / `skills/spring-mvc-patterns`

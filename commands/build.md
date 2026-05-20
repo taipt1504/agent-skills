@@ -239,14 +239,26 @@ Test still fails → debug and fix before moving on.
 
 ### Phase 3: REFACTOR (Clean Up)
 
-1. Review for:
-   - Method length (max 50 lines)
-   - Class length (max 400 lines, 800 absolute max)
-   - Nesting depth (max 4 levels)
-   - Duplicate code
-   - Naming clarity
-2. Refactor while keeping all tests green
-3. Run full test suite
+1. Apply ALL rules/java/code-review-*.md applicable to this slice (CORE/MVC/RX/WFL/XCT/JKS). Self-check critical IDs:
+   - `[CORE-NUM-001]` — no `double`/`float` for money?
+   - `[CORE-LOG-002]` — no sensitive data (password, OTP, full PAN, CVV, JWT) in logs?
+   - `[CORE-EXC-004]` — service boundary wraps technical exceptions to business exceptions?
+   - `[CORE-API-001]` — method ≤ 50 LOC, class ≤ 400 LOC?
+   - `[MVC-TX-001]` — no HTTP call inside `@Transactional`?
+   - `[MVC-TX-002]` — Kafka publish uses outbox pattern (same TX as DB)?
+   - `[MVC-VAL-001]` — `@Valid` on `@RequestBody`?
+   - `[RX-FND-001]` — no `.block()` in reactive chain?
+   - `[RX-OPS-002]` — `switchIfEmpty(Mono.defer(...))` not direct `Mono.error()`?
+   - `[WFL-WC-002]` — explicit timeouts on `WebClient`?
+   - `[JKS-OBJ-001]` — no `new ObjectMapper()` in service body? Inject from Spring?
+   - `[JKS-MOD-001]` — `JavaTimeModule` registered if using `java.time.*`?
+   - `[JKS-MNY-001]` — BigDecimal serialized as string (`@JsonFormat(shape = STRING)`)?
+   - `[JKS-POL-002]`/`[JKS-POL-003]` — no `JsonTypeInfo.Id.CLASS`, no `enableDefaultTyping()` (RCE)?
+   - `[JKS-ANN-003]` — passwords/secrets `@JsonIgnore` or `WRITE_ONLY`?
+   - `[XCT-IDM-001]` — idempotency-key for mutation endpoint?
+2. Method length (max 50 lines), class length (max 400, abs 800), nesting (max 4 levels), duplicate code, naming clarity
+3. Refactor while keeping all tests green
+4. Run full test suite
 
 ```bash
 ./gradlew test 2>&1 | tail -20
@@ -262,6 +274,7 @@ Include in each **slice-executor** subagent prompt:
 - **Hard blocks**: No `.block()` in src/main/. No git commit/push. No code without approved plan+spec.
 - **Fresh context**: Each slice-executor gets fresh context — pass skill and spec scenario explicitly
 - **Suggested skills**: `devco-agent-skills:testing-workflow` + domain-specific skill matching files touched (e.g., `devco-agent-skills:spring-webflux-patterns`, `devco-agent-skills:database-patterns`)
+- **Code review rules**: Subagent MUST load + apply ALL applicable `rules/java/code-review-*.md` during REFACTOR. Cite enforced rule IDs in result report (`CORE-NUM-001`, `MVC-TX-002`, etc.) — see `rules/java/code-review-crosscut.md §8` for full rule ID catalog.
 
 ## Skill Loading
 
